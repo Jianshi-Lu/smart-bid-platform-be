@@ -50,7 +50,11 @@ public class HelloService {
      * 注意：此方法接收 HttpServletResponse 是为了演示，实际推荐返回 URL 字符串给 Controller 处理
      * 这样 Service 层更纯粹，易于单元测试，不耦合 Servlet API
      */
-    public void custom(HttpServletResponse response) throws IOException {
+    public void accessUrl(HttpServletResponse response) throws IOException {
         response.sendRedirect(url);
+    }
+
+    public String fetchUrl() {
+        return url;
     }
 }

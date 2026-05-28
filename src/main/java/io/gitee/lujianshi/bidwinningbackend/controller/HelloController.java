@@ -4,6 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.service.HelloService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -48,8 +49,13 @@ public class HelloController {
      * 业务逻辑委托给 Service，返回目标 URL
      * Controller 负责 HTTP 层操作（sendRedirect）
      */
-    @GetMapping("/custom")
-    public void custom(HttpServletResponse response) throws IOException {
-        helloService.custom(response);
+    @GetMapping("/access-url")
+    public void accessUrl(HttpServletResponse response) throws IOException {
+        helloService.accessUrl(response);
+    }
+
+    @PostMapping("/fetch-url")
+    public String fetchUrl() {
+        return helloService.fetchUrl();
     }
 }
