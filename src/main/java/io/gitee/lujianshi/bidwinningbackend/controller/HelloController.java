@@ -55,7 +55,8 @@ public class HelloController {
     }
 
     @PostMapping("/fetch-url")
-    public String fetchUrl() {
-        return helloService.fetchUrl();
+    public void fetchUrl() {
+        helloService.fetchUrl();
+        helloService.fetchAfterDelay();
     }
 }

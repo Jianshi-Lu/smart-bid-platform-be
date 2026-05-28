@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,7 +14,7 @@ import java.io.IOException;
  *
  * 职责：
  * - 编写业务逻辑（与 web 层解耦）
- * - 无任何 @GetMapping 等路由注解
+ * - 无任何 @GetMapping 等web路由注解（不是不允许注解）
  * - 不直接操作 HttpServletResponse（Servlet API 属于 web 层）
  *
  * 配置注入：
@@ -54,7 +55,17 @@ public class HelloService {
         response.sendRedirect(url);
     }
 
-    public String fetchUrl() {
-        return url;
+    @Async
+    public void fetchAfterDelay() {
+        try {
+            Thread.sleep(3000);  // 睡眠3秒
+            System.out.println("获取地址成功");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void fetchUrl() {
+        System.out.println(url);
     }
 }
