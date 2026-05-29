@@ -21,6 +21,11 @@ import java.io.IOException;
  * 配置注入：
  * @Value("${key}") = 从 application.properties 读取配置值
  * 工作流程：Spring 启动时加载配置文件到 Environment → AutowiredAnnotationBeanPostProcessor 扫描 @Value → 从 Environment 取值注入
+ *
+ * @Async 注意事项：
+ * - @Async 靠 Spring AOP 代理实现，在新线程执行方法
+ * - 不能本类内部 this.method() 调用（会绕过 Spring 代理，导致 @Async 注解失效）
+ * - 当前 fetchAfterDelay() 内部又用 Thread 创建新线程，故仍能异步，但设计存在冗余
  */
 @Service
 public class HelloService {
@@ -29,6 +34,8 @@ public class HelloService {
      * @Value 注入配置值
      * Spring 启动时从 application.properties 读取 server.port=8079
      * 注意：字段不能是 static，必须是实例字段
+     *
+     * 原理：AutowiredAnnotationBeanPostProcessor 扫描 @Value → 从 Environment 取值注入
      */
     @Value("${server.port}")
     private int port;
@@ -49,22 +56,36 @@ public class HelloService {
 
     /**
      * 业务逻辑：提供重定向目标 URL
-     * 注意：此方法接收 HttpServletResponse 是为了演示，实际推荐返回 URL 字符串给 Controller 处理
+     * 此方法接收 HttpServletResponse 是为了演示，实际推荐返回 URL 字符串给 Controller 处理
      * 这样 Service 层更纯粹，易于单元测试，不耦合 Servlet API
      */
     public void accessUrl(HttpServletResponse response) throws IOException {
         response.sendRedirect(url);
     }
 
+    /**
+     * @Async 注解方法：异步延迟执行
+     *
+     * 注意：@Async 靠 Spring AOP 代理实现，在新线程执行方法
+     * 不能本类内部 this.fetchAfterDelay() 调用（会绕过 Spring 代理，导致 @Async 失效）
+     *
+     * 当前实现内部又用 AsyncTaskManager.execute() 创建新线程，故仍能异步，但双重异步设计冗余
+     * - 外层 @Async：Spring 代理在新线程执行 fetchAfterDelay() 方法体
+     * - 内层 Thread.sleep(3000)：在 fetchAfterDelay() 方法体内创建新线程延迟
+     *
+     * 两者取其一即可，当前保留以便未来灵活切换异步方案
+     */
     @Async
     public void fetchAfterDelay() {
-        AsyncTaskManager.execute(()-> {
+        AsyncTaskManager.execute(() -> {
             System.out.println("获取地址成功");
-            }, 3000
-        );
+        }, 3000);
     }
 
-
+    /**
+     * 业务逻辑：返回配置中的 URL
+     * @return custom.url 配置值
+     */
     public String fetchUrl() {
         return url;
     }

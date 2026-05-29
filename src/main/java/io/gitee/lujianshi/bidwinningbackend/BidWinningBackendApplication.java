@@ -12,11 +12,16 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * - @SpringBootApplication = @Configuration + @EnableAutoConfiguration + @ComponentScan
  *
  * 工作流程：
- * SpringApplication.run() → 创建嵌入式 Tomcat → 初始化 DispatcherServlet →
- * 扫描 @RestController → 注册 @GetMapping 到 URL 映射表 → 请求进来 → DispatcherServlet 查表路由
+ * SpringApplication.run() -> 创建嵌入式 Tomcat -> 初始化 DispatcherServlet ->
+ * 扫描 @RestController -> 注册 @GetMapping 到 URL 映射表 -> 请求进来 -> DispatcherServlet 查表路由
+ *
+ * @EnableAsync：开启异步支持后 @Async 注解才生效
+ * Spring 会创建异步代理，使标注了 @Async 的方法在独立线程中执行
+ *
+ * 注意：启动类本身也是 Bean，被 @Autowired 注入时可用
  */
 @SpringBootApplication
-@EnableAsync  // 开启异步支持
+@EnableAsync
 public class BidWinningBackendApplication {
 
     public static void main(String[] args) {

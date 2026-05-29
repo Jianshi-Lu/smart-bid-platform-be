@@ -15,7 +15,7 @@ import java.io.IOException;
  * @RestController = @Controller + @ResponseBody（所有方法返回对象序列化为 JSON/字符串，不走视图模板）
  *
  * 职责：
- * - 定义 URL 路由（@GetMapping）
+ * - 定义 URL 路由（@GetMapping / @PostMapping）
  * - 接收请求参数（可选）
  * - 调用 Service 处理业务逻辑
  * - 返回响应（Controller 决定如何包装返回值）
@@ -35,9 +35,11 @@ public class HelloController {
 
     /**
      * @GetMapping("/hello") = 绑定 URL 路径到方法
-     * 完整 URL = server.port（8080） + @GetMapping 路径
+     * 完整 URL = server.port（8079） + @GetMapping 路径
      * Spring Boot 启动时扫描所有 @RestController，将 @GetMapping 注册到 URL 映射表
      * 请求进来 → DispatcherServlet 查表 → 找到 hello() → 自动调用
+     *
+     * 返回 String 时 Spring 直接写入 HTTP Response Body（纯文本）
      */
     @GetMapping("/hello")
     public String hello() {
@@ -45,15 +47,21 @@ public class HelloController {
     }
 
     /**
-     * @GetMapping("/custom") 路由到百度重定向
+     * @GetMapping("/access-url") 路由到百度重定向
      * 业务逻辑委托给 Service，返回目标 URL
      * Controller 负责 HTTP 层操作（sendRedirect）
+     * Service 只返回 URL 字符串，Controller 调用 HttpServletResponse 执行重定向
      */
     @GetMapping("/access-url")
     public void accessUrl(HttpServletResponse response) throws IOException {
         helloService.accessUrl(response);
     }
 
+    /**
+     * @PostMapping("/fetch-url") POST 请求获取地址
+     * 调用 helloService.fetchAfterDelay() 触发异步任务（不等待）
+     * 调用 helloService.fetchUrl() 同步获取配置中的 URL 并立即返回
+     */
     @PostMapping("/fetch-url")
     public String fetchUrl() {
         helloService.fetchAfterDelay();
