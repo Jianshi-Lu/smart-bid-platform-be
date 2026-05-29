@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
+import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -57,15 +58,14 @@ public class HelloService {
 
     @Async
     public void fetchAfterDelay() {
-        try {
-            Thread.sleep(3000);  // 睡眠3秒
+        AsyncTaskManager.execute(()-> {
             System.out.println("获取地址成功");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+            }, 3000
+        );
     }
 
-    public void fetchUrl() {
-        System.out.println(url);
+
+    public String fetchUrl() {
+        return url;
     }
 }
