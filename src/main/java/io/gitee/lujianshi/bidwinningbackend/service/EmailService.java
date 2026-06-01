@@ -16,6 +16,16 @@ import org.springframework.stereotype.Service;
  * - 构建邮件消息
  * - 调用 JavaMailSender 发送邮件
  * - 发件人邮箱暂时固定为配置值（从 spring.mail.username 读取），后续可扩展为可配置
+ *
+ * 邮件发送完整链路（基于 EmailRequest DTO）：
+ * 1. Controller 调用 service.sendEmail(request)，传入 EmailRequest 对象
+ * 2. Service 用 request.getTo()、request.getSubject()、request.getContent() 获取数据
+ * 3. Service 创建 SimpleMailMessage 对象，调用 setTo()、setSubject()、setText() 赋值
+ * 4. Service 调用 mailSender.send(message) 发送
+ * 5. JavaMailSender 使用已配置的 SMTP 信息（host/port/username/password）与邮件服务器通信
+ * 6. 邮件服务器将邮件送达收件人
+ *
+ * 注：request.getFrom() 实际未使用，发件人固定为配置中的 spring.mail.username
  */
 @Service
 public class EmailService {

@@ -17,6 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
  * - 调用 EmailService 发送邮件
  *
  * 注意：不写业务逻辑，只负责路由和调用 Service
+ *
+ * 邮件发送完整链路：
+ * 1. Postman POST /send-email（form-data: to/subject/content）
+ * 2. Spring 根据 @PostMapping 找到此 Controller
+ * 3. Spring 自动将请求参数封装为 EmailRequest 对象（DTO）
+ * 4. Controller 调用 service.sendEmail(request)
+ * 5. 后续逻辑由 Service 层处理
  */
 @RestController
 public class EmailController {
