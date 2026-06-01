@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
-import io.gitee.lujianshi.bidwinningbackend.dto.NotificationRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.BidWinningMailRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
@@ -13,20 +13,20 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
  *
  * 功能：
  * - 读取 src/main/resources/templates/ 下的 Thymeleaf 模板
- * - 用 NotificationRequest 的数据填充模板，生成最终 HTML 字符串
+ * - 用 BidWinningMailRequest 的数据填充模板，生成最终 HTML 字符串
  *
  * Spring Boot 配置（ThymeleafAutoConfiguration）：
  * - 默认路径：classpath:/templates/
  * - 实际读取 classpath:/templates/bid-winning-notification.html（properties配置）
  */
 @Service
-public class TemplateService {
+public class BidWinningTemplateFiller {
 
     @Autowired
     private SpringTemplateEngine templateEngine;
 
     /**
-     * 处理模板：用 NotificationRequest 数据填充 Thymeleaf 模板
+     * 处理模板：用 BidWinningMailRequest 数据填充 Thymeleaf 模板
      *
      * Context 包说明（org.thymeleaf.context）：
      * - Context 是 Thymeleaf 的"模板数据容器"，封装了一个 Map + 一个 Locale
@@ -49,7 +49,7 @@ public class TemplateService {
      * @param request 通知请求对象（包含 to/from/subject/projectCode/handlerName）
      * @return 填充后的 HTML 字符串
      */
-    public String processTemplate(NotificationRequest request) {
+    public String processTemplate(BidWinningMailRequest request) {
         Context context = new Context();
         context.setVariable("projectCode", request.getProjectCode());
         context.setVariable("handlerName", request.getHandlerName());

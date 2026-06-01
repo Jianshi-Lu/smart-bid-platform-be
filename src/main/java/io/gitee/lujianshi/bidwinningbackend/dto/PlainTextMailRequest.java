@@ -26,7 +26,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class EmailRequest {
+public class PlainTextMailRequest {
     private String to;
     private String from;
     private String subject;

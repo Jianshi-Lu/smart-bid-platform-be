@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
-import io.gitee.lujianshi.bidwinningbackend.dto.EmailRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.PlainTextMailRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -17,8 +17,8 @@ import org.springframework.stereotype.Service;
  * - 调用 JavaMailSender 发送邮件
  * - 发件人邮箱暂时固定为配置值（从 spring.mail.username 读取），后续可扩展为可配置
  *
- * 邮件发送完整链路（基于 EmailRequest DTO）：
- * 1. Controller 调用 service.sendEmail(request)，传入 EmailRequest 对象
+ * 邮件发送完整链路（基于 PlainTextMailRequest DTO）：
+ * 1. Controller 调用 service.sendEmail(request)，传入 PlainTextMailRequest 对象
  * 2. Service 用 request.getTo()、request.getSubject()、request.getContent() 获取数据
  * 3. Service 创建 SimpleMailMessage 对象，调用 setTo()、setSubject()、setText() 赋值
  * 4. Service 调用 mailSender.send(message) 发送
@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
  * 注：request.getFrom() 实际未使用，发件人固定为配置中的 spring.mail.username
  */
 @Service
-public class EmailService {
+public class PlainTextMailSender {
 
     /**
      * @Autowired JavaMailSender mailSender
@@ -66,7 +66,7 @@ public class EmailService {
      *
      * @param request 邮件请求对象（to/subject/content）
      */
-    public void sendEmail(EmailRequest request) {
+    public void sendEmail(PlainTextMailRequest request) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(senderEmail);  // 使用配置中的发件人邮箱，非 request.from
         message.setTo(request.getTo());

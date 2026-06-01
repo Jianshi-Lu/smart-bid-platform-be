@@ -1,6 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
-import io.gitee.lujianshi.bidwinningbackend.dto.NotificationRequest;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +9,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
-public class NotificationService
+public class BidWinningMailSender
 {
     @Autowired private JavaMailSender mailSender;
 

@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * 接口仅有一个实现类时，@Autowired 接口 Spring 会自动注入该实现类 Bean
  */
 @Service
-public class FilePathService {
+public class StaticResourceSearcher {
 
     @Autowired
     private ResourcePatternResolver resourcePatternResolver;

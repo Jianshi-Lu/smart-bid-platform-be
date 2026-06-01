@@ -16,8 +16,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificationRequest extends EmailRequest{
-    //    EmailRequest:
+public class BidWinningMailRequest extends PlainTextMailRequest {
+    //    PlainTextMailRequest:
     //    private String to;
     //    private String from; （properties）
     //    private String subject;
