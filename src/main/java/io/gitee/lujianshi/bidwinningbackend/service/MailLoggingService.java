@@ -5,7 +5,8 @@ import org.springframework.stereotype.Service;
 import io.github.furstenheim.CopyDown;
 
 /**
- * 邮件日志格式化服务*
+ * 邮件日志格式化服务
+ *
  * 将邮件字段拼接为 Markdown 格式字符串，供异步任务打印到控制台。
  * 设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
  *

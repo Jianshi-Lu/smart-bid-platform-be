@@ -115,7 +115,7 @@ public @interface SpringBootApplication {
 | `MailLoggingService` | `@Service` |
 | `HelloController` | `@RestController`（含 `@Controller`） |
 | `PlainTextMailController` | `@RestController`（含 `@Controller`） |
-| `BidWinningNotificationController` | `@RestController`（含 `@Controller`） |
+| `BidWinningMailController` | `@RestController`（含 `@Controller`） |
 | `BidWinningBackendApplication` | `@Configuration`（隐含） |
 
 `AsyncTaskManager` **没有**任何上述注解，它是一个纯静态工具类，不归 Spring 容器管理。
@@ -242,7 +242,7 @@ DispatcherServlet.doDispatch(HttpServletRequest, HttpServletResponse)
   ├─ 3. HandlerAdapter.handle(request, response, handler)
   │     ↓
   │     → ArgumentResolvers：根据参数类型，从 request 中解析参数值
-  │        例如：BidWinningNotificationController.sendNotification(BidWinningMailRequest request)
+  │        例如：BidWinningMailController.sendNotification(BidWinningMailRequest request)
   │        → Spring 通过 data binding 将 form-data 字段映射到 BidWinningMailRequest 对象
   │     → HandlerMethod.invoke()：调用 Controller 方法
   │     → ReturnValueHandlers：将方法返回值转换为响应（直接写入 body 或渲染视图）
@@ -316,7 +316,7 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 8 | `MailLoggingService` | 无 |
 | 9 | `HelloController` | `HelloService` |
 | 10 | `PlainTextMailController` | `PlainTextMailSender` |
-| 11 | `BidWinningNotificationController` | `BidWinningTemplateFiller`、`BidWinningMailSender`、`MailLoggingService` |
+| 11 | `BidWinningMailController` | `BidWinningTemplateFiller`、`BidWinningMailSender`、`MailLoggingService` |
 
 `@Autowired` 注入发生在 Bean 创建时，Spring 通过 **AutowiredAnnotationBeanPostProcessor**（一个 `InstantiationAwareBeanPostProcessorAdapter`）实现：
 
@@ -505,9 +505,9 @@ PlainTextMailRequest 对象完整构建后，传入 Controller 方法
 
 ---
 
-### 3.3 `BidWinningNotificationController`
+### 3.3 `BidWinningMailController`
 
-**文件**：`src/main/java/.../controller/BidWinningNotificationController.java`
+**文件**：`src/main/java/.../controller/BidWinningMailController.java`
 
 #### `POST /send-notification`
 
