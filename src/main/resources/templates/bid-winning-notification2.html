@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中标通知书</title>
+</head>
+
+<body style="margin:0; padding:20px;
+background-color:#f5f7fa; font-family:'Microsoft YaHei',Arial,sans-serif;
+font-size:14px; line-height:1.5; color:#333333;">
+
+<!-- 最外层容器——使用<table></table>兼容邮件客户端 -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+    <td align="center">
+
+        <!-- 邮件主体 -->
+        <table border="0" cellpadding="0" cellspacing="0" width="600">
+
+            <!-- 头部标题 -->
+            <tr>
+                <td align="center">
+                    <h1>中标通知书模版2</h1>
+                </td>
+            </tr>
+
+            <!-- 基本信息 -->
+            <tr>
+                <td>
+                    <table border="0" cellpadding="8" cellspacing="0" width="100%">
+                        <tr>
+                            <td width="160">项目编号：</td>
+                            <td><span th:text="${projectCode}">000001</span></td>
+                        </tr>
+                        <tr>
+                            <td width="160">经办人：</td>
+                            <td><span th:text="${handlerName}">张三</span></td>
+                        </tr>
+                        <tr>
+                            <td>采购任务编号：</td>
+                            <td>WBYYPT20260325017</td>
+                        </tr>
+                        <tr>
+                            <td>采购公司：</td>
+                            <td>XXXXXXXX有限公司</td>
+                        </tr>
+                        <tr>
+                            <td>采购部门：</td>
+                            <td>供应链管理部</td>
+                        </tr>
+                        <tr>
+                            <td>招标流程：</td>
+                            <td>先技术后商务</td>
+                        </tr>
+                        <tr>
+                            <td>采购方式：</td>
+                            <td>邀请招标</td>
+                        </tr>
+                        <tr>
+                            <td>招标方式：</td>
+                            <td>总价招标</td>
+                        </tr>
+                        <tr>
+                            <td>固定总价招标：</td>
+                            <td>需要固定总价招标</td>
+                        </tr>
+                        <tr>
+                            <td>标书费：</td>
+                            <td>无标书费</td>
+                        </tr>
+                        <tr>
+                            <td>保证金：</td>
+                            <td>2,000.00 RMB</td>
+                        </tr>
+                        <tr>
+                            <td>创建时间：</td>
+                            <td>2026-03-25</td>
+                        </tr>
+                        <tr>
+                            <td>状态：</td>
+                            <td style="color:green;">已完成</td>
+                        </tr>
+                        <tr>
+                            <td>报名截止时间：</td>
+                            <td>2026-03-30 17:01</td>
+                        </tr>
+                        <tr>
+                            <td>平台采购类别：</td>
+                            <td>IT用品</td>
+                        </tr>
+                        <tr>
+                            <td>技术回标截止时间：</td>
+                            <td>2026-04-10 17:30</td>
+                        </tr>
+                        <tr>
+                            <td>招标主体：</td>
+                            <td>XXXXXXX有限公司</td>
+                        </tr>
+                        <tr>
+                            <td>商务回标截止时间：</td>
+                            <td>2026-04-10 17:30</td>
+                        </tr>
+                        <tr>
+                            <td>是否需要征信报告：</td>
+                            <td>暂不需要</td>
+                        </tr>
+                        <tr>
+                            <td>备注：</td>
+                            <td>目标成本：160,000.00 RMB</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table></td></tr>
+
+        <!-- 中标结果表格 -->
+        <tr>
+            <td>
+                <h2>中标结果</h2>
+
+                <table border="1" cellpadding="10" cellspacing="0" width="100%">
+                    <tr>
+                        <th width="70">序号</th>
+                        <th>供应商名称</th>
+                        <th width="150">中标价</th>
+                    </tr>
+
+                    <tr th:each="item, stat : ${bidWinningList}">
+                        <td th:text="${stat.count}">序号</td>
+                        <td th:text="${item.supplierName}">供应商名称</td>
+                        <td th:text="${item.bidWinningAmount}" style="color:red;">中标价</td>
+                    </tr>
+                    <tr th:if="${bidWinningList.isEmpty()}">
+                        <td colspan="3">暂无数据</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </td>
+</tr>
+</table>
+
+</body>
+</html>

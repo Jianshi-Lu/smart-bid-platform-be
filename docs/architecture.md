@@ -357,8 +357,16 @@ Bean 创建 → 检查字段/构造函数上的 @Autowired → 从容器中查�
 
 ```java
 public class BidWinningMailRequest extends PlainTextMailRequest {
-    private String projectCode;   // 项目编号
-    private String handlerName;   // 经办人
+    private String projectCode;                        // 项目编号
+    private String handlerName;                        // 经办人
+    private List<BidWinningListItem> bidWinningList;   // 中标结果列表
+    private String templateName;                        // 模板文件名（不含 .html 后缀）
+
+    @Data
+    public static class BidWinningListItem {
+        private String supplierName;    // 供应商名称
+        private String bidWinningAmount; // 中标价
+    }
 }
 ```
 
@@ -372,13 +380,14 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 |------|------|------|
 | `projectCode` | String | 项目编号，用于填充中标通知书模板中的 `th:text="${projectCode}"` |
 | `handlerName` | String | 经办人姓名，用于填充模板中的 `th:text="${handlerName}"` |
+| `bidWinningList` | `List<BidWinningListItem>` | 中标结果列表，`th:each` 循环渲染供应商名称 + 中标价 |
+| `templateName` | String | 模板文件名（不含 .html 后缀），由用户传入，后端根据此字段搜索并渲染对应模板 |
 
 **设计意图**：
 - 使用继承而非组合，是为了复用 `to`/`subject` 等字段，避免重复定义
 - `BidWinningMailRequest` 专门用于中标通知书邮件场景，携带模板渲染所需的项目信息
-- 相对于直接将 `projectCode`/`handlerName` 作为独立参数传入，使用 DTO 可以：
-  1. 避免方法签名膨胀（未来若有更多字段只需扩展 DTO）
-  2. 便于 Spring MVC 的自动参数绑定（form-data 直接映射为对象）
+- `bidWinningList` 支持多行中标数据，前端传入 JSON 数组，后端通过 Thymeleaf `th:each` 渲染
+- `templateName` 由用户传入，实现动态模板选择；传入值必须与 `classpath:/templates/` 下的实际文件名精确匹配，不存在则抛异常
 
 ---
 
@@ -502,7 +511,7 @@ PlainTextMailRequest 对象完整构建后，传入 Controller 方法
 
 ```java
 @PostMapping("/send-notification")
-public void sendNotification(BidWinningMailRequest request) throws MessagingException {
+public void sendNotification(@RequestBody BidWinningMailRequest request) throws MessagingException {
     String htmlContent = bidWinningTemplateFiller.processTemplate(request);
     bidWinningMailSender.sendHtmlEmail(
         request.getTo(),
@@ -516,40 +525,70 @@ public void sendNotification(BidWinningMailRequest request) throws MessagingExce
 |------|------|
 | HTTP 方法 | POST |
 | 完整 URL | `http://localhost:8079/send-notification` |
-| 请求参数 | `BidWinningMailRequest`（form-data: `to`/`subject`/`projectCode`/`handlerName`） |
+| 请求 Content-Type | `application/json`（`@RequestBody` 注解要求） |
+| 请求参数 | `BidWinningMailRequest`（JSON body） |
 | 调用链路 | 见下方详细分解 |
 | 返回值 | void |
 
-**完整调用链路**：
+**完整调用链路（模板动态选择）**：
 
 ```
-Step 1. 接收 BidWinningMailRequest
-        Spring 通过 data binding 将 form-data 自动映射为 BidWinningMailRequest 对象
-        （projectCode + handlerName 来自 form-data，to + subject 同样来自 form-data）
+Step 1. 接收 BidWinningMailRequest（JSON → @RequestBody 自动反序列化）
+        - to / subject / projectCode / handlerName / bidWinningList / templateName
 
 Step 2. bidWinningTemplateFiller.processTemplate(request)
+        ├─ 读取 request.getTemplateName() → 例如 "bid-winning-notification2"
+        ├─ staticResourceSearcher.validateTemplateExists(templateName)
+        │   ├─ 扫描 classpath:/templates/*.html
+        │   ├─ 精确匹配 "bid-winning-notification2"
+        │   └─ 找不到则抛出 IllegalArgumentException，不 fallback
         ├─ 创建 new Context()
         ├─ context.setVariable("projectCode", request.getProjectCode())
         ├─ context.setVariable("handlerName", request.getHandlerName())
-        └─ templateEngine.process("bid-winning-notification", context)
-            ├─ TemplateResolver 拼接模板路径：
-            │   classpath:/templates/ + "bid-winning-notification" + ".html"
-            │   = classpath:/templates/bid-winning-notification.html
+        ├─ context.setVariable("bidWinningList", request.getBidWinningList())
+        └─ templateEngine.process(templateName, context)
+            ├─ TemplateResolver 拼接完整路径：
+            │   classpath:/templates/ + "bid-winning-notification2" + ".html"
+            │   = classpath:/templates/bid-winning-notification2.html
             ├─ 读取 HTML 文件内容
             ├─ 扫描 HTML 中的 th:text="${projectCode}" 等 Thymeleaf 表达式
+            ├─ th:each 循环渲染 bidWinningList 每行数据
             ├─ 用 Context 中的变量值替换表达式，生成最终 HTML 字符串
             └─ 返回渲染后的 HTML 字符串
 
 Step 3. bidWinningMailSender.sendHtmlEmail(to, subject, htmlContent)
         ├─ mailSender.createMimeMessage() 创建 MimeMessage
         ├─ new MimeMessageHelper(mimeMessage, true, "UTF-8")
-        ├─ helper.setFrom(senderEmail)        ← 配置中的 spring.mail.username
-        ├─ helper.setTo(to)                   ← request.getTo()
-        ├─ helper.setSubject(subject)          ← request.getSubject()
-        ├─ helper.setText(htmlContent, true)  ← 第二个参数 true 表示 HTML 格式
+        ├─ helper.setFrom(senderEmail)
+        ├─ helper.setTo(to)
+        ├─ helper.setSubject(subject)
+        ├─ helper.setText(htmlContent, true)  ← HTML 格式
         └─ mailSender.send(mimeMessage)
-            └─ 通过 SMTP 与 smtp.qq.com:587 通信，发送 HTML 邮件
 ```
+
+**Postman 请求示例（选择模板 v2）**：
+
+```json
+POST http://localhost:8079/send-notification
+Content-Type: application/json
+
+{
+    "to": "xxx@outlook.com",
+    "subject": "中标通知书",
+    "projectCode": "WB20260325017",
+    "handlerName": "刘曼曼",
+    "bidWinningList": [
+        { "supplierName": "xxxxxx分公司 合作供应商", "bidWinningAmount": "67,500.00 RMB" },
+        { "supplierName": "xxxxx分公司 合作供应商", "bidWinningAmount": "83,000.00 RMB" }
+    ],
+    "templateName": "bid-winning-notification2"
+}
+```
+
+**模板搜索行为**：
+- 搜索范围：`classpath:/templates/*.html`（PathMatchingResourcePatternResolver 扫描）
+- 匹配方式：**精确匹配**（传入 `"bid-winning-notification2"` 匹配文件名 `"bid-winning-notification2.html"`）
+- 行为安全：**不存在则抛异常**，`IllegalArgumentException: 模板不存在: bid-winning-notification2`，不 fallback 到默认模板
 
 **HTML vs 纯文本邮件的区别**：
 
@@ -644,54 +683,59 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
-| `searchByKeyword(String keyword)` | 搜索关键字（String） | 匹配的文件路径列表 `List<String>` | `ResourcePatternResolver`（Spring Core） | 扫描 classpath 下 static 目录，用 Stream API 过滤并返回路径列表 |
+| `validateTemplateExists(String templateName)` | templateName（模板文件名，不含 .html 后缀） | void（验证通过则正常返回，失败则抛 `IllegalArgumentException`） | `ResourcePatternResolver`（Spring Core） | 精确搜索 `classpath:/templates/` 目录验证模板文件是否存在，为 `BidWinningTemplateFiller` 提供模板存在性校验，不存在则抛异常（不 fallback） |
 
-**`searchByKeyword()` 内部流程**：
+**`validateTemplateExists()` 内部流程**：
 
 ```java
-public List<String> searchByKeyword(String keyword) throws IOException {
-    // 1. 扫描 classpath:/static/**/* 下的所有文件
-    Resource[] resources = resourcePatternResolver.getResources("classpath:/static/**/*");
+public void validateTemplateExists(String templateName) {
+    // 1. 扫描 classpath:/templates/*.html 下的所有模板文件
+    Resource[] resources = resourcePatternResolver.getResources("classpath:/templates/*.html");
     //   ↓
-    //   PathMatchingResourcePatternResolver.getResources("classpath:/static/**/*")
+    //   PathMatchingResourcePatternResolver.getResources("classpath:/templates/*.html")
     //     ↓
-    //     ClassLoader.getResources("static/")  ← 遍历 classpath 下所有 static 目录
+    //     ClassLoader.getResources("templates/")  ← 遍历 classpath 下所有 templates 目录
     //     ↓
-    //     对每个文件创建 ClassPathResource 对象
+    //     对每个 .html 文件创建 ClassPathResource 对象
     //     ↓
     //     返回 Resource[] 数组
 
-    // 2. Stream 处理链
-    return Arrays.stream(resources)           // 将 Resource[] 转换为 Stream<Resource>
-            .map(this::extractPath)           // 调用 extractPath() 提取相对路径
-            .filter(path -> path != null)    // 过滤掉提取失败的（抛异常返回 null）
-            .filter(path -> path.contains(keyword))  // 关键字模糊匹配
-            .map(path -> "/" + path)          // 拼接前导斜杠，格式化为 /static/...
-            .collect(Collectors.toList());    // 收集为 List<String>
+    // 2. 精确匹配
+    boolean exists = Arrays.stream(resources)
+            .map(this::extractTemplateName)              // 提取文件名（去 .html 后缀）
+            .anyMatch(name -> name != null && name.equals(templateName));
+            // 精确匹配：传入 "bid-winning-notification2"
+            // → 只匹配文件名完全等于 "bid-winning-notification2" 的文件
+
+    // 3. 找不到则抛异常，不 fallback
+    if (!exists) {
+        throw new IllegalArgumentException("模板不存在: " + templateName);
+    }
 }
 ```
 
-**`extractPath()` 内部流程**：
+**`extractTemplateName()` 内部流程**：
 
 ```java
-private String extractPath(Resource resource) {
+private String extractTemplateName(Resource resource) {
     try {
-        String url = resource.getURL().getPath();
+        String path = resource.getURL().getPath();
         // resource.getURL() 返回 java.net.URL
-        // .getPath() 返回完整系统路径，如 /Users/.../target/classes/static/images/logo.png
-        int idx = url.indexOf("static");
-        // 找到 "static" 的位置，截取相对路径
-        return idx > -1 ? url.substring(idx) : url;
-        // static/.../logo.png 或保持原路径
+        // .getPath() 返回完整系统路径，如 /Users/.../target/classes/templates/bid-winning-notification2.html
+        int idx = path.lastIndexOf("/templates/");
+        if (idx < 0) return null;
+        return path.substring(idx + "/templates/".length()).replace(".html", "");
+        // /templates/bid-winning-notification2.html → "bid-winning-notification2"
     } catch (IOException e) {
-        return null;  // IO 异常时返回 null，由 filter 过滤
+        return null;
     }
 }
 ```
 
 **设计意图**：
-- 使用 `ResourcePatternResolver` 而不是直接读取文件系统，确保在打包成 JAR 后仍能正确扫描（`classpath:` 前缀指向 classpath 而非文件系统）
-- Stream API 链式调用，使过滤逻辑清晰、易读
+- 使用 `ResourcePatternResolver` 而不是直接读取文件系统，确保在打包成 JAR 后仍能正确扫描
+- **精确匹配**：不支持通配符或模糊匹配，必须文件名完全一致
+- **行为安全**：模板不存在时直接抛 `IllegalArgumentException`，不 fallback 到默认模板，保证用户传入的模板码始终受控
 
 ---
 
@@ -747,51 +791,79 @@ public void sendHtmlEmail(String to, String subject, String htmlContent) throws 
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
-| `processTemplate(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 projectCode + handlerName） | 渲染后的 HTML 字符串（String） | `SpringTemplateEngine`、`Context` | 将 Thymeleaf 模板与动态数据结合，生成最终 HTML 字符串 |
+| `processTemplate(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 projectCode + handlerName + bidWinningList + **templateName**） | 渲染后的 HTML 字符串（String） | `SpringTemplateEngine`、`Context`、`StaticResourceSearcher` | 将 Thymeleaf 模板与动态数据结合，根据 `request.templateName` 动态选择模板文件，模板不存在则抛异常（不 fallback） |
 
 **`processTemplate()` 内部流程**：
 
 ```java
 public String processTemplate(BidWinningMailRequest request) {
-    // Step 1: 创建 Thymeleaf 上下文（数据容器）
+    // Step 1: 读取用户传入的模板文件名（不含 .html 后缀）
+    String templateName = request.getTemplateName();  // 例如 "bid-winning-notification2"
+
+    // Step 2: 验证模板是否存在（精确匹配 classpath:/templates/*.html）
+    staticResourceSearcher.validateTemplateExists(templateName);
+    //    验证通过 → 继续
+    //    验证失败 → 抛出 IllegalArgumentException，不 fallback
+
+    // Step 3: 创建 Thymeleaf 上下文（数据容器）
     Context context = new Context();
     //    Context(org.thymeleaf.context) 内部维护一个 Map<String, Object>
     //    模板引擎渲染时，通过 ${变量名} 从这个 Map 中取值
 
-    // Step 2: 放入模板变量
+    // Step 4: 放入模板变量
     context.setVariable("projectCode", request.getProjectCode());
     context.setVariable("handlerName", request.getHandlerName());
-    //    setVariable(key, value) 相当于 context.getVariables().put(key, value)
+    context.setVariable("bidWinningList", request.getBidWinningList());
     //    模板中 ${projectCode} → 从 Map 取到 request.getProjectCode()
+    //    模板中 th:each="item : ${bidWinningList}" → 循环渲染每行中标数据
 
-    // Step 3: 渲染模板
-    return templateEngine.process("bid-winning-notification", context);
+    // Step 5: 渲染模板
+    return templateEngine.process(templateName, context);
     //    process(模板名, Context) 是 SpringTemplateEngine 的核心渲染方法
-    //    模板名 "bid-winning-notification" 经过 TemplateResolver 解析为完整路径：
-    //    classpath:/templates/ + "bid-winning-notification" + ".html"
+    //    模板名直接使用用户传入的 templateName（不含 .html），由 TemplateResolver 拼接完整路径：
+    //    "bid-winning-notification2" → classpath:/templates/bid-winning-notification2.html
     //    ↓
-    //    读取 HTML 文本 → 解析 Thymeleaf 表达式 → 替换变量 → 返回最终 HTML 字符串
+    //    读取 HTML 文本 → 解析 Thymeleaf 表达式 → 替换变量 → th:each 循环渲染 → 返回最终 HTML 字符串
 }
+```
+
+**模板搜索与选择机制（完整链路）**：
+
+```
+用户传入 templateName: "bid-winning-notification2"
+        ↓
+StaticResourceSearcher.validateTemplateExists("bid-winning-notification2")
+        ↓
+扫描 classpath:/templates/*.html → 精确匹配文件名
+        ↓
+找到 → TemplateResolver 拼接路径 → classpath:/templates/bid-winning-notification2.html
+        ↓
+读取文件 → Thymeleaf AST 解析 → 渲染
+        ↓
+找不到 → 抛出 IllegalArgumentException（不 fallback，不使用默认模板）
 ```
 
 **Thymeleaf 渲染原理（底层）**：
 
 ```
-templateEngine.process("bid-winning-notification", context)
+templateEngine.process(templateName, context)
   ↓
-TemplateResolver.resolveTemplateName("bid-winning-notification")
-  → 拼接完整路径 classpath:/templates/bid-winning-notification.html
+TemplateResolver.resolveTemplateName(templateName)
+  → 拼接完整路径 classpath:/templates/{templateName}.html
   ↓
 TemplateParser.parseTemplate()  ← 解析 HTML 为 AST（抽象语法树）
   → 遍历 AST 节点，遇到 th:text="${projectCode}" 节点
+  → 遍历 AST 节点，遇到 th:each="item : ${bidWinningList}" 节点
   ↓
 Dialect.execute()  ← 执行 OGNL/SpringEL 表达式从 Context 取值
-  → context.getVariable("projectCode") → "92873-PB202603003"
-  → 替换节点内容为 "92873-PB202603003"
+  → context.getVariable("projectCode") → "WB20260325017"
+  → bidWinningList 循环渲染每项 supplierName + bidWinningAmount
   ↓
 OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
   → 返回完整 HTML 字符串
 ```
+
+**设计决策**：模板名由用户传入，实现动态模板选择；验证后不使用默认模板，保证用户传入的 `templateName` 始终受控。
 
 **`SpringTemplateEngine` 的 Bean 来源**：`ThymeleafAutoConfiguration` 在容器启动时注册，单例模式。
 
