@@ -1,7 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.PlainTextMailRequest;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Service;
 public class PlainTextMailSender {
 
     /**
-     * @Autowired JavaMailSender mailSender
+     * @Resource JavaMailSender mailSender
      *
      * JavaMailSender 由 Spring Boot 自动配置（MailSenderAutoConfiguration）
      * - 读取 application.properties 的 spring.mail.* 配置项（host/port/username/password 等）
@@ -40,7 +40,7 @@ public class PlainTextMailSender {
      *
      * 注意：注入的是一个已配置好的 JavaMailSenderImpl（JavaMailSender 接口的实现类）实例
      */
-    @Autowired
+    @Resource
     private JavaMailSender mailSender;
 
     /**

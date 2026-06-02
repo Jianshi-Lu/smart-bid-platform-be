@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.BidWinningMailRequest;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
@@ -22,7 +23,7 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 @Service
 public class BidWinningTemplateFiller {
 
-    @Autowired
+    @Resource
     private SpringTemplateEngine templateEngine;
 
     /**
@@ -53,6 +54,7 @@ public class BidWinningTemplateFiller {
         Context context = new Context();
         context.setVariable("projectCode", request.getProjectCode());
         context.setVariable("handlerName", request.getHandlerName());
+        context.setVariable("bidWinningList", request.getBidWinningList());
 
         return templateEngine.process("bid-winning-notification", context);
     }

@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * 项目信息实体类
  *
@@ -24,4 +26,13 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
     //    private String content;
     private String projectCode;  // 项目编号
     private String handlerName;       // 经办人
+    private List<BidWinningListItem> bidWinningList;    // 中标结果表格
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BidWinningListItem {
+        private String supplierName;
+        private String bidWinningAmount;
+    }
 }

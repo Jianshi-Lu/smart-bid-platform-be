@@ -113,8 +113,7 @@ font-size:14px; line-height:1.5; color:#333333;">
                     </table>
                 </td>
             </tr>
-
-        <br>
+        </table></td></tr>
 
         <!-- 中标结果表格 -->
         <tr>
@@ -128,15 +127,13 @@ font-size:14px; line-height:1.5; color:#333333;">
                         <th width="150">中标价</th>
                     </tr>
 
-                    <tr>
-                        <td>1</td>
-                        <td>xxxxxx分公司 合作供应商</td>
-                        <td style="color:red;">67,500.00 RMB</td>
+                    <tr th:each="item, stat : ${bidWinningList}">
+                        <td th:text="${stat.count}">序号</td>
+                        <td th:text="${item.supplierName}">供应商名称</td>
+                        <td th:text="${item.bidWinningAmount}" style="color:red;">中标价</td>
                     </tr>
-                    <tr>
-                        <td>2</td>
-                        <td>xxxxx分公司 合作供应商</td>
-                        <td style="color:red;">83,000.00 RMB</td>
+                    <tr th:if="${bidWinningList.isEmpty()}">
+                        <td colspan="3">暂无数据</td>
                     </tr>
                 </table>
             </td>
