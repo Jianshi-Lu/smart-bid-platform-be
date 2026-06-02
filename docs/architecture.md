@@ -112,6 +112,7 @@ public @interface SpringBootApplication {
 | `StaticResourceSearcher` | `@Service` |
 | `BidWinningMailSender` | `@Service` |
 | `BidWinningTemplateFiller` | `@Service` |
+| `MailLoggingService` | `@Service` |
 | `HelloController` | `@RestController`（含 `@Controller`） |
 | `PlainTextMailController` | `@RestController`（含 `@Controller`） |
 | `BidWinningNotificationController` | `@RestController`（含 `@Controller`） |
@@ -312,9 +313,10 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 5 | `StaticResourceSearcher` | `ResourcePatternResolver` |
 | 6 | `BidWinningMailSender` | `JavaMailSender`、`@Value` |
 | 7 | `BidWinningTemplateFiller` | `SpringTemplateEngine` |
-| 8 | `HelloController` | `HelloService` |
-| 9 | `PlainTextMailController` | `PlainTextMailSender` |
-| 10 | `BidWinningNotificationController` | `BidWinningTemplateFiller`、`BidWinningMailSender` |
+| 8 | `MailLoggingService` | 无 |
+| 9 | `HelloController` | `HelloService` |
+| 10 | `PlainTextMailController` | `PlainTextMailSender` |
+| 11 | `BidWinningNotificationController` | `BidWinningTemplateFiller`、`BidWinningMailSender`、`MailLoggingService` |
 
 `@Autowired` 注入发生在 Bean 创建时，Spring 通过 **AutowiredAnnotationBeanPostProcessor**（一个 `InstantiationAwareBeanPostProcessorAdapter`）实现：
 
@@ -511,13 +513,24 @@ PlainTextMailRequest 对象完整构建后，传入 Controller 方法
 
 ```java
 @PostMapping("/send-notification")
-public void sendNotification(@RequestBody BidWinningMailRequest request) throws MessagingException {
+public String sendNotification(@RequestBody BidWinningMailRequest request) {
     String htmlContent = bidWinningTemplateFiller.processTemplate(request);
-    bidWinningMailSender.sendHtmlEmail(
-        request.getTo(),
-        request.getSubject(),
-        htmlContent
-    );
+
+    AsyncTaskManager.execute(() -> {
+        System.out.println(mailLoggingService.formatMailLog(
+            request.getTo(), request.getSubject(), htmlContent));
+
+        try {
+            bidWinningMailSender.sendHtmlEmail(
+                request.getTo(),
+                request.getSubject(),
+                htmlContent
+            );
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+    }, 5000);
+    return "发送成功";
 }
 ```
 
@@ -528,9 +541,9 @@ public void sendNotification(@RequestBody BidWinningMailRequest request) throws 
 | 请求 Content-Type | `application/json`（`@RequestBody` 注解要求） |
 | 请求参数 | `BidWinningMailRequest`（JSON body） |
 | 调用链路 | 见下方详细分解 |
-| 返回值 | void |
+| 返回值 | 字符串 `"发送成功"`（**立即返回**，不等待邮件实际发送） |
 
-**完整调用链路（模板动态选择）**：
+**完整调用链路（模板动态选择 + 异步延迟发送）**：
 
 ```
 Step 1. 接收 BidWinningMailRequest（JSON → @RequestBody 自动反序列化）
@@ -556,14 +569,19 @@ Step 2. bidWinningTemplateFiller.processTemplate(request)
             ├─ 用 Context 中的变量值替换表达式，生成最终 HTML 字符串
             └─ 返回渲染后的 HTML 字符串
 
-Step 3. bidWinningMailSender.sendHtmlEmail(to, subject, htmlContent)
-        ├─ mailSender.createMimeMessage() 创建 MimeMessage
-        ├─ new MimeMessageHelper(mimeMessage, true, "UTF-8")
-        ├─ helper.setFrom(senderEmail)
-        ├─ helper.setTo(to)
-        ├─ helper.setSubject(subject)
-        ├─ helper.setText(htmlContent, true)  ← HTML 格式
-        └─ mailSender.send(mimeMessage)
+Step 3. 立即返回 "发送成功"（主线程不受异步任务影响）
+
+Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟5秒后执行）：
+        ├─ mailLoggingService.formatMailLog(to, subject, htmlContent)
+        │   → 拼接 MD 格式日志字符串，System.out.println 打印到控制台
+        └─ bidWinningMailSender.sendHtmlEmail(to, subject, htmlContent)
+            ├─ mailSender.createMimeMessage() 创建 MimeMessage
+            ├─ new MimeMessageHelper(mimeMessage, true, "UTF-8")
+            ├─ helper.setFrom(senderEmail)
+            ├─ helper.setTo(to)
+            ├─ helper.setSubject(subject)
+            ├─ helper.setText(htmlContent, true)  ← HTML 格式
+            └─ mailSender.send(mimeMessage)
 ```
 
 **Postman 请求示例（选择模板 v2）**：
@@ -866,6 +884,29 @@ OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
 **设计决策**：模板名由用户传入，实现动态模板选择；验证后不使用默认模板，保证用户传入的 `templateName` 始终受控。
 
 **`SpringTemplateEngine` 的 Bean 来源**：`ThymeleafAutoConfiguration` 在容器启动时注册，单例模式。
+
+---
+
+### 4.6 `MailLoggingService`
+
+**文件**：`src/main/java/.../service/MailLoggingService.java`
+
+| 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
+|------|------|------|-------------|----------|
+| `formatMailLog(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | MD 格式字符串（String） | 无 | 将邮件字段拼接为 Markdown 格式，供异步任务打印到控制台，便于后续扩展（文件/数据库等） |
+
+**`formatMailLog()` 输出格式**：
+
+````markdown
+## 邮件发送日志
+**收件人:** xxx@outlook.com
+**主题:** 中标通知书
+```html
+<html>...</html>
+```
+````
+
+**用途**：`BidWinningNotificationController` 在异步任务中调用 `System.out.println()` 打印到控制台。设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
 
 ---
 
