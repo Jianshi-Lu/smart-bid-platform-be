@@ -893,20 +893,20 @@ OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
-| `formatMailLog(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | MD 格式字符串（String） | 无 | 将邮件字段拼接为 Markdown 格式，供异步任务打印到控制台，便于后续扩展（文件/数据库等） |
+| `formatMailLog(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | MD 格式字符串（String） | `io.github.furstenheim:copy_down` | 将邮件字段拼接为 Markdown 格式（HTML 经 copy_down 转换后），供异步任务打印到控制台，便于后续扩展（文件/数据库等） |
 
-**`formatMailLog()` 输出格式**：
+**`formatMailLog()` 输出格式**（copy_down 将 HTML 表格转换为 Markdown 表格）：
 
-````markdown
+```markdown
 ## 邮件发送日志
 **收件人:** xxx@outlook.com
 **主题:** 中标通知书
-```html
-<html>...</html>
+| 供应商名称 | 中标价 |
+|---|---|
+| xxx公司 | 67,500.00 RMB |
 ```
-````
 
-**用途**：`BidWinningNotificationController` 在异步任务中调用 `System.out.println()` 打印到控制台。设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
+**用途**：`BidWinningMailController` 在异步任务中调用 `System.out.println()` 打印到控制台。设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
 
 ---
 
@@ -1008,6 +1008,7 @@ catch 块：Thread.currentThread().interrupt()
 | `spring-boot-starter-thymeleaf` | 由 parent 管理 | spring-boot-starter-thymeleaf + thymeleaf-spring6 | 模板引擎 |
 | `fastjson2` | 2.0.52 | 阿里 JSON 序列化库 | JSON 处理（额外引入，本项目未直接使用） |
 | `lombok` | 由 parent 管理 | 无（编译时注解处理） | 自动生成 getter/setter |
+| `copy_down` | 1.1 | io.github.furstenheim:copy_down | HTML → Markdown 转换（MailLoggingService 使用） |
 
 **依赖传递链**：
 

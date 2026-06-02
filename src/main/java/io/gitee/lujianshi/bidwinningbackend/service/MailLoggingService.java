@@ -1,10 +1,11 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
+
 import org.springframework.stereotype.Service;
+import io.github.furstenheim.CopyDown;
 
 /**
- * 邮件日志格式化服务
- *
+ * 邮件日志格式化服务*
  * 将邮件字段拼接为 Markdown 格式字符串，供异步任务打印到控制台。
  * 设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
  *
@@ -21,14 +22,16 @@ public class MailLoggingService {
      * @param htmlContent 渲染后的 HTML 内容
      * @return MD 格式日志字符串
      */
+
     public String formatMailLog(String to, String subject, String htmlContent) {
+        CopyDown copyDown = new CopyDown();
+        String md = copyDown.convert(htmlContent);
+
         return """
-            ## 邮件发送日志
-            **收件人:** %s
-            **主题:** %s
-            ```html
-            %s
-            ```
-            """.formatted(to, subject, htmlContent);
+        ## 邮件发送日志
+        **收件人:** %s
+        **主题:** %s
+        %s
+        """.formatted(to, subject, md);
     }
 }

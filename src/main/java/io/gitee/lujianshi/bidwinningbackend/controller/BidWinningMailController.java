@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * - 调用 BidWinningMailSender 发送 HTML 邮件（异步延迟5秒）
  */
 @RestController
-public class BidWinningNotificationController {
+public class BidWinningMailController {
 
     @Autowired private BidWinningTemplateFiller bidWinningTemplateFiller;
 
