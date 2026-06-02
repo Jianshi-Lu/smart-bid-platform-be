@@ -23,7 +23,7 @@ import java.util.Arrays;
 @Service
 public class StaticResourceSearcher {
     /**
-     * 验证模板文件是否存在（精确匹配 classpath:/templates/ 目录）
+     * 验证模板文件是否存在（匹配 classpath:/templates/ 目录）
      *
      * 搜索方式：
      * - 通过 ResourcePatternResolver.getResources("classpath:/templates/*.html") 扫描 templates/ 下所有 HTML 文件

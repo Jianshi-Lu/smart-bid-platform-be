@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 import io.gitee.lujianshi.bidwinningbackend.dto.BidWinningMailRequest;
 import io.gitee.lujianshi.bidwinningbackend.service.BidWinningMailSender;
 import io.gitee.lujianshi.bidwinningbackend.service.BidWinningTemplateFiller;
+import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,17 +51,24 @@ public class BidWinningNotificationController {
      *                - handlerName：经办人（模板填充变量）
      *                - bidWinningList：List<BidWinningListItem>（th:each 循环渲染中标结果）
      *                - templateName：模板文件名（不含 .html 后缀，例如 "bid-winning-notification"）
-     * @throws MessagingException 邮件发送失败时抛出
      * @throws IllegalArgumentException 模板文件不存在于 classpath:/templates/ 目录时抛出
      */
     @PostMapping("/send-notification")
-    public void sendNotification(@RequestBody BidWinningMailRequest request) throws MessagingException {
+    public String sendNotification(@RequestBody BidWinningMailRequest request) {
         String htmlContent = bidWinningTemplateFiller.processTemplate(request);
-        bidWinningMailSender.sendHtmlEmail(
-                request.getTo(),
-                request.getSubject(),
-                htmlContent
-        );
+
+        AsyncTaskManager.execute(() -> {
+            try {
+                bidWinningMailSender.sendHtmlEmail(
+                    request.getTo(),
+                    request.getSubject(),
+                    htmlContent
+                );
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
+            }
+        }, 5000);
+        return "发送成功";
     }
 
 }
