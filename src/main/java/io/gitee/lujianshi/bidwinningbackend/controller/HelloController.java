@@ -59,8 +59,12 @@ public class HelloController {
 
     /**
      * @PostMapping("/fetch-url") POST 请求获取地址
-     * 调用 helloService.fetchAfterDelay() 触发异步任务（不等待）
-     * 调用 helloService.fetchUrl() 同步获取配置中的 URL 并立即返回
+     *
+     * 执行链路：
+     * 1. 调用 helloService.fetchAfterDelay() 触发异步任务（@Async 立即返回，不等待）
+     * 2. 调用 helloService.fetchUrl() 同步获取配置中的 URL 并立即返回
+     *
+     * 返回值：custom.url 配置值（https://baidu.com）
      */
     @PostMapping("/fetch-url")
     public String fetchUrl() {

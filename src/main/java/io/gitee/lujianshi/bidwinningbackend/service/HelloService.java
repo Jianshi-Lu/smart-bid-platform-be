@@ -57,6 +57,17 @@ public class HelloService {
     }
 
     @Async
+    /**
+     * 异步任务：延迟3秒后打印"获取地址成功"
+     *
+     * 执行链路：
+     * 1. @Async 注解使方法被 Spring AOP 代理（主线程立即返回，不阻塞）
+     * 2. 方法内部调用 AsyncTaskManager.execute(..., 3000)
+     * 3. 新线程中 sleep 3秒后，System.out.println 打印日志
+     *
+     * 注意：@Async + AsyncTaskManager 嵌套使用（双重异步），存在设计冗余，
+     * 实际生产中建议只选其一。
+     */
     public void fetchAfterDelay() {
         AsyncTaskManager.execute(()-> {
             System.out.println("获取地址成功");
@@ -64,7 +75,11 @@ public class HelloService {
         );
     }
 
-
+    /**
+     * 返回配置中的 URL
+     *
+     * @return custom.url 配置值（https://baidu.com）
+     */
     public String fetchUrl() {
         return url;
     }
