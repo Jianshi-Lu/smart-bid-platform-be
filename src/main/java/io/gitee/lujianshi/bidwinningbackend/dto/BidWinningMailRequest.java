@@ -34,12 +34,4 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
     private String handlerName;       // 经办人
     private List<BidWinningListItem> bidWinningList;    // 中标结果表格
     private String templateName;      // 模板文件名（不含 .html 后缀）
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class BidWinningListItem {
-        private String supplierName;
-        private String bidWinningAmount;
-    }
 }

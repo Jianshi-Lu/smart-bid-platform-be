@@ -1,0 +1,27 @@
+server:
+  address: 0.0.0.0
+  port: 8080
+
+custom:
+  url: https://test.example.com
+
+spring:
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: ${TEST_MAIL_USERNAME:1649681371@qq.com}
+    password: ${TEST_MAIL_PASSWORD:test-password-placeholder}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+logging:
+  file:
+    name: logs/test.log
+  level:
+    root: DEBUG

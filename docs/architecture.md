@@ -973,27 +973,98 @@ catch 块：Thread.currentThread().interrupt()
 
 ## 6. 配置与模板
 
-### 6.1 `application.properties`
+### 6.1 多环境配置（application.yml 系列）
 
-**文件**：`src/main/resources/application.properties`
+**文件结构**：
 
-| 配置项 | 值 | 作用 |
-|--------|-----|------|
-| `spring.application.name` | `bid-winning-backend` | 应用名称 |
-| `server.port` | `8079` | 嵌入式 Tomcat 监听端口 |
-| `custom.url` | `https://baidu.com` | 业务配置（HelloController 使用） |
-| `spring.mail.host` | `smtp.qq.com` | QQ SMTP 服务器地址 |
-| `spring.mail.port` | `587` | QQ SMTP 端口（STARTTLS） |
-| `spring.mail.username` | `1649681371@qq.com` | SMTP 认证用户名（同时是发件人） |
-| `spring.mail.password` | `xhixpbmbkfyhchbb` | SMTP 授权码（**不是 QQ 登录密码**） |
-| `spring.mail.properties.mail.smtp.auth` | `true` | 启用 SMTP 认证 |
-| `spring.mail.properties.mail.smtp.starttls.enable` | `true` | 启用 STARTTLS 加密 |
-| `spring.mail.properties.mail.smtp.starttls.required` | `true` | 强制 STARTTLS |
-| `spring.mail.default-encoding` | `UTF-8` | 默认字符编码 |
-| `spring.thymeleaf.prefix` | `classpath:/templates/` | Thymeleaf 模板文件根目录 |
-| `spring.thymeleaf.suffix` | `.html` | 模板文件后缀 |
+```
+src/main/resources/
+├── application.yml       # 公共配置 + 默认 profile = dev
+├── application-dev.yml   # 开发环境
+├── application-test.yml  # 测试环境
+└── application-prod.yml  # 生产环境
+```
+
+**公共配置**（`application.yml`）：
+
+```yaml
+spring:
+  application:
+    name: bid-winning-backend
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+  profiles:
+    active: dev   # 默认启动 dev 环境
+```
+
+#### 6.1.1 各环境配置
+
+| Profile | 端口 | 日志路径 | 备注 |
+|---------|------|----------|------|
+| `dev`（开发） | `8079` | `logs/app.log` | 默认环境，明文密码，QQ SMTP |
+| `test`（测试） | `8080` | `logs/test.log` | 日志级别 DEBUG，密码用 `${TEST_MAIL_PASSWORD:default}` 占位符 |
+| `prod`（生产） | `80` | `logs/prod.log` | 日志级别 INFO，敏感信息全部走环境变量（`${PROD_MAIL_PASSWORD}`） |
+
+#### 6.1.2 配置示例（dev）
+
+```yaml
+server:
+  address: 0.0.0.0
+  port: 8079
+
+custom:
+  url: https://baidu.com
+
+spring:
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 1649681371@qq.com
+    password: xhixpbmbkfyhchbb
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+logging:
+  file:
+    name: logs/app.log
+```
+
+#### 6.1.3 环境切换方式
+
+**方式 1：默认 profile（推荐）**
+修改 `application.yml` 中的 `spring.profiles.active` 切换。
+
+**方式 2：启动时指定**
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=test
+```
+
+**方式 3：环境变量**
+```bash
+export SPRING_PROFILES_ACTIVE=prod
+./mvnw spring-boot:run
+```
+
+#### 6.1.4 关键配置项对照
+
+| 配置项 | dev | test | prod |
+|--------|-----|------|------|
+| `server.port` | `8079` | `8080` | `80` |
+| `spring.mail.username` | `1649681371@qq.com` | `${TEST_MAIL_USERNAME:...}` | `${PROD_MAIL_USERNAME}` |
+| `spring.mail.password` | `xhixpbmbkfyhchbb`（明文） | `${TEST_MAIL_PASSWORD:...}`（占位符） | `${PROD_MAIL_PASSWORD}`（环境变量，强制） |
+| `custom.url` | `https://baidu.com` | `https://test.example.com` | `https://prod.example.com` |
+| `logging.level.root` | `INFO`（默认） | `DEBUG` | `INFO` |
 
 **关于 SMTP 授权码**：授权码是 QQ 邮箱为第三方客户端提供的专用密码，不能用 QQ 登录密码代替。授权码在 QQ 邮箱设置 → 账户 → POP3/SMTP服务 中生成。
+
+**安全建议**：生产环境 `application-prod.yml` 应加入 `.gitignore`，或提交到独立私有仓库，敏感信息通过环境变量/CI 注入。
 
 ---
 

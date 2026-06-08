@@ -1,0 +1,25 @@
+server:
+  address: 0.0.0.0
+  port: 8079
+
+custom:
+  url: https://baidu.com
+
+spring:
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: 1649681371@qq.com
+    password: xhixpbmbkfyhchbb
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+logging:
+  file:
+    name: logs/app.log

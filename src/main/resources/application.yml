@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: bid-winning-backend
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+  profiles:
+    active: dev

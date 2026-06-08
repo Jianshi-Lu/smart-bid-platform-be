@@ -1,0 +1,27 @@
+server:
+  address: 0.0.0.0
+  port: 80
+
+custom:
+  url: https://prod.example.com
+
+spring:
+  mail:
+    host: ${PROD_MAIL_HOST:smtp.qq.com}
+    port: ${PROD_MAIL_PORT:587}
+    username: ${PROD_MAIL_USERNAME}
+    password: ${PROD_MAIL_PASSWORD}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+logging:
+  file:
+    name: logs/prod.log
+  level:
+    root: INFO

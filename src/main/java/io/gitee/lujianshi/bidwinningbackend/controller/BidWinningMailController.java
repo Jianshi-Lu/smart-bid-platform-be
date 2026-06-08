@@ -60,6 +60,8 @@ public class BidWinningMailController {
      *                - templateName：模板文件名（不含 .html 后缀，例如 "bid-winning-notification"）
      * @throws IllegalArgumentException 模板文件不存在于 classpath:/templates/ 目录时抛出
      * @return 字符串 "发送成功"（立即返回，不等待邮件实际发送）
+     *
+     * TODO: 少参（templateName）报错-需新增兜底机制
      */
     @PostMapping("/send-notification")
     public String sendNotification(@RequestBody BidWinningMailRequest request) {
@@ -81,5 +83,4 @@ public class BidWinningMailController {
         }, 5000);
         return "发送成功";
     }
-
 }
