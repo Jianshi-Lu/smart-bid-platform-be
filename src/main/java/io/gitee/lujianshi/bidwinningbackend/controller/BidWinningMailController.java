@@ -79,6 +79,8 @@ public class BidWinningMailController {
                 );
             } catch (MessagingException e) {
                 throw new RuntimeException(e);
+            } finally {
+                System.out.println("邮件发送任务完成: to=" + request.getTo());
             }
         }, 5000);
         return "发送成功";

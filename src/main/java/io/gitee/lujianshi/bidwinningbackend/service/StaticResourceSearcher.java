@@ -52,6 +52,8 @@ public class StaticResourceSearcher {
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("模板搜索失败: " + templateCode, e);
+        } finally {
+            System.out.println("模板搜索完成: " + templateCode);
         }
     }
 

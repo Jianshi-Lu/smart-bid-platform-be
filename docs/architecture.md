@@ -582,6 +582,7 @@ Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟5秒后执行
             ├─ helper.setSubject(subject)
             ├─ helper.setText(htmlContent, true)  ← HTML 格式
             └─ mailSender.send(mimeMessage)
+        └─ finally: System.out.println("邮件发送任务完成: to=...")（兜底日志，无论成功失败）
 ```
 
 **Postman 请求示例（选择模板 v2）**：
@@ -707,27 +708,33 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 ```java
 public void validateTemplateExists(String templateName) {
-    // 1. 扫描 classpath:/templates/*.html 下的所有模板文件
-    Resource[] resources = resourcePatternResolver.getResources("classpath:/templates/*.html");
-    //   ↓
-    //   PathMatchingResourcePatternResolver.getResources("classpath:/templates/*.html")
-    //     ↓
-    //     ClassLoader.getResources("templates/")  ← 遍历 classpath 下所有 templates 目录
-    //     ↓
-    //     对每个 .html 文件创建 ClassPathResource 对象
-    //     ↓
-    //     返回 Resource[] 数组
+    try {
+        // 1. 扫描 classpath:/templates/*.html 下的所有模板文件
+        Resource[] resources = resourcePatternResolver.getResources("classpath:/templates/*.html");
+        //   ↓
+        //   PathMatchingResourcePatternResolver.getResources("classpath:/templates/*.html")
+        //     ↓
+        //     ClassLoader.getResources("templates/")  ← 遍历 classpath 下所有 templates 目录
+        //     ↓
+        //     对每个 .html 文件创建 ClassPathResource 对象
+        //     ↓
+        //     返回 Resource[] 数组
 
-    // 2. 精确匹配
-    boolean exists = Arrays.stream(resources)
-            .map(this::extractTemplateName)              // 提取文件名（去 .html 后缀）
-            .anyMatch(name -> name != null && name.equals(templateName));
-            // 精确匹配：传入 "bid-winning-notification2"
-            // → 只匹配文件名完全等于 "bid-winning-notification2" 的文件
+        // 2. 精确匹配
+        boolean exists = Arrays.stream(resources)
+                .map(this::extractTemplateName)              // 提取文件名（去 .html 后缀）
+                .anyMatch(name -> name != null && name.equals(templateName));
+                // 精确匹配：传入 "bid-winning-notification2"
+                // → 只匹配文件名完全等于 "bid-winning-notification2" 的文件
 
-    // 3. 找不到则抛异常，不 fallback
-    if (!exists) {
-        throw new IllegalArgumentException("模板不存在: " + templateName);
+        // 3. 找不到则抛异常，不 fallback
+        if (!exists) {
+            throw new IllegalArgumentException("模板不存在: " + templateName);
+        }
+    } catch (IOException e) {
+        throw new IllegalArgumentException("模板搜索失败: " + templateName, e);
+    } finally {
+        System.out.println("模板搜索完成: " + templateName);
     }
 }
 ```
@@ -932,7 +939,10 @@ public static void execute(Runnable task, long delayMillis) {
             Thread.currentThread().interrupt();      // 4. InterruptedException 处理
             throw new RuntimeException(e);            //   - 恢复中断状态
         }                                            //   - 转换为未检查异常上抛
-    }).start();                                      // 5. 启动线程，立即返回（不等待子线程执行）
+        } finally {
+            System.out.println("异步任务执行完成: delayMillis=" + delayMillis);
+        }                                            // 5. finally 兜底日志（无论成功失败都执行）
+    }).start();                                      // 6. 启动线程，立即返回（不等待子线程执行）
 }
 ```
 

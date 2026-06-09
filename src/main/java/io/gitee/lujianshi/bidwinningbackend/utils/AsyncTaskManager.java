@@ -37,12 +37,14 @@ public class AsyncTaskManager {
      *    - 阻塞的是 new 出来的子线程，不是调用 execute 的主线程
      *    - 实现"延迟执行"效果，同时主线程继续运行不阻塞
      * 3. task.run()：睡醒后执行传入的业务逻辑
-     * 4. .start()：启动新线程（start 后立即返回，不等待线程执行完成）
+     * 4. finally：无论 try 成功或 catch 拦截异常，都输出"异步任务执行完成"日志
+     * 5. .start()：启动新线程（start 后立即返回，不等待线程执行完成）
      *
      * 异常处理：
      * - InterruptedException：捕获 sleep 过程中的中断信号
      * - Thread.currentThread().interrupt()：恢复线程中断状态，符合 Java 规范
      * - throw new RuntimeException(e)：转换为未检查异常上抛
+     * - finally：状态日志记录（不释放资源，因为线程由 JVM 管理）
      *
      * @param task        要执行的任务（Runnable 接口）
      * @param delayMillis 延迟多少毫秒后再执行
@@ -55,6 +57,8 @@ public class AsyncTaskManager {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();  // 恢复中断状态
                 throw new RuntimeException(e);       // 转换为未检查异常
+            } finally {
+                System.out.println("异步任务执行完成: delayMillis=" + delayMillis);
             }
         }).start();  // 启动新线程，立即返回，不等待执行完成
     }
