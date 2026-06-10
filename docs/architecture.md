@@ -975,6 +975,107 @@ OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
 
 ---
 
+### 4.7 MyBatis-Plus 持久化层（Mapper + XML）
+
+> 详细端到端开发流程（从 DB 到 Controller）见 [`docs/development-flow.md`](development-flow.md)。本节重点说明 Mapper 与 XML 的设计。
+
+**目录结构**：
+
+```
+src/main/
+├── java/io/gitee/lujianshi/bidwinningbackend/
+│   ├── entity/                          ← Java 实体（Plus 注解）
+│   │   ├── BidHandlerInfo.java
+│   │   ├── BidWinningNotification.java
+│   │   └── BidWinningSupplierDetail.java
+│   ├── mapper/                          ← Mapper 接口（手写签名）
+│   │   └── BidHandlerInfoMapper.java
+│   └── service/                          ← 业务层
+│       └── BidHandlerInfoService.java
+└── resources/
+    ├── mapper/                           ← Mapper XML（SQL 独立）
+    │   └── BidHandlerInfoMapper.xml
+    └── sql/ddl/                          ← 建表脚本（Flyway 兼容命名，**当前未启用 Flyway**）
+        ├── V1__create_handler_info.sql
+        └── ...
+```
+
+**完整链路（7 层自下而上）**：
+
+```
+DB 表（建表脚本，Flyway 兼容命名）
+  ↓
+Entity（@TableName + @TableId）
+  ↓
+Mapper 接口（手写方法签名，**不继承 BaseMapper**）
+  ↓
+Mapper XML（namespace 绑定接口，**Java 与 SQL 分离**）
+  ↓
+Service（注入 Mapper 接口，**不继承 IService**）
+  ↓
+DTO（@NotBlank 校验）
+  ↓
+Controller（@Valid 触发校验）
+```
+
+**关键设计原则**：
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| Mapper 继承 `BaseMapper` | ❌ 不继承 | Java/SQL 分离，扩展性强 |
+| `@Mapper` 注解 | ❌ 不写 | 启动类 `@MapperScan` 统一扫描 |
+| Service 继承 `IService` | ❌ 不继承 | 与 Mapper 风格统一，手写 |
+| Entity 加 Plus 注解 | ✅ `@TableName` + `@TableId` | 配合启动类 + Mapper 自动映射 |
+| SQL 写在 XML | ✅ 必选 | 坚持 Java/SQL 分离 |
+| XML 位置 | `resources/mapper/*.xml` | Maven 编译范围外，是资源文件 |
+| `namespace` | = Mapper 接口全限定名 | 关键约束，错一位全废 |
+
+**完整链路实例（POST /bid-handler）**：
+
+1. Postman POST `{handlerName, companyName, departmentName}`
+2. Spring MVC 路由 → `BidHandlerInfoController.create()`
+3. `@Valid` 触发 `jakarta.validation` 校验
+4. Jackson 反序列化 → `BidHandlerInfoCreateRequest`
+5. 字段拷贝：DTO → Entity
+6. `BidHandlerInfoService.create(entity)`
+7. `BidHandlerInfoMapper.insert(entity)`（**Spring 注入的代理实现**）
+8. `BidHandlerInfoMapper.xml <insert>` 标签执行 SQL
+9. MySQL 写入 + 自增 ID 回填
+10. Jackson 序列化 entity → JSON 返回
+
+**`@MapperScan` 启动类配置**：
+
+```java
+@SpringBootApplication
+@MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")
+public class BidWinningBackendApplication { ... }
+```
+
+**MyBatis-Plus 关键配置**（`application-dev.yml`）：
+
+```yaml
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml    # XML 位置
+  type-aliases-package: io.gitee.lujianshi.bidwinningbackend.entity  # 别名
+  configuration:
+    map-underscore-to-camel-case: true         # 字段映射
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印 SQL
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto                             # 主键自增策略
+```
+
+**详见**：
+
+- [`docs/development-flow.md`](development-flow.md) — 端到端开发流程详解
+- [`docs/database.md`](database.md) — 数据库结构与 Entity 映射
+- `entity/BidHandlerInfo.java` — Entity 类注释（链路位置）
+- `mapper/BidHandlerInfoMapper.java` — Mapper 接口注释（设计原则）
+- `resources/mapper/BidHandlerInfoMapper.xml` — XML 头部注释（SQL 约束）
+
+---
+
 ## 5. 工具类
 
 ### 5.1 `AsyncTaskManager`

@@ -1,8 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  BidHandlerInfoMapper.xml — 经办人 SQL 映射                       │
+  │                                                                    │
+  │  在整个开发链路中的位置：                                          │
+  │   ① 数据库表（V1~V3 演进）                                        │
+  │   ② Entity 层（BidHandlerInfo）                                   │
+  │   ③ Mapper 接口（BidHandlerInfoMapper）                           │
+  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
+  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
+  │   ⑥ DTO 层                                                        │
+  │   ⑦ Controller 层                                                 │
+  │                                                                    │
+  │  关键约定：                                                        │
+  │   - namespace 必须等于 Mapper 接口全限定名（一个字符都不能错）    │
+  │   - 每个 <insert> / <update> / <delete> / <select> 标签的         │
+  │     id = Mapper 接口中的方法名                                    │
+  │   - parameterType / resultMap 用全限定名（最稳）                  │
+  │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
+  └────────────────────────────────────────────────────────────────────┘
+-->
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper">
 
+    <!--
+      BaseResultMap：Java 字段 ↔ DB 列映射
+      即使 application.yml 配了 map-underscore-to-camel-case=true，
+      这里仍显式声明，避免魔法规则带来的隐式行为。
+    -->
     <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
         <id     column="handler_id"      property="handlerId"/>
         <result column="handler_name"    property="handlerName"/>
@@ -10,13 +36,24 @@
         <result column="department_name" property="departmentName"/>
     </resultMap>
 
-    <insert id="insert" parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
-            useGeneratedKeys="true" keyProperty="handlerId">
+    <!--
+      插入：自增主键回填
+      useGeneratedKeys="true" 让 MySQL 把自增 ID 写回 Java 对象的 handlerId 字段
+      keyProperty 必须等于 Entity 中的 @TableId 字段名
+    -->
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
+            useGeneratedKeys="true"
+            keyProperty="handlerId">
         INSERT INTO bid_handler_info (handler_name, company_name, department_name)
         VALUES (#{handlerName}, #{companyName}, #{departmentName})
     </insert>
 
-    <update id="updateById" parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
+    <!--
+      按 ID 更新：传入 entity 必须携带 handlerId
+    -->
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
         UPDATE bid_handler_info
         SET handler_name    = #{handlerName},
             company_name    = #{companyName},
@@ -24,16 +61,27 @@
         WHERE handler_id    = #{handlerId}
     </update>
 
+    <!--
+      按 ID 删除：#{handlerId} 名称 = Mapper 接口方法参数名
+    -->
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM bid_handler_info WHERE handler_id = #{handlerId}
+        DELETE FROM bid_handler_info
+        WHERE handler_id = #{handlerId}
     </delete>
 
+    <!--
+      按 ID 查询：resultMap 引用上面定义的 BaseResultMap
+    -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT handler_id, handler_name, company_name, department_name
         FROM bid_handler_info
         WHERE handler_id = #{handlerId}
     </select>
 
+    <!--
+      查询全部（无参）：用 resultMap 复用
+      数据量小时可直接用，数据量大时建议加分页（后续可加 PageHelper / Plus PaginationInnerInterceptor）
+    -->
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT handler_id, handler_name, company_name, department_name
         FROM bid_handler_info

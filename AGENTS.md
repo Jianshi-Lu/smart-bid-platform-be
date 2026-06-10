@@ -122,22 +122,54 @@
 ## Entity（数据库实体）
 
 - 数据库表映射（详见 `docs/database.md`）
-- 当前为纯 POJO，无 ORM 注解（待引入 MyBatis-Plus / JPA 后再加）
+- MyBatis-Plus 注解: `@TableName` + `@TableId(type = AUTO)`
+- 字段命名：Java 驼峰 ↔ DB 下划线（依赖 Plus 的下划线-驼峰映射）
 
 ### BidHandlerInfo
 
 - 对应表: `bid_handler_info`
 - 字段: `handlerId` / `handlerName` / `companyName` / `departmentName`
+- 完整链路（Mapper + XML + Service + Controller）已实现
 
 ### BidWinningNotification
 
 - 对应表: `bid_winning_notification`
 - 字段: 19 个字段（详见 `docs/database.md` 2.2 节）
+- 待复制 BidHandlerInfo 模式实现完整链路
 
 ### BidWinningSupplierDetail
 
 - 对应表: `bid_winning_supplier_detail`
 - 字段: `detailId` / `notificationId` / `supplierName` / `amount`
+- 待复制 BidHandlerInfo 模式实现完整链路
+
+## Mapper（持久化层）
+
+- **位置**: `src/main/java/.../mapper/`
+- **设计原则**: 手写接口 + XML 分离（Java 与 SQL 解耦）
+- **不写** `@Mapper` 注解（启动类 `@MapperScan` 统一扫描）
+- **不继承** `BaseMapper<T>`（不用 Plus 自动 CRUD）
+- **SQL 独立** 在 `src/main/resources/mapper/*.xml`
+
+### BidHandlerInfoMapper
+
+- 接口: `mapper/BidHandlerInfoMapper.java`
+- XML: `resources/mapper/BidHandlerInfoMapper.xml`
+- 方法: `insert` / `updateById` / `deleteById` / `selectById` / `selectAll`
+
+## 端到端开发流程
+
+> 完整链路（从数据库到 Controller）详见 [`docs/development-flow.md`](docs/development-flow.md)
+
+**7 层链路（自下而上）**：
+
+1. **DB 脚本**（V1__xxx.sql，Flyway 兼容命名，**当前未启用 Flyway**）
+2. **Entity**（@TableName + @TableId）
+3. **Mapper 接口**（手写方法签名）
+4. **Mapper XML**（namespace 绑定接口，SQL 独立）
+5. **Service**（注入 Mapper，**不继承 IService**）
+6. **DTO**（@NotBlank 校验）
+7. **Controller**（@Valid 触发校验）
 
 ## Testing
 

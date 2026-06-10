@@ -1,6 +1,8 @@
 # 数据库结构文档
 
-> 本文档描述 bid-winning-backend 项目的数据库表结构，所有表均通过 `src/main/resources/sql/ddl/` 下的 Flyway 命名规范脚本管理。
+> 本文档描述 bid-winning-backend 项目的数据库表结构。所有表通过 `src/main/resources/sql/ddl/` 下的脚本管理，脚本文件名采用 **Flyway 兼容的版本号格式**（V1__xxx.sql），便于未来切换到 Flyway / Liquibase 等迁移工具时无需改名。
+>
+> **当前状态**：**未实际启用 Flyway**，表结构需 DBA 或开发者手动执行 `sql/ddl/` 下的脚本。引入 Flyway 的步骤见第 5 节待办。
 
 ---
 
@@ -159,9 +161,42 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 
 ## 5. 待办
 
-- [ ] 添加 `flyway-core` 依赖到 `pom.xml`
-- [ ] 在 `application.yml` 配置 `spring.flyway.enabled: true`
+- [ ] 添加 `flyway-core` 依赖到 `pom.xml`（**当前未引入**）
+- [ ] 在 `application.yml` 配置 `spring.flyway.enabled: true`（**当前未启用**）
 - [x] 创建 Java 实体类（`BidHandlerInfo`、`BidWinningNotification`、`BidWinningSupplierDetail`）
-- [ ] 创建 MyBatis/JPA Mapper
-- [ ] 解决 Java 字段与 DB 字段命名不一致问题
-- [ ] 引入 ORM 框架（MyBatis-Plus / JPA）并加注解
+- [x] 加 MyBatis-Plus 注解（`@TableName` + `@TableId`）
+- [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` 完整链路已实现）
+- [x] 引入 MyBatis-Plus 框架
+- [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningNotification` 完整链路
+- [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningSupplierDetail` 完整链路
+- [ ] 新增 `GlobalExceptionHandler` 统一异常处理
+- [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充）
+- [ ] 解决 Java 字段与 DB 字段命名不一致问题（`projectNo` vs `projectCode` 等）
+
+---
+
+## 6. 端到端开发流程
+
+> DB 表是开发链路的起点。从建表 SQL 到暴露给前端的 Controller，每一层产物和约定详见 [`docs/development-flow.md`](development-flow.md)。
+
+**链路总览（7 层自下而上）**：
+
+```
+DB 表（V*.sql，Flyway 兼容命名，当前未启用 Flyway）
+  ↓
+Entity（@TableName + @TableId）
+  ↓
+Mapper 接口（手写签名，不继承 BaseMapper）
+  ↓
+Mapper XML（namespace 绑定，SQL 独立）
+  ↓
+Service（注入 Mapper，不继承 IService）
+  ↓
+DTO（@NotBlank / @Size 校验）
+  ↓
+Controller（@Valid 触发校验）
+```
+
+**当前已实现**：`BidHandlerInfo` 完整 7 层链路
+
+**待复制实现**：`BidWinningNotification` / `BidWinningSupplierDetail`
