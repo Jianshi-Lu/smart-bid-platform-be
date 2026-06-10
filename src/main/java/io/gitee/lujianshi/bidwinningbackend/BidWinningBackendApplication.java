@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend;
 
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -22,6 +23,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  */
 @SpringBootApplication
 @EnableAsync
+@MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")
 public class BidWinningBackendApplication {
 
     public static void main(String[] args) {

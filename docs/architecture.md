@@ -88,7 +88,7 @@ public @interface SpringBootApplication {
 | `@EnableAutoConfiguration` | 启用自动配置，让 Spring Boot 根据 classpath 和条件注解（`@Conditional`）自动配置第三方库 |
 | `@ComponentScan` | 组件扫描，从主配置类所在包（`io.gitee.lujianshi.bidwinningbackend`）向下扫描，收集 `@Component`、`@Service`、`@Controller` 等标注的类注册为 Spring Bean |
 
-**关键点**：`@ComponentScan` 默认只扫描主配置类所在的包及其子包。这就解释了为什么 `BidWinningBackendApplication` 放在 `io.gitee.lujianshi.bidwinningbackend` 包下，所有子包（controller、service、dto、utils）中的组件都能被自动发现。
+**关键点**：`@ComponentScan` 默认只扫描主配置类所在的包及其子包。这就解释了为什么 `BidWinningBackendApplication` 放在 `io.gitee.lujianshi.bidwinningbackend` 包下，所有子包（controller、service、dto、entity、utils）中的组件都能被自动发现。
 
 ---
 
@@ -390,6 +390,64 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 - `BidWinningMailRequest` 专门用于中标通知书邮件场景，携带模板渲染所需的项目信息
 - `bidWinningList` 支持多行中标数据，前端传入 JSON 数组，后端通过 Thymeleaf `th:each` 渲染
 - `templateName` 由用户传入，实现动态模板选择；传入值必须与 `classpath:/templates/` 下的实际文件名精确匹配，不存在则抛异常
+
+---
+
+## 2.3 实体类（Entity）
+
+**目录**：`src/main/java/io/gitee/lujianshi/bidwinningbackend/entity/`
+
+**职责**：与数据库表结构一一对应的 Java POJO。当前为**纯 POJO**，不带任何 ORM 注解（待引入 MyBatis-Plus / JPA 后再加）。
+
+**共同特点**：
+
+| 特征 | 说明 |
+|------|------|
+| Lombok 注解 | `@Data` + `@NoArgsConstructor` + `@AllArgsConstructor` |
+| 命名风格 | Java 驼峰，对应 DB 下划线（如 `handlerName` ↔ `handler_name`） |
+| 主键类型 | `Integer`（包装类，区分 null 与 0） |
+| 金额字段 | `BigDecimal`（避免浮点精度问题） |
+| 布尔字段 | `Boolean`（包装类，区分 null 与 false） |
+| 时间字段 | `LocalDateTime`（Java 8+，线程安全） |
+
+### 2.3.1 `BidHandlerInfo`
+
+**对应表**：`bid_handler_info`（V3 重命名自 `handler_info`）
+
+| Java 字段 | DB 字段 | 类型 | 必填 |
+|-----------|---------|------|------|
+| `handlerId` | `handler_id` | `Integer` | ✅（PK, AUTO_INCREMENT） |
+| `handlerName` | `handler_name` | `String` | ✅ |
+| `companyName` | `company_name` | `String` | ✅（V2+） |
+| `departmentName` | `department_name` | `String` | ✅（V2+） |
+
+### 2.3.2 `BidWinningNotification`
+
+**对应表**：`bid_winning_notification`（V4 创建）
+
+19 个字段，详见 `docs/database.md` 2.2 节。
+
+### 2.3.3 `BidWinningSupplierDetail`
+
+**对应表**：`bid_winning_supplier_detail`（V5 创建）
+
+| Java 字段 | DB 字段 | 类型 | 必填 |
+|-----------|---------|------|------|
+| `detailId` | `detail_id` | `Integer` | ✅（PK, AUTO_INCREMENT） |
+| `notificationId` | `notification_id` | `Integer` | ✅（FK，关联主表） |
+| `supplierName` | `supplier_name` | `String` | ✅ |
+| `amount` | `amount` | `BigDecimal` | ✅ |
+
+**与 DTO 的命名差异**（已知问题）：
+
+| Java 字段 | DTO 字段 | DB 字段 |
+|-----------|----------|---------|
+| `projectNo` | `projectCode` | `project_no` |
+| `amount` | `bidWinningAmount` | `amount` |
+
+**解决思路**（待引入 ORM 后处理）：
+- 方案 A：Entity 跟 DB 命名，DTO 跟业务命名，加 Mapper 转换层
+- 方案 B：Entity 跟 DTO 命名，加 `@TableField("xxx")` 映射
 
 ---
 

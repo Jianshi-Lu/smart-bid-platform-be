@@ -128,18 +128,32 @@
 
 ## 4. 与 Java 实体的映射
 
-当前 Java 代码中**尚未建立 JPA/MyBatis 实体类**，仅 `BidWinningMailRequest` DTO 与 `bid_winning_notification` + `bid_winning_supplier_detail` 业务对应：
+项目已在 `src/main/java/io/gitee/lujianshi/bidwinningbackend/entity/` 下建立 3 个 Entity 类（纯 POJO）：
 
-| Java 字段 | 数据库表 | 数据库字段 |
-|-----------|----------|------------|
-| `BidWinningMailRequest.projectCode` | `bid_winning_notification` | `project_no` ⚠️ 命名不一致 |
-| `BidWinningMailRequest.handlerName` | `bid_handler_info` | `handler_name` |
-| `BidWinningMailRequest.bidWinningList[].supplierName` | `bid_winning_supplier_detail` | `supplier_name` |
-| `BidWinningMailRequest.bidWinningList[].bidWinningAmount` | `bid_winning_supplier_detail` | `amount` ⚠️ 命名不一致 |
+| Java Entity | 数据库表 |
+|-------------|----------|
+| `BidHandlerInfo` | `bid_handler_info` |
+| `BidWinningNotification` | `bid_winning_notification` |
+| `BidWinningSupplierDetail` | `bid_winning_supplier_detail` |
 
-**已知问题**：
-- `projectCode` vs `project_no`：Java 驼峰 vs DB 下划线（建议加 `@Column` 映射）
-- `bidWinningAmount` vs `amount`：Java 详细命名 vs DB 简短命名（建议加 `@Column` 映射）
+### 4.1 Entity ↔ DTO 字段对应
+
+DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在差异：
+
+| Entity 字段（DB 对齐） | DTO 字段（业务对齐） | DB 字段 |
+|----------------------|---------------------|---------|
+| `BidWinningNotification.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` ⚠️ |
+| `BidWinningNotification.handlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念） | `handler_id` |
+| `BidWinningSupplierDetail.supplierName` | `BidWinningListItem.supplierName` | `supplier_name` |
+| `BidWinningSupplierDetail.amount` | `BidWinningListItem.bidWinningAmount` | `amount` ⚠️ |
+
+**已知命名差异**（待 ORM 引入后处理）：
+- `projectNo` vs `projectCode`
+- `amount` vs `bidWinningAmount`
+
+**解决思路**：
+- 方案 A：Entity 跟 DB 命名，DTO 跟业务命名，加 Mapper 转换层
+- 方案 B：Entity 跟 DTO 命名，加 `@TableField("xxx")` 映射
 
 ---
 
@@ -147,6 +161,7 @@
 
 - [ ] 添加 `flyway-core` 依赖到 `pom.xml`
 - [ ] 在 `application.yml` 配置 `spring.flyway.enabled: true`
-- [ ] 创建 Java 实体类（`BidHandlerInfo`、`BidWinningNotification`、`BidWinningSupplierDetail`）
+- [x] 创建 Java 实体类（`BidHandlerInfo`、`BidWinningNotification`、`BidWinningSupplierDetail`）
 - [ ] 创建 MyBatis/JPA Mapper
 - [ ] 解决 Java 字段与 DB 字段命名不一致问题
+- [ ] 引入 ORM 框架（MyBatis-Plus / JPA）并加注解

@@ -32,6 +32,11 @@
   - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
     - PlainTextMailRequest - 纯文本邮件请求
     - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
+    - BidWinningListItem - 中标结果条目（独立顶层类）
+  - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
+    - BidHandlerInfo - 经办人/招标负责人
+    - BidWinningNotification - 定标通知主表
+    - BidWinningSupplierDetail - 中标结果明细
   - `utils/` - 工具类
     - AsyncTaskManager - 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
   - `templates/` - Thymeleaf 模板文件（src/main/resources/templates/）
@@ -113,6 +118,26 @@
 - 自有字段: `projectCode`、`handlerName`、`bidWinningList`、`templateName`
 - 内部类: `BidWinningListItem(supplierName, bidWinningAmount)`
 - 使用场景: POST /send-notification（中标通知书 HTML 邮件）
+
+## Entity（数据库实体）
+
+- 数据库表映射（详见 `docs/database.md`）
+- 当前为纯 POJO，无 ORM 注解（待引入 MyBatis-Plus / JPA 后再加）
+
+### BidHandlerInfo
+
+- 对应表: `bid_handler_info`
+- 字段: `handlerId` / `handlerName` / `companyName` / `departmentName`
+
+### BidWinningNotification
+
+- 对应表: `bid_winning_notification`
+- 字段: 19 个字段（详见 `docs/database.md` 2.2 节）
+
+### BidWinningSupplierDetail
+
+- 对应表: `bid_winning_supplier_detail`
+- 字段: `detailId` / `notificationId` / `supplierName` / `amount`
 
 ## Testing
 
