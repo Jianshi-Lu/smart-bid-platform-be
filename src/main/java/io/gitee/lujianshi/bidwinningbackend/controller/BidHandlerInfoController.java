@@ -59,17 +59,17 @@ import org.springframework.web.bind.annotation.*;
  *   <li>{@code POST   /create-bid-handler-info}     — 创建经办人</li>
  *   <li>{@code DELETE /bid-handler-info/{id}}        — 按主键删除经办人</li>
  *   <li>{@code PUT    /bid-handler-info/{id}}        — 按主键更新经办人（返回 before/after diff）</li>
+ *   <li>{@code GET    /bid-handler-info/{id}}        — 按主键单条查询</li>
  * </ul>
  *
  * <h3>待实现端点（查）</h3>
  * <ul>
- *   <li>{@code GET    /bid-handler-info/{id}}        — 按主键单条查询</li>
- *   <li>{@code GET    /bid-handler-info}             — 列表查询</li>
+ *   <li>{@code GET    /bid-handler-info}             — 列表查询（<b>待设计分页机制</b>）</li>
  * </ul>
  *
  * <h3>待办</h3>
  * <ul>
- *   <li>实现 2 个待实现端点（查）</li>
+ *   <li>实现列表查询端点（需先设计分页机制：MyBatis-Plus 分页插件 / 手动 LIMIT / PageHelper）</li>
  *   <li>当前 {@code createBidHandlerInfo} / {@code updateBidHandlerInfo} 未加 {@code @Valid} 校验，DTO 上的 {@code @NotBlank}/{@code @Size} 暂未生效</li>
  *   <li>统一异常处理（{@code GlobalExceptionHandler} 尚未实现）</li>
  * </ul>
@@ -184,5 +184,29 @@ public class BidHandlerInfoController {
 
         // 4. 包装 diff 返回
         return Result.success(new Diff<>(before, after), "更新成功");
+    }
+
+    /**
+     * 按主键 ID 查询单条经办人
+     *
+     * <p>执行链路：</p>
+     * <pre>
+     *   GET /bid-handler-info/{id}（无需 body，无需认证参数）
+     *     → @PathVariable 从 URL 路径读取 id
+     *     → service.getById(id) → mapper.selectById(id) → SQL SELECT
+     *     → 包装为 Result&lt;BidHandlerInfo&gt; 序列化为 JSON
+     *   成功：code=200, data=entity, message="查询成功"
+     *   失败：code=404, data=null, message="记录不存在"
+     * </pre>
+     *
+     * @param id 经办人主键 ID（从 URL 路径 {@code {id}} 自动注入）
+     * @return {@code Result<BidHandlerInfo>} — code=200 成功（含 entity） / code=404 记录不存在
+     */
+    @GetMapping("/bid-handler-info/{id}")
+    public Result<BidHandlerInfo> getByIdBidHandlerInfo(@PathVariable Integer id) {
+        BidHandlerInfo entity = service.getById(id);
+        return entity != null
+                ? Result.success(entity, "查询成功")    // 找到
+                : Result.error(404, "记录不存在");   // 未找到
     }
 }
