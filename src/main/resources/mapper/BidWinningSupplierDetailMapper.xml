@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  BidWinningSupplierDetailMapper.xml — 中标结果明细表 SQL 映射      │
+  │                                                                    │
+  │  在整个开发链路中的位置：                                          │
+  │   ① 数据库表（V5 建表）                                            │
+  │   ② Entity 层（BidWinningSupplierDetail）                          │
+  │   ③ Mapper 接口（BidWinningSupplierDetailMapper）                  │
+  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
+  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
+  │   ⑥ DTO 层                                                        │
+  │   ⑦ Controller 层                                                 │
+  │                                                                    │
+  │  关键约定：                                                        │
+  │   - namespace 必须等于 Mapper 接口全限定名（一个字符都不能错）    │
+  │   - 每个 <insert> / <update> / <delete> / <select> 标签的         │
+  │     id = Mapper 接口中的方法名                                    │
+  │   - parameterType / resultMap 用全限定名（最稳）                  │
+  │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
+  │                                                                    │
+  │  本表特点（最简实现）：4 字段、无 DB 默认值、无时间字段            │
+  │  业务关系：一条定标通知 → 多条中标明细（1:N）                       │
+  └────────────────────────────────────────────────────────────────────┘
+-->
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningSupplierDetailMapper">
+
+    <!--
+      BaseResultMap：Java 字段 ↔ DB 列映射
+      即使 application.yml 配了 map-underscore-to-camel-case=true，
+      这里仍显式声明，避免魔法规则带来的隐式行为。
+    -->
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail">
+        <id     column="detail_id"       property="detailId"/>
+        <result column="notification_id" property="notificationId"/>
+        <result column="supplier_name"   property="supplierName"/>
+        <result column="amount"          property="amount"/>
+    </resultMap>
+
+    <!--
+      插入：自增主键回填
+      - detail_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.detailId）
+      - 其余 3 字段全部为 NOT NULL，必须显式传入
+    -->
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail"
+            useGeneratedKeys="true"
+            keyProperty="detailId">
+        INSERT INTO bid_winning_supplier_detail
+            (notification_id, supplier_name, amount)
+        VALUES
+            (#{notificationId}, #{supplierName}, #{amount})
+    </insert>
+
+    <!--
+      按 ID 更新：传入 entity 必须携带 detailId
+    -->
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail">
+        UPDATE bid_winning_supplier_detail
+        SET notification_id = #{notificationId},
+            supplier_name    = #{supplierName},
+            amount           = #{amount}
+        WHERE detail_id     = #{detailId}
+    </update>
+
+    <!--
+      按 ID 删除：#{detailId} 名称 = Mapper 接口方法参数名
+    -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM bid_winning_supplier_detail
+        WHERE detail_id = #{detailId}
+    </delete>
+
+    <!--
+      按 ID 查询：resultMap 复用 BaseResultMap
+    -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT detail_id, notification_id, supplier_name, amount
+        FROM bid_winning_supplier_detail
+        WHERE detail_id = #{detailId}
+    </select>
+
+    <!--
+      查询全部（无参）：用 resultMap 复用
+      数据量小时可直接用，数据量大时建议后续加分页
+    -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT detail_id, notification_id, supplier_name, amount
+        FROM bid_winning_supplier_detail
+    </select>
+
+</mapper>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  BidWinningNotificationMapper.xml — 定标通知主表 SQL 映射          │
+  │                                                                    │
+  │  在整个开发链路中的位置：                                          │
+  │   ① 数据库表（V4 建表）                                            │
+  │   ② Entity 层（BidWinningNotification）                            │
+  │   ③ Mapper 接口（BidWinningNotificationMapper，待实现）             │
+  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
+  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
+  │   ⑥ DTO 层                                                        │
+  │   ⑦ Controller 层                                                 │
+  │                                                                    │
+  │  关键约定：                                                        │
+  │   - namespace 必须等于 Mapper 接口全限定名（一个字符都不能错）    │
+  │   - 每个 <insert> / <update> / <delete> / <select> 标签的         │
+  │     id = Mapper 接口中的方法名                                    │
+  │   - parameterType / resultMap 用全限定名（最稳）                  │
+  │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
+  │                                                                    │
+  │  本次提交范围：仅 XML（保持最小实现，Mapper 接口待后续补全）      │
+  └────────────────────────────────────────────────────────────────────┘
+-->
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper">
+
+    <!--
+      BaseResultMap：Java 字段 ↔ DB 列映射
+      即使 application.yml 配了 map-underscore-to-camel-case=true，
+      这里仍显式声明，避免魔法规则带来的隐式行为。
+    -->
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">
+        <id     column="notification_id"        property="notificationId"/>
+        <result column="handler_id"             property="handlerId"/>
+        <result column="project_no"             property="projectNo"/>
+        <result column="purchase_task_no"       property="purchaseTaskNo"/>
+        <result column="platform_category"      property="platformCategory"/>
+        <result column="bidding_process"        property="biddingProcess"/>
+        <result column="bidding_method"         property="biddingMethod"/>
+        <result column="purchase_method"        property="purchaseMethod"/>
+        <result column="is_fixed_price"         property="isFixedPrice"/>
+        <result column="target_cost"            property="targetCost"/>
+        <result column="document_fee"           property="documentFee"/>
+        <result column="deposit"                property="deposit"/>
+        <result column="credit_report_required" property="creditReportRequired"/>
+        <result column="registration_deadline"  property="registrationDeadline"/>
+        <result column="tech_bid_deadline"      property="techBidDeadline"/>
+        <result column="business_bid_deadline"  property="businessBidDeadline"/>
+        <result column="bidding_status"         property="biddingStatus"/>
+        <result column="notes"                  property="notes"/>
+        <result column="created_at"             property="createdAt"/>
+    </resultMap>
+
+    <!--
+      插入：自增主键回填 + 依赖 DB 默认值
+      - notification_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.notificationId）
+      - created_at 省略（DB DEFAULT CURRENT_TIMESTAMP 自动填）
+      - bidding_status 省略（DB DEFAULT '已完成' 自动填）
+    -->
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification"
+            useGeneratedKeys="true"
+            keyProperty="notificationId">
+        INSERT INTO bid_winning_notification
+            (handler_id, project_no, purchase_task_no, platform_category,
+             bidding_process, bidding_method, purchase_method, is_fixed_price,
+             target_cost, document_fee, deposit, credit_report_required,
+             registration_deadline, tech_bid_deadline, business_bid_deadline,
+             notes)
+        VALUES
+            (#{handlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
+             #{biddingProcess}, #{biddingMethod}, #{purchaseMethod}, #{isFixedPrice},
+             #{targetCost}, #{documentFee}, #{deposit}, #{creditReportRequired},
+             #{registrationDeadline}, #{techBidDeadline}, #{businessBidDeadline},
+             #{notes})
+    </insert>
+
+    <!--
+      按 ID 更新：传入 entity 必须携带 notificationId
+      排除 created_at（DB 维护，不应被业务更新）
+    -->
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">
+        UPDATE bid_winning_notification
+        SET handler_id              = #{handlerId},
+            project_no              = #{projectNo},
+            purchase_task_no        = #{purchaseTaskNo},
+            platform_category       = #{platformCategory},
+            bidding_process         = #{biddingProcess},
+            bidding_method          = #{biddingMethod},
+            purchase_method         = #{purchaseMethod},
+            is_fixed_price          = #{isFixedPrice},
+            target_cost             = #{targetCost},
+            document_fee            = #{documentFee},
+            deposit                 = #{deposit},
+            credit_report_required  = #{creditReportRequired},
+            registration_deadline   = #{registrationDeadline},
+            tech_bid_deadline       = #{techBidDeadline},
+            business_bid_deadline   = #{businessBidDeadline},
+            bidding_status          = #{biddingStatus},
+            notes                   = #{notes}
+        WHERE notification_id       = #{notificationId}
+    </update>
+
+    <!--
+      按 ID 删除：#{notificationId} 名称 = Mapper 接口方法参数名
+    -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM bid_winning_notification
+        WHERE notification_id = #{notificationId}
+    </delete>
+
+    <!--
+      按 ID 查询：resultMap 引用上面定义的 BaseResultMap
+    -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
+               document_fee, deposit, credit_report_required, registration_deadline,
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+        FROM bid_winning_notification
+        WHERE notification_id = #{notificationId}
+    </select>
+
+    <!--
+      查询全部（无参）：用 resultMap 复用
+      数据量小时可直接用，数据量大时建议后续加分页
+    -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
+               document_fee, deposit, credit_report_required, registration_deadline,
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+        FROM bid_winning_notification
+    </select>
+
+</mapper>

@@ -34,7 +34,7 @@ public class PlainTextMailSender {
      * @Resource JavaMailSender mailSender
      *
      * JavaMailSender 由 Spring Boot 自动配置（MailSenderAutoConfiguration）
-     * - 读取 application.properties 的 spring.mail.* 配置项（host/port/username/password 等）
+     * - 读取 yml 的 mail.* 配置项（host/port/username/password 等）
      * - 一次性设置到 JavaMailSenderImpl 实例
      * - send() 方法直接使用配置，不重复读取 properties
      *
