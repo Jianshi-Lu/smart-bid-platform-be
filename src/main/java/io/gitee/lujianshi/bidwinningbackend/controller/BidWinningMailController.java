@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 中标通知书 Controller 层：路由 + 参数校验 + 调用 Service
- *
- * @RestController = @Controller + @ResponseBody
- *
+ * <p>
+ * RestController = @Controller + @ResponseBody
+ * <p>
  * 职责：
  * - 定义中标通知书发送路由（POST /send-notification）
  * - 接收请求参数（BidWinningMailRequest POJO，即 DTO）
@@ -34,7 +34,7 @@ public class BidWinningMailController {
 
     /**
      * 中标通知书发送接口
-     *
+     * <p>
      * 完整执行链路：
      * 1. 接收 JSON 请求（@RequestBody 将 JSON 反序列化为 BidWinningMailRequest）
      * 2. 调用 BidWinningTemplateFiller.processTemplate(request)
@@ -61,7 +61,6 @@ public class BidWinningMailController {
      * @throws IllegalArgumentException 模板文件不存在于 classpath:/templates/ 目录时抛出
      * @return 字符串 "发送成功"（立即返回，不等待邮件实际发送）
      *
-     * TODO: 少参（templateName）报错-需新增兜底机制
      */
     @PostMapping("/send-notification")
     public String sendNotification(@RequestBody BidWinningMailRequest request) {

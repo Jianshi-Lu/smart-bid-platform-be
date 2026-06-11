@@ -10,11 +10,11 @@ import org.springframework.stereotype.Service;
 
 /**
  * HTML 邮件发送服务
- *
+ * <p>
  * 使用 MimeMessage + MimeMessageHelper 构造并发送 HTML 格式邮件。
  * 与 PlainTextMailSender（SimpleMailMessage）的区别：
  * - SimpleMailMessage 仅支持纯文本，MimeMessage 支持 HTML/附件/多语言编码
- * - 中标通知书含表格样式，必须使用 HTML 邮件
+ * - 中标通知书含表格样式，必须使用 HTML 邮件asfasdf
  *
  * @see <a href="../../../docs/architecture.md#44-bidwinningmailsender">架构文档 4.4</a>
  */
