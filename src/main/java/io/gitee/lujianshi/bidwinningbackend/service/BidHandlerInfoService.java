@@ -2,7 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -35,11 +35,13 @@ import java.util.List;
  *   <li>当前只有简单 CRUD 转发，未来业务逻辑（如"按公司分组"）放这里</li>
  * </ul>
  *
- * <h3>为什么用 {@code @Autowired} 字段注入而非构造器注入？</h3>
+ * <h3>为什么用 {@code @Resource(jakarta)} 字段注入而非构造器注入？</h3>
  * <ul>
  *   <li>字段注入代码更简洁（节省模板）</li>
  *   <li>缺点：不便于单元测试、可能掩盖循环依赖</li>
  *   <li>当前项目风格以简洁为主；如要严格，可改 Lombok {@code @RequiredArgsConstructor} + final 字段</li>
+ *   <li>从 {@code @Autowired(spring)} 迁移到 {@code @Resource(jakarta)}：Spring 6+ 推荐使用 jakarta 注解，
+ *       {@code @Resource} 默认按名称注入（与 {@code @Autowired} 默认按类型不同），当前只有一个 Mapper 实现时行为一致</li>
  * </ul>
  *
  * <h3>调用链路（以 create 为例）</h3>
@@ -57,7 +59,7 @@ import java.util.List;
 @Service
 public class BidHandlerInfoService {
 
-    @Autowired
+    @Resource
     private BidHandlerInfoMapper mapper;
 
     /**

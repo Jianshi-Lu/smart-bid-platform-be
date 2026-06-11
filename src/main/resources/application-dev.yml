@@ -6,6 +6,11 @@ custom:
   url: https://baidu.com
 
 spring:
+  datasource:
+    url: ${MYSQL_URL}
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+
   mail:
     host: smtp.qq.com
     port: 587

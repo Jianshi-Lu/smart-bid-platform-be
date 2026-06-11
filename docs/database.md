@@ -165,11 +165,12 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 - [ ] 在 `application.yml` 配置 `spring.flyway.enabled: true`（**当前未启用**）
 - [x] 创建 Java 实体类（`BidHandlerInfo`、`BidWinningNotification`、`BidWinningSupplierDetail`）
 - [x] 加 MyBatis-Plus 注解（`@TableName` + `@TableId`）
-- [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` 完整链路已实现）
+- [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` 完整链路已实现，含 Controller）
 - [x] 引入 MyBatis-Plus 框架
+- [x] **BidHandlerInfo 端到端 7 层链路打通**（DB → Entity → Mapper → XML → Service → DTO → Controller）
 - [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningNotification` 完整链路
 - [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningSupplierDetail` 完整链路
-- [ ] 新增 `GlobalExceptionHandler` 统一异常处理
+- [ ] 新增 `GlobalExceptionHandler` 统一异常处理（`@Valid` 校验失败统一 400 响应）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充）
 - [ ] 解决 Java 字段与 DB 字段命名不一致问题（`projectNo` vs `projectCode` 等）
 
@@ -197,6 +198,6 @@ DTO（@NotBlank / @Size 校验）
 Controller（@Valid 触发校验）
 ```
 
-**当前已实现**：`BidHandlerInfo` 完整 7 层链路
+**当前已实现**：`BidHandlerInfo` 完整 7 层链路（含 Controller `POST /create-bid-handler-info`）
 
-**待复制实现**：`BidWinningNotification` / `BidWinningSupplierDetail`
+**待复制实现**：`BidWinningNotification` / `BidWinningSupplierDetail`（按 7 层模式复制即可）

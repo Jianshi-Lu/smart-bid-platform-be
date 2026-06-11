@@ -96,6 +96,7 @@
             <version>${mybatis-plus.version}</version>
         </dependency>
 
+
         <!-- MySQL 驱动（prod），指定scope避免数据库实现细节泄露 -->
         <dependency>
             <groupId>com.mysql</groupId>
@@ -103,8 +104,7 @@
             <scope>runtime</scope>
         </dependency>
 
-
-    </dependencies>
+        </dependencies>
 
     <build>
         <plugins>

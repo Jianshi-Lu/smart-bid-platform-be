@@ -36,3 +36,9 @@ build/
 *.log
 logs/
 app.log
+
+### Environment Variables ###
+.env
+.env.properties
+.env.*.properties
+!.env.example

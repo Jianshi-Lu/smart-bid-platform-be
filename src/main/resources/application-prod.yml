@@ -6,6 +6,8 @@ custom:
   url: https://prod.example.com
 
 spring:
+
+
   mail:
     host: ${PROD_MAIL_HOST:smtp.qq.com}
     port: ${PROD_MAIL_PORT:587}

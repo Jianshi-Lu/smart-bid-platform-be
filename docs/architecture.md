@@ -113,9 +113,11 @@ public @interface SpringBootApplication {
 | `BidWinningMailSender` | `@Service` |
 | `BidWinningTemplateFiller` | `@Service` |
 | `MailLoggingService` | `@Service` |
+| `BidHandlerInfoService` | `@Service` |
 | `HelloController` | `@RestController`（含 `@Controller`） |
 | `PlainTextMailController` | `@RestController`（含 `@Controller`） |
 | `BidWinningMailController` | `@RestController`（含 `@Controller`） |
+| `BidHandlerInfoController` | `@RestController`（含 `@Controller`） |
 | `BidWinningBackendApplication` | `@Configuration`（隐含） |
 
 `AsyncTaskManager` **没有**任何上述注解，它是一个纯静态工具类，不归 Spring 容器管理。
@@ -317,6 +319,9 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 9 | `HelloController` | `HelloService` |
 | 10 | `PlainTextMailController` | `PlainTextMailSender` |
 | 11 | `BidWinningMailController` | `BidWinningTemplateFiller`、`BidWinningMailSender`、`MailLoggingService` |
+| 12 | `BidHandlerInfoMapper` | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
+| 13 | `BidHandlerInfoService` | `BidHandlerInfoMapper`（`@Resource` 注入） |
+| 14 | `BidHandlerInfoController` | `BidHandlerInfoService`（`@Resource` 注入） |
 
 `@Autowired` 注入发生在 Bean 创建时，Spring 通过 **AutowiredAnnotationBeanPostProcessor**（一个 `InstantiationAwareBeanPostProcessorAdapter`）实现：
 
@@ -678,6 +683,67 @@ Content-Type: application/json
 
 ---
 
+### 3.4 `BidHandlerInfoController`
+
+**文件**：`src/main/java/.../controller/BidHandlerInfoController.java`
+
+#### `POST /create-bid-handler-info`
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | POST |
+| 完整 URL | `http://localhost:8079/create-bid-handler-info` |
+| Content-Type | `application/json`（`@RequestBody` 要求） |
+| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，含 `@NotBlank` / `@Size` 校验注解） |
+| 调用链路 | 见下方 |
+| 返回值 | `BidHandlerInfo`（含 DB 自增 `handlerId`，Jackson 序列化为 JSON） |
+
+**完整调用链路**：
+
+```
+JSON (handlerName/companyName/departmentName)
+  ↓ Jackson 反序列化
+BidHandlerInfoCreateRequest（HTTP 请求载体）
+  ↓ 字段拷贝（Controller 手动 setXxx）
+BidHandlerInfo Entity
+  ↓ BidHandlerInfoService.create(entity)
+  ↓ BidHandlerInfoMapper.insert(entity)
+  ↓ BidHandlerInfoMapper.xml <insert> 标签
+  ↓ MySQL INSERT + 自增回填 handlerId
+  ↓ Jackson 序列化
+JSON Response ({handlerId, handlerName, companyName, departmentName})
+```
+
+**Postman 示例**：
+
+```json
+POST http://localhost:8079/create-bid-handler-info
+Content-Type: application/json
+
+{
+    "handlerName": "张三",
+    "companyName": "测试公司",
+    "departmentName": "采购部"
+}
+```
+
+**响应示例**（handlerId 由 DB 自增回填）：
+
+```json
+{
+    "handlerId": 1,
+    "handlerName": "张三",
+    "companyName": "测试公司",
+    "departmentName": "采购部"
+}
+```
+
+**待办**：
+- ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- "删/改/查"4 个端点尚未实现（详见 Controller 类级 Javadoc 的"待实现端点"章节）
+
+---
+
 ## 4. Service 层
 
 ### 4.1 `HelloService`
@@ -1030,11 +1096,11 @@ Controller（@Valid 触发校验）
 | XML 位置 | `resources/mapper/*.xml` | Maven 编译范围外，是资源文件 |
 | `namespace` | = Mapper 接口全限定名 | 关键约束，错一位全废 |
 
-**完整链路实例（POST /bid-handler）**：
+**完整链路实例（POST /create-bid-handler-info）**：
 
 1. Postman POST `{handlerName, companyName, departmentName}`
-2. Spring MVC 路由 → `BidHandlerInfoController.create()`
-3. `@Valid` 触发 `jakarta.validation` 校验
+2. Spring MVC 路由 → `BidHandlerInfoController.createBidHandlerInfo()`
+3. ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（待 `GlobalExceptionHandler` 一起补全）
 4. Jackson 反序列化 → `BidHandlerInfoCreateRequest`
 5. 字段拷贝：DTO → Entity
 6. `BidHandlerInfoService.create(entity)`
@@ -1186,11 +1252,15 @@ custom:
   url: https://baidu.com
 
 spring:
+  datasource:
+    url: ${MYSQL_URL}        # 环境变量注入（必填，详见 §6.4）
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
   mail:
     host: smtp.qq.com
     port: 587
-    username: 1649681371@qq.com
-    password: xhixpbmbkfyhchbb
+    username: 1649681371@qq.com       # dev 明文（开发效率优先）
+    password: xhixpbmbkfyhchbb       # dev 明文
     default-encoding: UTF-8
     properties:
       mail:
@@ -1226,6 +1296,9 @@ export SPRING_PROFILES_ACTIVE=prod
 | 配置项 | dev | test | prod |
 |--------|-----|------|------|
 | `server.port` | `8079` | `8080` | `80` |
+| `spring.datasource.url` | `${MYSQL_URL}` | `${MYSQL_URL}` | `${MYSQL_URL}` |
+| `spring.datasource.username` | `${MYSQL_USERNAME}` | `${MYSQL_USERNAME}` | `${MYSQL_USERNAME}` |
+| `spring.datasource.password` | `${MYSQL_PASSWORD}` | `${MYSQL_PASSWORD}` | `${MYSQL_PASSWORD}` |
 | `spring.mail.username` | `1649681371@qq.com` | `${TEST_MAIL_USERNAME:...}` | `${PROD_MAIL_USERNAME}` |
 | `spring.mail.password` | `xhixpbmbkfyhchbb`（明文） | `${TEST_MAIL_PASSWORD:...}`（占位符） | `${PROD_MAIL_PASSWORD}`（环境变量，强制） |
 | `custom.url` | `https://baidu.com` | `https://test.example.com` | `https://prod.example.com` |
@@ -1283,6 +1356,67 @@ spring-boot-starter-webmvc
 3. `th:text` 覆盖标签内文本内容，标签本身不会显示
 
 **为什么使用 `<table>` 布局**：HTML 邮件客户端（Outlook、Apple Mail 等）对 CSS float/flexbox 支持不一致，使用 `<table>` 做布局是最稳妥的兼容性方案。
+
+---
+
+### 6.4 环境变量配置（外置化敏感信息）
+
+**12-Factor App 原则**：配置与代码分离。敏感信息（DB 密码、邮件授权码）不应写入代码仓库，应通过环境变量在启动时注入。
+
+#### 6.4.1 占位符解析顺序
+
+Spring 解析 `${XXX}` 占位符时按以下顺序查找：
+
+```
+1. OS 环境变量（IDEA Run Configuration / Shell `export`）
+   ↓
+2. JVM 系统属性（-D 参数，如 -DMYSQL_USERNAME=jianshi）
+   ↓
+3. application-*.yml 中显式设置的值
+   ↓
+4. application-*.yml 中 ${XXX:default} 的默认值
+```
+
+**匹配规则**：Spring 把环境变量名转 `MYSQL_USERNAME` → 找 `myql.username` / `MYSQL_USERNAME`（大小写不敏感，下划线/点互转）。
+
+#### 6.4.2 占位符清单
+
+| 占位符 | 必填场景 | 用途 | 典型值 |
+|--------|----------|------|--------|
+| `${MYSQL_URL}` | dev/test/prod | JDBC URL | `jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true` |
+| `${MYSQL_USERNAME}` | dev/test/prod | DB 用户名 | `jianshi` |
+| `${MYSQL_PASSWORD}` | dev/test/prod | DB 密码 | — |
+| `${PROD_MAIL_USERNAME}` | prod | 发件邮箱 | `service@company.com` |
+| `${PROD_MAIL_PASSWORD}` | prod | 邮箱授权码 | — |
+| `${PROD_MAIL_HOST}` | prod（可选，有默认 `smtp.qq.com`） | SMTP 主机 | `smtp.exmail.qq.com` |
+| `${PROD_MAIL_PORT}` | prod（可选，有默认 `587`） | SMTP 端口 | `465` |
+
+> 完整清单与启动方式详见 `AGENTS.md` → "环境变量配置" 章节。
+
+#### 6.4.3 注入方式
+
+| 方式 | 适用场景 | 示例 |
+|------|----------|------|
+| IDEA Run Configuration | 本地开发 | Run → Edit Configurations → Environment variables |
+| Shell `export` | CLI 启动 | `export MYSQL_PASSWORD=xxx && ./mvnw spring-boot:run` |
+| JVM `-D` 系统属性 | CLI 启动 | `./mvnw spring-boot:run -DMYSQL_PASSWORD=xxx` |
+| Docker / K8s Secrets | 容器化部署 | `env: MYSQL_PASSWORD_FILE: /run/secrets/db_password` |
+
+#### 6.4.4 安全红线
+
+- ❌ **不要**把生产密码 commit 到 yml
+- ❌ **不要**把 `.env` / `.env.properties` 文件 commit（已加 `.gitignore`）
+- ✅ **必须**用占位符 + 外部注入
+- ⚠️ dev 环境可临时明文（开发效率优先），prod **强制**走环境变量
+- ⚠️ `allowPublicKeyRetrieval=true` 仅适用于 dev/test，**prod 应配 `useSSL=true` + 正确证书**
+
+#### 6.4.5 常见错误速查
+
+| 报错 | 根因 | 解决 |
+|------|------|------|
+| `Access denied for user '${MYSQL_USERNAME}'@'10.0.0.1'` | 占位符没解析（env var 名拼错/未设） | 检查 IDEA 配置中的 env var 名 |
+| `Public Key Retrieval is not allowed` | MySQL 8 + `caching_sha2_password` + SSL 关闭 | URL 加 `&allowPublicKeyRetrieval=true` |
+| `Failed to determine a suitable driver class` | yml 没配 `spring.datasource` | 补 `application-{profile}.yml` 的 datasource 段 |
 
 ---
 

@@ -21,14 +21,10 @@
 - Source root package: `io.gitee.lujianshi.bidwinningbackend`
 - Layered architecture:
   - `controller/` - HTTP 路由层（@RestController + @GetMapping / @PostMapping）
-    - HelloController, PlainTextMailController, BidWinningMailController
-  - `service/` - 业务逻辑层（@Service + @Value）
-    - HelloService - 演示服务
-    - PlainTextMailSender - 纯文本邮件发送（SimpleMailMessage）
-    - BidWinningMailSender - HTML 邮件发送（MimeMessageHelper）
-    - BidWinningTemplateFiller - Thymeleaf 模板渲染
-    - StaticResourceSearcher - 模板文件存在性验证（精确匹配）
-    - MailLoggingService - MD 格式日志格式化
+    - HelloController - 演示 / 异步重定向
+    - PlainTextMailController - 纯文本邮件发送
+    - BidWinningMailController - HTML 中标通知书邮件发送
+    - BidHandlerInfoController - 经办人 CRUD（已实现 create，待补删/改/查）
   - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
     - PlainTextMailRequest - 纯文本邮件请求
     - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
@@ -59,6 +55,48 @@
 2. 启动命令：`./mvnw spring-boot:run -Dspring-boot.run.profiles=test`
 3. 环境变量：`export SPRING_PROFILES_ACTIVE=prod`
 
+## 环境变量配置
+
+### 占位符变量（启动时必须提供）
+
+| 变量 | 必填 | 用途 | 示例 |
+|------|:----:|------|------|
+| `MYSQL_URL` | ✅ | JDBC URL | `jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true` |
+| `MYSQL_USERNAME` | ✅ | DB 用户名 | `jianshi` |
+| `MYSQL_PASSWORD` | ✅ | DB 密码 | `Ljs83455012.` |
+| `PROD_MAIL_USERNAME` | ⚠️ prod 必填 | 发件邮箱 | `service@company.com` |
+| `PROD_MAIL_PASSWORD` | ⚠️ prod 必填 | 邮箱授权码 | `xxxx` |
+| `PROD_MAIL_HOST` | ❌ 有默认 `smtp.qq.com` | SMTP 主机 | `smtp.exmail.qq.com` |
+| `PROD_MAIL_PORT` | ❌ 有默认 `587` | SMTP 端口 | `465` |
+
+> ⚠️ dev 环境必须设 `MYSQL_*` 三个变量；prod 环境必须设 `PROD_MAIL_USERNAME` + `PROD_MAIL_PASSWORD`（其他 prod mail 变量有默认值）。
+> mail.password 在 dev 环境保持明文（开发效率优先），prod 强制走环境变量。
+
+### dev 环境提供方式
+
+dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
+
+1. **IDEA Run/Debug Configurations** → Environment variables 逐个添加
+2. **Shell 启动**：
+   ```bash
+   export MYSQL_URL='jdbc:mysql://...' MYSQL_USERNAME=jianshi MYSQL_PASSWORD=xxx
+   ./mvnw spring-boot:run
+   ```
+3. **JVM 系统属性**（最稳）：
+   ```
+   -DMYSQL_URL=jdbc:mysql://... -DMYSQL_USERNAME=jianshi -DMYSQL_PASSWORD=xxx
+   ```
+
+### 常见错误
+
+| 错误 | 现象 | 解决 |
+|------|------|------|
+| 变量名拼写错误 | 报 `Access denied for user '${MYSQL_USERNAME}'` | 检查 IDEA 环境变量名是否完全一致 |
+| 多个 Run Configuration 混淆 | 旧配置仍生效 | 删除或修正 Run Configuration |
+| 没点 Apply / OK | 环境变量未保存 | 改完配置点 Apply 再 OK |
+| dev 切到 prod | 缺 `${PROD_MAIL_*}` 占位符报错 | 加环境变量或切回 dev profile |
+| 缺 `allowPublicKeyRetrieval=true` | MySQL 8 + SSL 关闭时 `Public Key Retrieval is not allowed` | URL 末尾加 `&allowPublicKeyRetrieval=true` |
+
 ## API Endpoints
 
 | Method | Path | Content-Type | Description |
@@ -68,6 +106,7 @@
 | POST | /fetch-url | - | 异步触发延迟任务，同步返回 URL |
 | POST | /send-email | application/x-www-form-urlencoded | 发送纯文本邮件 |
 | POST | /send-notification | application/json | 发送中标通知书 HTML 邮件（异步延迟5秒返回"发送成功"） |
+| POST | /create-bid-handler-info | application/json | 创建经办人（返回含自增 handlerId 的 Entity） |
 
 ## Email
 

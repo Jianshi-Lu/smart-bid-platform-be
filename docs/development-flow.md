@@ -210,49 +210,48 @@ public class BidHandlerInfoCreateRequest {
 
 **RESTful 路由**：
 
-| Method | Path | 作用 |
-|--------|------|------|
-| POST | `/bid-handler` | 创建 |
-| GET | `/bid-handler/{id}` | 按 ID 查询 |
-| GET | `/bid-handler` | 查全部 |
-| PUT | `/bid-handler/{id}` | 按 ID 更新 |
-| DELETE | `/bid-handler/{id}` | 按 ID 删除 |
+| Method | Path | 作用 | 状态 |
+|--------|------|------|------|
+| POST | `/create-bid-handler-info` | 创建 | ✅ 已实现 |
+| GET | `/bid-handler-info/{id}` | 按 ID 查询 | ⏳ 待实现 |
+| GET | `/bid-handler-info` | 查全部 | ⏳ 待实现 |
+| PUT | `/bid-handler-info/{id}` | 按 ID 更新 | ⏳ 待实现 |
+| DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ⏳ 待实现 |
 
-**本例产物**（简化）：
+**本例产物**（实际代码）：
 ```java
 @RestController
-@RequestMapping("/bid-handler")
 public class BidHandlerInfoController {
 
-    @Autowired
+    @Resource
     private BidHandlerInfoService service;
 
-    @PostMapping
-    public ResponseEntity<BidHandlerInfo> create(@Valid @RequestBody BidHandlerInfoCreateRequest request) {
+    @PostMapping("/create-bid-handler-info")
+    public BidHandlerInfo createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
         entity.setHandlerName(request.getHandlerName());
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
         service.create(entity);
-        return ResponseEntity.ok(entity);
+        return entity;
     }
-    // ... 其他 CRUD ...
 }
 ```
 
-**`@Valid` 触发校验**：DTO 字段上的 `@NotBlank` / `@Size` 在 `@Valid` 注解的方法参数上生效。校验失败抛 `MethodArgumentNotValidException`（由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息）。
+**`@Valid` 触发校验**（**当前未启用，待补全**）：DTO 字段上的 `@NotBlank` / `@Size` 需要在 Controller 方法参数上加 `@Valid` 才生效。当前 `createBidHandlerInfo` **未加 `@Valid`**，校验注解暂未生效（待 `GlobalExceptionHandler` 一起补全）。校验失败时预期抛 `MethodArgumentNotValidException`，由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息。
+
+**注入风格**：使用 `jakarta.annotation.Resource` 字段注入（Spring 6+ 推荐），非 `org.springframework.beans.factory.annotation.Autowired`。
 
 ---
 
-## 3. 完整调用链（以 POST /bid-handler 为例）
+## 3. 完整调用链（以 POST /create-bid-handler-info 为例）
 
 ```
 Postman
-  ↓ POST /bid-handler {handlerName, companyName, departmentName}
+  ↓ POST /create-bid-handler-info {handlerName, companyName, departmentName}
 Spring DispatcherServlet
-  ↓ 路由匹配 → BidHandlerInfoController.create()
-  ↓ @Valid 触发 jakarta.validation 校验
-  ↓ (校验失败抛 MethodArgumentNotValidException)
+  ↓ 路由匹配 → BidHandlerInfoController.createBidHandlerInfo()
+  ↓ ⚠️ 当前未加 @Valid，DTO 上的 @NotBlank/@Size 暂未生效
 Jackson
   ↓ 反序列化 JSON → BidHandlerInfoCreateRequest
 Controller
@@ -267,7 +266,7 @@ Controller
   ↓ 自增 ID 回填 entity.handlerId
   ↓ (返回影响行数 1)
 Controller
-  ↓ 包装 ResponseEntity<BidHandlerInfo>
+  ↓ 直接返回 entity 对象（含回填的 handlerId）
 Jackson
   ↓ 序列化 entity → JSON
 Postman
@@ -302,7 +301,7 @@ Postman
 | ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL |
 | ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 |
 | ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 调整字段 |
-| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名 |
+| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名（注意：现 URL 前缀是 `/bid-handler-info`，复制时按业务改 URL） |
 
 ---
 
