@@ -402,7 +402,7 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 
 **目录**：`src/main/java/io/gitee/lujianshi/bidwinningbackend/entity/`
 
-**职责**：与数据库表结构一一对应的 Java POJO。当前为**纯 POJO**，不带任何 ORM 注解（待引入 MyBatis-Plus / JPA 后再加）。
+**职责**：与数据库表结构一一对应的 Java POJO。**已加 MyBatis-Plus 注解**（`@TableName` + `@TableId`），由 `mybatis-plus-spring-boot4-starter` 自动处理映射。
 
 **共同特点**：
 
@@ -453,6 +453,90 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 **解决思路**（待引入 ORM 后处理）：
 - 方案 A：Entity 跟 DB 命名，DTO 跟业务命名，加 Mapper 转换层
 - 方案 B：Entity 跟 DTO 命名，加 `@TableField("xxx")` 映射
+
+---
+
+### 2.4 `Result<T>` 通用响应包装
+
+**文件**：`src/main/java/.../dto/Result.java`
+
+**设计目标**：所有 Controller 端点统一返回 `Result<T>`，前端解析结构一致；HTTP 状态码只表示传输层状态（200/400/500），**业务状态由 `code` 字段表达**。
+
+**字段**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `code` | `Integer` | ✅ | 业务状态码（200=成功，404=资源不存在） |
+| `message` | `String` | ✅ | 文字消息（用户友好提示或错误描述） |
+| `data` | `T`（泛型） | ❌（删除类操作时为 null） | 业务数据载荷 |
+
+**静态工厂**：
+
+```java
+// 成功响应（含数据）
+public static <T> Result<T> success(T data, String message)
+// e.g. Result.success(entity, "创建成功")
+
+// 业务失败响应
+public static <T> Result<T> error(Integer code, String message)
+// e.g. Result.error(404, "记录不存在")
+```
+
+**使用约定**：
+
+| 场景 | code | message | data |
+|------|------|---------|------|
+| 成功（含数据） | 200 | 自定义 | 业务对象 |
+| 成功（无数据，如删除） | 200 | 自定义 | `null` |
+| 业务失败 | 404 或自定义 | 必填 | `null` |
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "创建成功",
+  "data": {"handlerId":1,"handlerName":"张三",...}
+}
+```
+
+**链路位置**：
+
+```
+Service（业务结果）→ Controller（包装为 Result）→ Jackson（序列化为 JSON）→ 前端
+```
+
+---
+
+### 2.5 `Diff<T>` 通用 diff 包装
+
+**文件**：`src/main/java/.../dto/Diff.java`
+
+**设计目标**：用于展示 update 操作前后的实体对比，前端可直观看到"修改前 → 修改后"的完整数据。
+
+**字段**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `before` | T（泛型） | 修改前的实体（DB 原值） |
+| `after` | T（泛型） | 修改后的实体（请求体新值 + path id） |
+
+**使用场景**：PUT /bid-handler-info/{id} 更新端点（返回 `Result<Diff<BidHandlerInfo>>`）。
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "更新成功",
+  "data": {
+    "before": {"handlerId":1,"handlerName":"张三","companyName":"原公司","departmentName":"原部门"},
+    "after":  {"handlerId":1,"handlerName":"李四","companyName":"新公司","departmentName":"新部门"}
+  }
+}
+```
+
+**泛型优势**：未来其他表的 update 端点可复用，无需新建 Diff 子类。
 
 ---
 
@@ -687,60 +771,181 @@ Content-Type: application/json
 
 **文件**：`src/main/java/.../controller/BidHandlerInfoController.java`
 
+**职责**：经办人 CRUD 端点（4 端点已实现），统一返回 `Result<T>` 包装。
+
+**统一响应格式**（所有端点）：
+
+```json
+{
+  "code": 200,
+  "message": "成功消息",
+  "data": { ...业务数据，可为 null }
+}
+```
+
+- `code` 200 = 成功；404 = 资源不存在
+- `data` 删除类操作时为 `null`，update 端点时为 `Diff<BidHandlerInfo>`
+
+#### 端点清单
+
+| Method | Path | 用途 | 返回类型 | 状态 |
+|--------|------|------|----------|------|
+| POST | `/create-bid-handler-info` | 创建经办人 | `Result<BidHandlerInfo>` | ✅ |
+| GET | `/bid-handler-info/{id}` | 按主键查询 | `Result<BidHandlerInfo>` | ✅ |
+| PUT | `/bid-handler-info/{id}` | 按主键更新（返回 diff） | `Result<Diff<BidHandlerInfo>>` | ✅ |
+| DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` | ✅ |
+| GET | `/bid-handler-info` | 列表查询 | — | ⏳（待设计分页） |
+
+---
+
 #### `POST /create-bid-handler-info`
 
 | 项目 | 内容 |
 |------|------|
 | HTTP 方法 | POST |
-| 完整 URL | `http://localhost:8079/create-bid-handler-info` |
+| 完整 URL | `http://localhost:8080/create-bid-handler-info` |
 | Content-Type | `application/json`（`@RequestBody` 要求） |
-| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，含 `@NotBlank` / `@Size` 校验注解） |
-| 调用链路 | 见下方 |
-| 返回值 | `BidHandlerInfo`（含 DB 自增 `handlerId`，Jackson 序列化为 JSON） |
+| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，含 `@NotBlank` / `@Size` 校验注解，**当前未加 @Valid**） |
+| 返回值 | `Result<BidHandlerInfo>`（code=200，data=Entity） |
 
-**完整调用链路**：
+**调用链路**：
 
 ```
 JSON (handlerName/companyName/departmentName)
   ↓ Jackson 反序列化
-BidHandlerInfoCreateRequest（HTTP 请求载体）
-  ↓ 字段拷贝（Controller 手动 setXxx）
+BidHandlerInfoCreateRequest
+  ↓ 字段拷贝
 BidHandlerInfo Entity
-  ↓ BidHandlerInfoService.create(entity)
-  ↓ BidHandlerInfoMapper.insert(entity)
-  ↓ BidHandlerInfoMapper.xml <insert> 标签
-  ↓ MySQL INSERT + 自增回填 handlerId
-  ↓ Jackson 序列化
-JSON Response ({handlerId, handlerName, companyName, departmentName})
+  ↓ service.create(entity) → mapper.insert() → XML <insert> → MySQL INSERT + 自增回填
+  ↓ 包装为 Result.success(entity, "创建成功")
+JSON Response
 ```
 
-**Postman 示例**：
-
-```json
-POST http://localhost:8079/create-bid-handler-info
-Content-Type: application/json
-
-{
-    "handlerName": "张三",
-    "companyName": "测试公司",
-    "departmentName": "采购部"
-}
-```
-
-**响应示例**（handlerId 由 DB 自增回填）：
+**响应示例**：
 
 ```json
 {
-    "handlerId": 1,
-    "handlerName": "张三",
-    "companyName": "测试公司",
-    "departmentName": "采购部"
+  "code": 200,
+  "message": "创建成功",
+  "data": {"handlerId":1,"handlerName":"张三","companyName":"测试","departmentName":"采购部"}
 }
 ```
+
+---
+
+#### `GET /bid-handler-info/{id}`
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | GET（无需 body） |
+| 完整 URL | `http://localhost:8080/bid-handler-info/1` |
+| 请求参数 | `@PathVariable Integer id` |
+| 返回值 | `Result<BidHandlerInfo>`（code=200 成功 / code=404 记录不存在） |
+
+**调用链路**：
+
+```
+URL {id} → @PathVariable 注入
+  → service.getById(id) → mapper.selectById(id) → XML <select> → MySQL SELECT
+  → entity 为 null → Result.error(404, "记录不存在")
+  → entity 不为 null → Result.success(entity, "查询成功")
+```
+
+**响应示例**（成功）：
+
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {"handlerId":1,"handlerName":"张三","companyName":"测试","departmentName":"采购部"}
+}
+```
+
+**响应示例**（不存在）：
+
+```json
+{"code":404,"message":"记录不存在","data":null}
+```
+
+---
+
+#### `PUT /bid-handler-info/{id}`（带 diff 逻辑）
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | PUT |
+| 完整 URL | `http://localhost:8080/bid-handler-info/1` |
+| Content-Type | `application/json` |
+| 请求参数 | `@PathVariable Integer id` + `@RequestBody BidHandlerInfoUpdateRequest`（3 字段） |
+| 返回值 | `Result<Diff<BidHandlerInfo>>`（code=200 成功 / code=404 记录不存在） |
+
+**diff 逻辑核心**：
+
+```java
+BidHandlerInfo before = service.getById(id);          // 1. 查原始
+if (before == null) return Result.error(404, "记录不存在");
+
+BidHandlerInfo after = new BidHandlerInfo();           // 2. 构造新（id + 3 字段）
+after.setHandlerId(id);
+after.setHandlerName(request.getHandlerName());
+after.setCompanyName(request.getCompanyName());
+after.setDepartmentName(request.getDepartmentName());
+
+int rows = service.update(after);                      // 3. 执行更新
+if (rows == 0) return Result.error(404, "记录不存在");
+
+return Result.success(new Diff<>(before, after), "更新成功");
+```
+
+**调用链路**：
+
+```
+URL {id} → @PathVariable
+  → service.getById(id)              ← diff.before 来源
+  → service.update(newEntity)        ← diff.after 来源
+  → mapper.updateById(entity)        → SQL UPDATE
+  → 包装 Diff<before, after>
+JSON Response
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "更新成功",
+  "data": {
+    "before": {"handlerId":1,"handlerName":"张三","companyName":"原公司","departmentName":"原部门"},
+    "after":  {"handlerId":1,"handlerName":"李四","companyName":"新公司","departmentName":"新部门"}
+  }
+}
+```
+
+---
+
+#### `DELETE /bid-handler-info/{id}`
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | DELETE（无需 body） |
+| 完整 URL | `http://localhost:8080/bid-handler-info/1` |
+| 请求参数 | `@PathVariable Integer id` |
+| 返回值 | `Result<Void>`（code=200 删除成功 / code=404 记录不存在，data 始终为 null） |
+
+**调用链路**：
+
+```
+URL {id} → @PathVariable
+  → service.delete(id) → mapper.deleteById(id) → SQL DELETE
+  → rows = 0 → Result.error(404, "记录不存在")
+  → rows = 1 → Result.success(null, "删除成功")
+```
+
+---
 
 **待办**：
-- ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（待 `GlobalExceptionHandler` 一起补全）
-- "删/改/查"4 个端点尚未实现（详见 Controller 类级 Javadoc 的"待实现端点"章节）
+- ⚠️ `createBidHandlerInfo` / `updateBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- 列表查询端点（GET /bid-handler-info）待设计分页机制（MyBatis-Plus PageHelper / 手动 LIMIT）
 
 ---
 
@@ -1237,7 +1442,7 @@ spring:
 
 | Profile | 端口 | 日志路径 | 备注 |
 |---------|------|----------|------|
-| `dev`（开发） | `8079` | `logs/app.log` | 默认环境，明文密码，QQ SMTP |
+| `dev`（开发） | `8080` | `logs/app.log` | 默认环境，明文密码，QQ SMTP |
 | `test`（测试） | `8080` | `logs/test.log` | 日志级别 DEBUG，密码用 `${TEST_MAIL_PASSWORD:default}` 占位符 |
 | `prod`（生产） | `80` | `logs/prod.log` | 日志级别 INFO，敏感信息全部走环境变量（`${PROD_MAIL_PASSWORD}`） |
 
@@ -1295,7 +1500,7 @@ export SPRING_PROFILES_ACTIVE=prod
 
 | 配置项 | dev | test | prod |
 |--------|-----|------|------|
-| `server.port` | `8079` | `8080` | `80` |
+| `server.port` | `8080` | `8080` | `80` |
 | `spring.datasource.url` | `${MYSQL_URL}` | `${MYSQL_URL}` | `${MYSQL_URL}` |
 | `spring.datasource.username` | `${MYSQL_USERNAME}` | `${MYSQL_USERNAME}` | `${MYSQL_USERNAME}` |
 | `spring.datasource.password` | `${MYSQL_PASSWORD}` | `${MYSQL_PASSWORD}` | `${MYSQL_PASSWORD}` |

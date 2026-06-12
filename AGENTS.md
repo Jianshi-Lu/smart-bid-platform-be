@@ -24,11 +24,15 @@
     - HelloController - 演示 / 异步重定向
     - PlainTextMailController - 纯文本邮件发送
     - BidWinningMailController - HTML 中标通知书邮件发送
-    - BidHandlerInfoController - 经办人 CRUD（已实现 create，待补删/改/查）
+    - BidHandlerInfoController - 经办人 CRUD（已实现 create / getById / update / delete，待补 listAll 分页）
   - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
     - PlainTextMailRequest - 纯文本邮件请求
     - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
     - BidWinningListItem - 中标结果条目（独立顶层类）
+    - BidHandlerInfoCreateRequest - 创建经办人请求（3 字段 + @NotBlank/@Size）
+    - BidHandlerInfoUpdateRequest - 更新经办人请求（独立 DTO，3 字段）
+    - Result<T> - 通用响应包装（code/message/data + success/error 工厂）
+    - Diff<T> - 通用 diff 包装（before/after，用于 update 端点）
   - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
     - BidHandlerInfo - 经办人/招标负责人
     - BidWinningNotification - 定标通知主表
@@ -40,14 +44,14 @@
 ## Entry Point
 
 - `BidWinningBackendApplication.java` — Spring Boot 启动入口（纯 bootstrap，无路由）
-- Dev server: `http://localhost:8079`
-- 配置端口: `server.port=8079`（application-dev.yml）
+- Dev server: `http://localhost:8080`
+- 配置端口: `server.port=8080`（application-dev.yml）
 
 ## Profiles（多环境配置）
 
 - `application.yml` — 公共配置（应用名、Thymeleaf 路径）+ 默认 profile
-- `application-dev.yml` — 开发环境（默认，端口 8079）
-- `application-test.yml` — 测试环境（端口 8080）
+- `application-dev.yml` — 开发环境（默认，端口 8080，MySQL URL 含默认值）
+- `application-test.yml` — 测试环境（端口 8080，MySQL URL 含默认值，DEBUG 日志）
 - `application-prod.yml` — 生产环境（端口 80，敏感信息走环境变量）
 
 **切换方式**：
@@ -106,7 +110,10 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 | POST | /fetch-url | - | 异步触发延迟任务，同步返回 URL |
 | POST | /send-email | application/x-www-form-urlencoded | 发送纯文本邮件 |
 | POST | /send-notification | application/json | 发送中标通知书 HTML 邮件（异步延迟5秒返回"发送成功"） |
-| POST | /create-bid-handler-info | application/json | 创建经办人（返回含自增 handlerId 的 Entity） |
+| POST | /create-bid-handler-info | application/json | 创建经办人（返回 `Result<BidHandlerInfo>`，code=200） |
+| GET | /bid-handler-info/{id} | - | 按主键查询单条经办人（`Result<BidHandlerInfo>`，code=200/404） |
+| PUT | /bid-handler-info/{id} | application/json | 按主键更新经办人（`Result<Diff<BidHandlerInfo>>` 含 before/after） |
+| DELETE | /bid-handler-info/{id} | - | 按主键删除经办人（`Result<Void>`，code=200/404） |
 
 ## Email
 
@@ -158,6 +165,33 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 - 内部类: `BidWinningListItem(supplierName, bidWinningAmount)`
 - 使用场景: POST /send-notification（中标通知书 HTML 邮件）
 
+### BidHandlerInfoCreateRequest
+
+- 字段: `handlerName` / `companyName` / `departmentName`（3 字段，含 `@NotBlank` / `@Size` 校验）
+- 使用场景: POST /create-bid-handler-info（创建经办人）
+- 校验: 当前 `createBidHandlerInfo` 未加 `@Valid`，校验注解暂未生效（待 `GlobalExceptionHandler` 一起补全）
+
+### BidHandlerInfoUpdateRequest
+
+- 字段: 与 `BidHandlerInfoCreateRequest` 相同的 3 字段（独立 DTO，未来可加 `version` / `expectedUpdatedAt` 等）
+- 使用场景: PUT /bid-handler-info/{id}（按主键 ID 更新）
+- 注意: ID 来自 URL `@PathVariable`，**不在 DTO 中**（RESTful 风格）
+
+### Result<T>（通用响应包装）
+
+- 字段: `code`（业务状态码）/ `message`（文字消息）/ `data`（业务数据载荷）
+- 静态工厂:
+  - `Result.success(data, message)` — 成功响应（code=200）
+  - `Result.error(code, message)` — 业务失败（code 自定义，如 404）
+- 使用场景: 所有 BidHandlerInfo Controller 端点（统一返回结构）
+- 链路位置: Service（业务结果）→ Controller（包装为 Result）→ Jackson（序列化为 JSON）→ 前端
+
+### Diff<T>（通用 diff 包装）
+
+- 字段: `before`（修改前的实体）/ `after`（修改后的实体）
+- 使用场景: PUT /bid-handler-info/{id}（更新端点返回 before/after 对比）
+- 设计意图: 前端可直观看到"修改前 → 修改后"的完整数据
+
 ## Entity（数据库实体）
 
 - 数据库表映射（详见 `docs/database.md`）
@@ -174,27 +208,46 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 
 - 对应表: `bid_winning_notification`
 - 字段: 19 个字段（详见 `docs/database.md` 2.2 节）
-- 待复制 BidHandlerInfo 模式实现完整链路
+- Mapper 状态: ✅ 已实现，Service / DTO / Controller 待补
 
 ### BidWinningSupplierDetail
 
 - 对应表: `bid_winning_supplier_detail`
 - 字段: `detailId` / `notificationId` / `supplierName` / `amount`
-- 待复制 BidHandlerInfo 模式实现完整链路
+- Mapper 状态: ✅ 已实现，Service / DTO / Controller 待补
 
 ## Mapper（持久化层）
 
 - **位置**: `src/main/java/.../mapper/`
 - **设计原则**: 手写接口 + XML 分离（Java 与 SQL 解耦）
-- **不写** `@Mapper` 注解（启动类 `@MapperScan` 统一扫描）
+- **写** `@Mapper` 注解（显式标注 + 启动类 `@MapperScan` 双重保险）
 - **不继承** `BaseMapper<T>`（不用 Plus 自动 CRUD）
 - **SQL 独立** 在 `src/main/resources/mapper/*.xml`
+- 启动类 `@MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")` 统一扫描注册
 
 ### BidHandlerInfoMapper
 
 - 接口: `mapper/BidHandlerInfoMapper.java`
 - XML: `resources/mapper/BidHandlerInfoMapper.xml`
 - 方法: `insert` / `updateById` / `deleteById` / `selectById` / `selectAll`
+- 对应表: `bid_handler_info`
+- 状态: ✅ 完整 7 层 + 4 个 Controller 端点已实现
+
+### BidWinningNotificationMapper
+
+- 接口: `mapper/BidWinningNotificationMapper.java`
+- XML: `resources/mapper/BidWinningNotificationMapper.xml`
+- 方法: 5 个（同上模式）
+- 对应表: `bid_winning_notification`（19 字段）
+- 状态: ✅ Mapper 已实现，Service / DTO / Controller 待补
+
+### BidWinningSupplierDetailMapper
+
+- 接口: `mapper/BidWinningSupplierDetailMapper.java`
+- XML: `resources/mapper/BidWinningSupplierDetailMapper.xml`
+- 方法: 5 个（同上模式）
+- 对应表: `bid_winning_supplier_detail`（4 字段，最简实现）
+- 状态: ✅ Mapper 已实现，Service / DTO / Controller 待补
 
 ## 端到端开发流程
 

@@ -165,9 +165,9 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 - [ ] 在 `application.yml` 配置 `spring.flyway.enabled: true`（**当前未启用**）
 - [x] 创建 Java 实体类（`BidHandlerInfo`、`BidWinningNotification`、`BidWinningSupplierDetail`）
 - [x] 加 MyBatis-Plus 注解（`@TableName` + `@TableId`）
-- [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` 完整链路已实现，含 Controller）
+- [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` / `BidWinningNotification` / `BidWinningSupplierDetail` 三个 Mapper 均已实现）
 - [x] 引入 MyBatis-Plus 框架
-- [x] **BidHandlerInfo 端到端 7 层链路打通**（DB → Entity → Mapper → XML → Service → DTO → Controller）
+- [x] **BidHandlerInfo 端到端 7 层链路打通 + 4 个 Controller 端点**（POST create / GET getById / PUT update / DELETE delete）
 - [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningNotification` 完整链路
 - [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningSupplierDetail` 完整链路
 - [ ] 新增 `GlobalExceptionHandler` 统一异常处理（`@Valid` 校验失败统一 400 响应）
@@ -198,6 +198,6 @@ DTO（@NotBlank / @Size 校验）
 Controller（@Valid 触发校验）
 ```
 
-**当前已实现**：`BidHandlerInfo` 完整 7 层链路（含 Controller `POST /create-bid-handler-info`）
+**当前已实现**：`BidHandlerInfo` 完整 7 层 + 4 个 Controller 端点（`POST /create-bid-handler-info` / `GET /bid-handler-info/{id}` / `PUT /bid-handler-info/{id}` / `DELETE /bid-handler-info/{id}`）
 
-**待复制实现**：`BidWinningNotification` / `BidWinningSupplierDetail`（按 7 层模式复制即可）
+**Mapper 已实现，待补 Service/DTO/Controller**：`BidWinningNotification` / `BidWinningSupplierDetail`（按 7 层模式复制即可）

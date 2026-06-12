@@ -76,7 +76,8 @@ public class BidHandlerInfo {
 
 **关键约定**（坚持 Java 与 SQL 分离）：
 - **不继承** `BaseMapper<T>`（不用 Plus 自动 CRUD）
-- **不写** `@Mapper` 注解（启动类 `@MapperScan` 统一扫描）
+- **写** `@Mapper` 注解（显式标注，与启动类 `@MapperScan` 双重保险）
+- 启动类 `@MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")` 统一扫描注册
 - import 只保留业务需要的类
 
 **本例产物**：
@@ -201,24 +202,26 @@ public class BidHandlerInfoCreateRequest {
     private String departmentName;
 }
 ```
-
 ### ⑦ Controller 层
 
 **位置**：`src/main/java/.../controller/BidHandlerInfoController.java`
 
-**职责**：HTTP 入口。接收请求 → 校验 → 转换 DTO 到 Entity → 调用 Service → 返回响应。
+**职责**：HTTP 入口。接收请求 → 校验 → 转换 DTO 到 Entity → 调用 Service → 返回 `Result<T>` 包装。
 
 **RESTful 路由**：
 
 | Method | Path | 作用 | 状态 |
 |--------|------|------|------|
 | POST | `/create-bid-handler-info` | 创建 | ✅ 已实现 |
-| GET | `/bid-handler-info/{id}` | 按 ID 查询 | ⏳ 待实现 |
-| GET | `/bid-handler-info` | 查全部 | ⏳ 待实现 |
-| PUT | `/bid-handler-info/{id}` | 按 ID 更新 | ⏳ 待实现 |
-| DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ⏳ 待实现 |
+| GET | `/bid-handler-info/{id}` | 按 ID 查询 | ✅ 已实现 |
+| PUT | `/bid-handler-info/{id}` | 按 ID 更新（带 diff） | ✅ 已实现 |
+| DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ✅ 已实现 |
+| GET | `/bid-handler-info` | 列表查询 | ⏳ 待实现（需先设计分页） |
 
-**本例产物**（实际代码）：
+**统一返回格式**：所有端点返 `Result<T>`（`code`/`message`/`data`），具体见 `docs/architecture.md` §2.4。
+
+**本例产物**（实际代码，简化）：
+
 ```java
 @RestController
 public class BidHandlerInfoController {
@@ -226,19 +229,58 @@ public class BidHandlerInfoController {
     @Resource
     private BidHandlerInfoService service;
 
+    // 创建
     @PostMapping("/create-bid-handler-info")
-    public BidHandlerInfo createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
+    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
         entity.setHandlerName(request.getHandlerName());
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
         service.create(entity);
-        return entity;
+        return Result.success(entity, "创建成功");
+    }
+
+    // 查询
+    @GetMapping("/bid-handler-info/{id}")
+    public Result<BidHandlerInfo> getByIdBidHandlerInfo(@PathVariable Integer id) {
+        BidHandlerInfo entity = service.getById(id);
+        return entity != null
+                ? Result.success(entity, "查询成功")
+                : Result.error(404, "记录不存在");
+    }
+
+    // 更新（带 diff）
+    @PutMapping("/bid-handler-info/{id}")
+    public Result<Diff<BidHandlerInfo>> updateBidHandlerInfo(
+            @PathVariable Integer id,
+            @RequestBody BidHandlerInfoUpdateRequest request) {
+        BidHandlerInfo before = service.getById(id);
+        if (before == null) return Result.error(404, "记录不存在");
+
+        BidHandlerInfo after = new BidHandlerInfo();
+        after.setHandlerId(id);
+        after.setHandlerName(request.getHandlerName());
+        after.setCompanyName(request.getCompanyName());
+        after.setDepartmentName(request.getDepartmentName());
+
+        int rows = service.update(after);
+        if (rows == 0) return Result.error(404, "记录不存在");
+
+        return Result.success(new Diff<>(before, after), "更新成功");
+    }
+
+    // 删除
+    @DeleteMapping("/bid-handler-info/{id}")
+    public Result<Void> deleteBidHandlerInfo(@PathVariable Integer id) {
+        int rows = service.delete(id);
+        return rows > 0
+                ? Result.success(null, "删除成功")
+                : Result.error(404, "记录不存在");
     }
 }
 ```
 
-**`@Valid` 触发校验**（**当前未启用，待补全**）：DTO 字段上的 `@NotBlank` / `@Size` 需要在 Controller 方法参数上加 `@Valid` 才生效。当前 `createBidHandlerInfo` **未加 `@Valid`**，校验注解暂未生效（待 `GlobalExceptionHandler` 一起补全）。校验失败时预期抛 `MethodArgumentNotValidException`，由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息。
+**`@Valid` 触发校验**（**当前未启用，待补全**）：DTO 字段上的 `@NotBlank` / `@Size` 需要在 Controller 方法参数上加 `@Valid` 才生效。当前 `createBidHandlerInfo` / `updateBidHandlerInfo` **未加 `@Valid`**，校验注解暂未生效（待 `GlobalExceptionHandler` 一起补全）。校验失败时预期抛 `MethodArgumentNotValidException`，由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息。
 
 **注入风格**：使用 `jakarta.annotation.Resource` 字段注入（Spring 6+ 推荐），非 `org.springframework.beans.factory.annotation.Autowired`。
 
@@ -266,12 +308,21 @@ Controller
   ↓ 自增 ID 回填 entity.handlerId
   ↓ (返回影响行数 1)
 Controller
-  ↓ 直接返回 entity 对象（含回填的 handlerId）
+  ↓ 包装为 Result.success(entity, "创建成功")
 Jackson
-  ↓ 序列化 entity → JSON
+  ↓ 序列化 Result → JSON
 Postman
-  ↓ 收到 {handlerId:1, handlerName:"张三", ...}
+  ↓ 收到 {code:200, message:"创建成功", data:{handlerId:1, handlerName:"张三", ...}}
 ```
+
+**4 个端点差异点速查**：
+
+| 端点 | 入口 | 调用 Service | 包装 Result |
+|------|------|------------|-------------|
+| POST | @RequestBody DTO | `create(entity)` | `Result.success(entity, "创建成功")` |
+| GET | @PathVariable id | `getById(id)` | `Result.success(entity, "查询成功")` / `Result.error(404, ...)` |
+| PUT | @PathVariable id + @RequestBody DTO | `getById(id)` + `update(after)` | `Result.success(new Diff(before, after), "更新成功")` |
+| DELETE | @PathVariable id | `delete(id)` | `Result.success(null, "删除成功")` / `Result.error(404, ...)` |
 
 ---
 
@@ -293,23 +344,29 @@ Postman
 
 按照 BidHandlerInfo 的 7 层结构，**复制**即可实现 BidWinningNotification、BidWinningSupplierDetail：
 
-| 步骤 | 复用点 |
-|------|--------|
-| ① DB 脚本 | V4 / V5 已有 |
-| ② Entity | 已有 `BidWinningNotification` / `BidWinningSupplierDetail` |
-| ③ Mapper 接口 | 复制 `BidHandlerInfoMapper.java` 改名 |
-| ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL |
-| ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 |
-| ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 调整字段 |
-| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名（注意：现 URL 前缀是 `/bid-handler-info`，复制时按业务改 URL） |
+| 步骤 | 复用点 | 当前状态 |
+|------|--------|----------|
+| ① DB 脚本 | V4 / V5 已有 | ✅ |
+| ② Entity | 已有 `BidWinningNotification` / `BidWinningSupplierDetail` | ✅ |
+| ③ Mapper 接口 | 复制 `BidHandlerInfoMapper.java` 改名 | ✅（含 @Mapper 注解）|
+| ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL | ✅ |
+| ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 | ⏳ 待复制 |
+| ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 调整字段 | ⏳ 待复制 |
+| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名（**注意**：现 Controller 返 `Result<T>` 包装，update 端点用 `Result<Diff<T>>`） | ⏳ 待复制 |
+
+**Controller 复制要点**：
+- URL 前缀从 `/bid-handler-info` 改为业务相关（例：`/bid-winning-notifications`）
+- 复用 `Result<T>` / `Result<Diff<T>>` 包装
+- 复用 `Result.success(...)` / `Result.error(404, "...")` 工厂
 
 ---
 
 ## 6. 后续待办
 
-- [ ] 复制模式实现 `BidWinningNotification` 完整链路
-- [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路
-- [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`
+- [ ] 复制模式实现 `BidWinningNotification` 完整链路（Service / DTO / Controller）
+- [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller）
+- [ ] 列表查询端点 `GET /bid-handler-info`（**先设计分页机制**：MyBatis-Plus PageHelper / 手动 LIMIT / IPaging）
+- [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）
 - [ ] 单元测试（Mapper / Service / Controller）
 - [ ] API 文档（`docs/api.md`）
