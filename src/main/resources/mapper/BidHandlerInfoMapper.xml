@@ -50,14 +50,21 @@
     </insert>
 
     <!--
-      按 ID 更新：传入 entity 必须携带 handlerId
+      按 ID 更新（PATCH 风格动态 SQL）：
+      - 传入 entity 必须携带 handlerId（WHERE 条件）
+      - 使用 <set> + <if> 实现 PATCH 语义：
+        * 字段为 null → 不更新（保留 DB 原值）
+        * 字段非 null → 更新
+      - 配合 BidHandlerInfoUpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
         UPDATE bid_handler_info
-        SET handler_name    = #{handlerName},
-            company_name    = #{companyName},
-            department_name = #{departmentName}
+        <set>
+            <if test="handlerName != null">handler_name = #{handlerName},</if>
+            <if test="companyName != null">company_name = #{companyName},</if>
+            <if test="departmentName != null">department_name = #{departmentName},</if>
+        </set>
         WHERE handler_id    = #{handlerId}
     </update>
 

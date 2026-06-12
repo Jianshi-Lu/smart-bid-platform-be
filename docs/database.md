@@ -167,12 +167,13 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 - [x] 加 MyBatis-Plus 注解（`@TableName` + `@TableId`）
 - [x] 创建 Mapper 接口 + XML（`BidHandlerInfo` / `BidWinningNotification` / `BidWinningSupplierDetail` 三个 Mapper 均已实现）
 - [x] 引入 MyBatis-Plus 框架
-- [x] **BidHandlerInfo 端到端 7 层链路打通 + 4 个 Controller 端点**（POST create / GET getById / PUT update / DELETE delete）
-- [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningNotification` 完整链路
-- [ ] 复制 `BidHandlerInfo` 模式实现 `BidWinningSupplierDetail` 完整链路
+- [x] **BidHandlerInfo 端到端 7 层链路打通 + 5 个 Controller 端点**（POST create / GET getById / PATCH update / DELETE delete / GET list）
+- [x] **BidWinningNotification 端到端 7 层链路打通 + 5 个 Controller 端点**（PATCH 语义 + 动态 SQL + 17 字段 DTO）
+- [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路
 - [ ] 新增 `GlobalExceptionHandler` 统一异常处理（`@Valid` 校验失败统一 400 响应）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充）
 - [ ] 解决 Java 字段与 DB 字段命名不一致问题（`projectNo` vs `projectCode` 等）
+- [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 校验失效）
 
 ---
 
@@ -198,6 +199,8 @@ DTO（@NotBlank / @Size 校验）
 Controller（@Valid 触发校验）
 ```
 
-**当前已实现**：`BidHandlerInfo` 完整 7 层 + 4 个 Controller 端点（`POST /create-bid-handler-info` / `GET /bid-handler-info/{id}` / `PUT /bid-handler-info/{id}` / `DELETE /bid-handler-info/{id}`）
+**当前已实现**：
+- `BidHandlerInfo` 完整 7 层 + 5 个 Controller 端点（`POST /create-bid-handler-info` / `GET /bid-handler-info/{id}` / `PATCH /bid-handler-info/{id}` / `DELETE /bid-handler-info/{id}` / `GET /bid-handler-info`）
+- `BidWinningNotification` 完整 7 层 + 5 个 Controller 端点（PATCH 风格 + 17 字段动态 SQL）
 
-**Mapper 已实现，待补 Service/DTO/Controller**：`BidWinningNotification` / `BidWinningSupplierDetail`（按 7 层模式复制即可）
+**待复制实现**：`BidWinningSupplierDetail`（按 7 层模式复制即可，4 字段最简实现）

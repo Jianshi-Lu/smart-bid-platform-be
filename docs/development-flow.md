@@ -214,9 +214,9 @@ public class BidHandlerInfoCreateRequest {
 |--------|------|------|------|
 | POST | `/create-bid-handler-info` | 创建 | ✅ 已实现 |
 | GET | `/bid-handler-info/{id}` | 按 ID 查询 | ✅ 已实现 |
-| PUT | `/bid-handler-info/{id}` | 按 ID 更新（带 diff） | ✅ 已实现 |
+| **PATCH** | `/bid-handler-info/{id}` | 按 ID **部分更新**（带 diff） | ✅ 已实现 |
 | DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ✅ 已实现 |
-| GET | `/bid-handler-info` | 列表查询 | ⏳ 待实现（需先设计分页） |
+| GET | `/bid-handler-info` | 列表查询（PageHelper 分页） | ✅ 已实现 |
 
 **统一返回格式**：所有端点返 `Result<T>`（`code`/`message`/`data`），具体见 `docs/architecture.md` §2.4。
 
@@ -249,9 +249,9 @@ public class BidHandlerInfoController {
                 : Result.error(404, "记录不存在");
     }
 
-    // 更新（带 diff）
-    @PutMapping("/bid-handler-info/{id}")
-    public Result<Diff<BidHandlerInfo>> updateBidHandlerInfo(
+    // 更新（PATCH 语义，动态 SQL）
+    @PatchMapping("/bid-handler-info/{id}")
+    public Result<Diff<BidHandlerInfo>> patchBidHandlerInfo(
             @PathVariable Integer id,
             @RequestBody BidHandlerInfoUpdateRequest request) {
         BidHandlerInfo before = service.getById(id);
@@ -276,6 +276,23 @@ public class BidHandlerInfoController {
         return rows > 0
                 ? Result.success(null, "删除成功")
                 : Result.error(404, "记录不存在");
+    }
+
+    // 列表查询（PageHelper 分页）
+    @GetMapping("/bid-handler-info")
+    public Result<PageInfo<BidHandlerInfo>> getAllBidHandlerInfo(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "3") int size,
+            @RequestParam(defaultValue = "handler_id desc") String sort) {
+        try {
+            PageHelper.startPage(page, size, sort);
+            List<BidHandlerInfo> list = service.listAll();
+            return Result.success(new PageInfo<>(list), "查询成功");
+        } catch (Exception e) {
+            return Result.error(400, "分页查询参数错误: " + e.getMessage());
+        } finally {
+            PageHelper.clearPage();
+        }
     }
 }
 ```
@@ -315,14 +332,15 @@ Postman
   ↓ 收到 {code:200, message:"创建成功", data:{handlerId:1, handlerName:"张三", ...}}
 ```
 
-**4 个端点差异点速查**：
+**5 个端点差异点速查**：
 
 | 端点 | 入口 | 调用 Service | 包装 Result |
 |------|------|------------|-------------|
 | POST | @RequestBody DTO | `create(entity)` | `Result.success(entity, "创建成功")` |
 | GET | @PathVariable id | `getById(id)` | `Result.success(entity, "查询成功")` / `Result.error(404, ...)` |
-| PUT | @PathVariable id + @RequestBody DTO | `getById(id)` + `update(after)` | `Result.success(new Diff(before, after), "更新成功")` |
+| **PATCH** | @PathVariable id + @RequestBody DTO | `getById(id)` + `update(after)` | `Result.success(new Diff(before, after), "更新成功")` |
 | DELETE | @PathVariable id | `delete(id)` | `Result.success(null, "删除成功")` / `Result.error(404, ...)` |
+| GET (list) | @RequestParam page/size/sort | `listAll()` (PageHelper 拦截) | `Result.success(pageInfo, "查询成功")` / `Result.error(400, ...)` |
 
 ---
 
@@ -344,29 +362,50 @@ Postman
 
 按照 BidHandlerInfo 的 7 层结构，**复制**即可实现 BidWinningNotification、BidWinningSupplierDetail：
 
+### BidWinningNotification（已实现，参考样板）
+
 | 步骤 | 复用点 | 当前状态 |
 |------|--------|----------|
-| ① DB 脚本 | V4 / V5 已有 | ✅ |
-| ② Entity | 已有 `BidWinningNotification` / `BidWinningSupplierDetail` | ✅ |
+| ① DB 脚本 | V4 已有 | ✅ |
+| ② Entity | 已有 `BidWinningNotification`（19 字段 + @NotBlank/@NotNull）| ✅ |
 | ③ Mapper 接口 | 复制 `BidHandlerInfoMapper.java` 改名 | ✅（含 @Mapper 注解）|
-| ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL | ✅ |
-| ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 | ⏳ 待复制 |
-| ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 调整字段 | ⏳ 待复制 |
-| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名（**注意**：现 Controller 返 `Result<T>` 包装，update 端点用 `Result<Diff<T>>`） | ⏳ 待复制 |
+| ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL | ✅（含 PATCH 动态 SQL `<set> + <if>`）|
+| ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 | ✅ |
+| ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 17 字段 | ✅（CreateRequest + UpdateRequest）|
+| ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名 + 5 端点 | ✅ |
+
+**BidWinningNotification vs BidHandlerInfo 差异**：
+- 字段数 19 vs 4（含 6 个时间/金额/布尔字段）
+- URL 前缀 `/bid-winning-notification` vs `/bid-handler-info`
+- PATCH 端点 17 字段 vs 3 字段
+- DTO 分 2 个（CreateRequest 必填 + UpdateRequest PATCH）
+- Service 仍是 5 简单 CRUD 转发
 
 **Controller 复制要点**：
-- URL 前缀从 `/bid-handler-info` 改为业务相关（例：`/bid-winning-notifications`）
-- 复用 `Result<T>` / `Result<Diff<T>>` 包装
-- 复用 `Result.success(...)` / `Result.error(404, "...")` 工厂
+- URL 前缀从 `/bid-handler-info` 改为业务相关
+- 复用 `Result<T>` / `Result<Diff<T>>` / `Result<PageInfo<T>>` 包装
+- 复用 `Result.success(...)` / `Result.error(400/404, "...")` 工厂
+- 列表查询用 `PageHelper.startPage` + `clearPage`（finally 必加）
+
+### BidWinningSupplierDetail（待复制）
+
+| 步骤 | 复用点 | 当前状态 |
+|------|--------|----------|
+| ① DB 脚本 | V5 已有 | ✅ |
+| ② Entity | 已有 `BidWinningSupplierDetail`（4 字段最简）| ✅ |
+| ③ Mapper 接口 | 复制 `BidWinningNotificationMapper.java` 改名 | ✅ |
+| ④ Mapper XML | 复制 `BidWinningNotificationMapper.xml` 改名 + 改 SQL | ✅ |
+| ⑤ Service | 复制 `BidWinningNotificationService.java` 改名 | ⏳ 待复制 |
+| ⑥ DTO | 复制 `BidWinningNotificationCreateRequest.java` 改名 + 3 字段 | ⏳ 待复制 |
+| ⑦ Controller | 复制 `BidWinningNotificationController.java` 改名 | ⏳ 待复制 |
 
 ---
 
 ## 6. 后续待办
 
-- [ ] 复制模式实现 `BidWinningNotification` 完整链路（Service / DTO / Controller）
 - [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller）
-- [ ] 列表查询端点 `GET /bid-handler-info`（**先设计分页机制**：MyBatis-Plus PageHelper / 手动 LIMIT / IPaging）
 - [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
+- [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 上 `@NotBlank` / `@Size` 校验失效）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）
 - [ ] 单元测试（Mapper / Service / Controller）
 - [ ] API 文档（`docs/api.md`）

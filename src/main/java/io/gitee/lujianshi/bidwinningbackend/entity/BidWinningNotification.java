@@ -1,5 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.entity;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,8 +20,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 public class BidWinningNotification {
     @TableId(type = IdType.AUTO)
     private Integer notificationId;
+    @NotNull
     private Integer handlerId;
+    @NotBlank
     private String projectNo;
+    @NotBlank
     private String purchaseTaskNo;
     private String platformCategory;
     private String biddingProcess;

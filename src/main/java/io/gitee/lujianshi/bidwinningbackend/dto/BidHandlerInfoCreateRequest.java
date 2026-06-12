@@ -9,7 +9,7 @@ import lombok.Data;
  *
  * <h3>在整个开发链路中的位置</h3>
  * <pre>
- *   ① 数据库表
+ *   ① 数据库表（bid_handler_info）
  *      ↓
  *   ② Entity（BidHandlerInfo）— 持久化映射
  *      ↓
@@ -32,11 +32,20 @@ import lombok.Data;
  *   <li><b>安全隔离</b>：Entity 不直接暴露给前端，避免泄漏敏感字段</li>
  * </ul>
  *
+ * <h3>与 {@code BidHandlerInfoUpdateRequest} 的对比</h3>
+ * <table border="1">
+ *   <tr><th>维度</th><th>CreateRequest（本类）</th><th>UpdateRequest</th></tr>
+ *   <tr><td>HTTP 方法</td><td>POST</td><td>PATCH</td></tr>
+ *   <tr><td>字段集合</td><td>3 字段</td><td>3 字段（完全相同）</td></tr>
+ *   <tr><td>handlerId</td><td>不在 DTO（DB 自增）</td><td>不在 DTO（URL path @PathVariable 传入）</td></tr>
+ *   <tr><td>校验规则</td><td>{@code @NotBlank} + {@code @Size}</td><td>仅 {@code @Size}（PATCH 语义下 null 是合法值）</td></tr>
+ * </table>
+ *
  * <h3>校验机制</h3>
  * <ul>
  *   <li>{@link NotBlank}：字符串非 null 且去除首尾空格后长度 &gt; 0</li>
  *   <li>{@link Size}：字符串最大长度限制</li>
- *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解</li>
+ *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解（当前未加，待 GlobalExceptionHandler 一起补全）</li>
  *   <li>校验失败：抛 {@code MethodArgumentNotValidException}（由 {@code GlobalExceptionHandler} 统一处理）</li>
  * </ul>
  *
@@ -49,11 +58,11 @@ import lombok.Data;
  * </table>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo
+ * @see io.gitee.lujianshi.bidwinningbackend.dto.BidHandlerInfoUpdateRequest
  * @see io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController
  */
 @Data
 public class BidHandlerInfoCreateRequest {
-
     @NotBlank(message = "经办人姓名不能为空")
     @Size(max = 50, message = "经办人姓名长度不能超过50")
     private String handlerName;

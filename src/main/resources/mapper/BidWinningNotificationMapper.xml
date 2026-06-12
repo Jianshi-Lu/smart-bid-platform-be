@@ -78,30 +78,37 @@
     </insert>
 
     <!--
-      按 ID 更新：传入 entity 必须携带 notificationId
-      排除 created_at（DB 维护，不应被业务更新）
+      按 ID 更新（PATCH 风格动态 SQL）：
+      - 传入 entity 必须携带 notificationId（WHERE 条件）
+      - 排除 created_at（DB 维护，不应被业务更新）
+      - 使用 <set> + <if> 实现 PATCH 语义：
+        * 字段为 null → 不更新（保留 DB 原值）
+        * 字段非 null → 更新
+      - 配合 BidWinningNotificationUpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">
         UPDATE bid_winning_notification
-        SET handler_id              = #{handlerId},
-            project_no              = #{projectNo},
-            purchase_task_no        = #{purchaseTaskNo},
-            platform_category       = #{platformCategory},
-            bidding_process         = #{biddingProcess},
-            bidding_method          = #{biddingMethod},
-            purchase_method         = #{purchaseMethod},
-            is_fixed_price          = #{isFixedPrice},
-            target_cost             = #{targetCost},
-            document_fee            = #{documentFee},
-            deposit                 = #{deposit},
-            credit_report_required  = #{creditReportRequired},
-            registration_deadline   = #{registrationDeadline},
-            tech_bid_deadline       = #{techBidDeadline},
-            business_bid_deadline   = #{businessBidDeadline},
-            bidding_status          = #{biddingStatus},
-            notes                   = #{notes}
-        WHERE notification_id       = #{notificationId}
+        <set>
+            <if test="handlerId != null">handler_id = #{handlerId},</if>
+            <if test="projectNo != null">project_no = #{projectNo},</if>
+            <if test="purchaseTaskNo != null">purchase_task_no = #{purchaseTaskNo},</if>
+            <if test="platformCategory != null">platform_category = #{platformCategory},</if>
+            <if test="biddingProcess != null">bidding_process = #{biddingProcess},</if>
+            <if test="biddingMethod != null">bidding_method = #{biddingMethod},</if>
+            <if test="purchaseMethod != null">purchase_method = #{purchaseMethod},</if>
+            <if test="isFixedPrice != null">is_fixed_price = #{isFixedPrice},</if>
+            <if test="targetCost != null">target_cost = #{targetCost},</if>
+            <if test="documentFee != null">document_fee = #{documentFee},</if>
+            <if test="deposit != null">deposit = #{deposit},</if>
+            <if test="creditReportRequired != null">credit_report_required = #{creditReportRequired},</if>
+            <if test="registrationDeadline != null">registration_deadline = #{registrationDeadline},</if>
+            <if test="techBidDeadline != null">tech_bid_deadline = #{techBidDeadline},</if>
+            <if test="businessBidDeadline != null">business_bid_deadline = #{businessBidDeadline},</if>
+            <if test="biddingStatus != null">bidding_status = #{biddingStatus},</if>
+            <if test="notes != null">notes = #{notes},</if>
+        </set>
+        WHERE notification_id = #{notificationId}
     </update>
 
     <!--

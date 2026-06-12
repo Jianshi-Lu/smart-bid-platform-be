@@ -771,7 +771,7 @@ Content-Type: application/json
 
 **文件**：`src/main/java/.../controller/BidHandlerInfoController.java`
 
-**职责**：经办人 CRUD 端点（4 端点已实现），统一返回 `Result<T>` 包装。
+**职责**：经办人 CRUD 端点（**5 端点已实现**），统一返回 `Result<T>` 包装。
 
 **统一响应格式**（所有端点）：
 
@@ -779,12 +779,12 @@ Content-Type: application/json
 {
   "code": 200,
   "message": "成功消息",
-  "data": { ...业务数据，可为 null }
+  "data": { ...业务数据，可为 null / Diff<T> / PageInfo<T> }
 }
 ```
 
-- `code` 200 = 成功；404 = 资源不存在
-- `data` 删除类操作时为 `null`，update 端点时为 `Diff<BidHandlerInfo>`
+- `code` 200 = 成功；400 = 参数错误；404 = 资源不存在
+- `data` 删除类操作时为 `null`，PATCH update 端点时为 `Diff<BidHandlerInfo>`，列表查询时为 `PageInfo<BidHandlerInfo>`
 
 #### 端点清单
 
@@ -792,9 +792,14 @@ Content-Type: application/json
 |--------|------|------|----------|------|
 | POST | `/create-bid-handler-info` | 创建经办人 | `Result<BidHandlerInfo>` | ✅ |
 | GET | `/bid-handler-info/{id}` | 按主键查询 | `Result<BidHandlerInfo>` | ✅ |
-| PUT | `/bid-handler-info/{id}` | 按主键更新（返回 diff） | `Result<Diff<BidHandlerInfo>>` | ✅ |
+| **PATCH** | `/bid-handler-info/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidHandlerInfo>>` | ✅ |
 | DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` | ✅ |
-| GET | `/bid-handler-info` | 列表查询 | — | ⏳（待设计分页） |
+| GET | `/bid-handler-info` | 列表查询（PageHelper 分页） | `Result<PageInfo<BidHandlerInfo>>` | ✅ |
+
+**PATCH 语义（RFC 5789）**：
+- 调用方传哪些字段，update 端点就更新哪些字段
+- 未传的字段（`null`）在 DB 中保持原值，由 XML 动态 SQL（`<set> + <if test="xxx != null">`）实现
+- 与 `BidWinningNotificationController` 风格保持一致
 
 ---
 
@@ -805,7 +810,7 @@ Content-Type: application/json
 | HTTP 方法 | POST |
 | 完整 URL | `http://localhost:8080/create-bid-handler-info` |
 | Content-Type | `application/json`（`@RequestBody` 要求） |
-| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，含 `@NotBlank` / `@Size` 校验注解，**当前未加 @Valid**） |
+| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，3 字段含 `@NotBlank` / `@Size` 校验注解，**当前未加 @Valid**） |
 | 返回值 | `Result<BidHandlerInfo>`（code=200，data=Entity） |
 
 **调用链路**：
@@ -869,31 +874,35 @@ URL {id} → @PathVariable 注入
 
 ---
 
-#### `PUT /bid-handler-info/{id}`（带 diff 逻辑）
+#### `PATCH /bid-handler-info/{id}`（带 diff 逻辑，PATCH 语义）
 
 | 项目 | 内容 |
 |------|------|
-| HTTP 方法 | PUT |
+| HTTP 方法 | **PATCH**（非 PUT） |
 | 完整 URL | `http://localhost:8080/bid-handler-info/1` |
 | Content-Type | `application/json` |
-| 请求参数 | `@PathVariable Integer id` + `@RequestBody BidHandlerInfoUpdateRequest`（3 字段） |
+| 请求参数 | `@PathVariable Integer id` + `@RequestBody BidHandlerInfoUpdateRequest`（3 字段，仅 `@Size`，**无 `@NotBlank`**） |
 | 返回值 | `Result<Diff<BidHandlerInfo>>`（code=200 成功 / code=404 记录不存在） |
 
-**diff 逻辑核心**：
+**PATCH 流程**：
 
 ```java
-BidHandlerInfo before = service.getById(id);          // 1. 查原始
+// 1. 查原始 entity（diff.before 来源）
+BidHandlerInfo before = service.getById(id);
 if (before == null) return Result.error(404, "记录不存在");
 
-BidHandlerInfo after = new BidHandlerInfo();           // 2. 构造新（id + 3 字段）
+// 2. 构造新 entity（id 来自 path，3 字段来自 body，null 字段不更新）
+BidHandlerInfo after = new BidHandlerInfo();
 after.setHandlerId(id);
-after.setHandlerName(request.getHandlerName());
-after.setCompanyName(request.getCompanyName());
-after.setDepartmentName(request.getDepartmentName());
+after.setHandlerName(request.getHandlerName());    // 可能为 null
+after.setCompanyName(request.getCompanyName());    // 可能为 null
+after.setDepartmentName(request.getDepartmentName()); // 可能为 null
 
-int rows = service.update(after);                      // 3. 执行更新
+// 3. 调用 service 更新（动态 SQL 只更新非 null 字段）
+int rows = service.update(after);
 if (rows == 0) return Result.error(404, "记录不存在");
 
+// 4. 包装 diff 返回
 return Result.success(new Diff<>(before, after), "更新成功");
 ```
 
@@ -902,8 +911,8 @@ return Result.success(new Diff<>(before, after), "更新成功");
 ```
 URL {id} → @PathVariable
   → service.getById(id)              ← diff.before 来源
-  → service.update(newEntity)        ← diff.after 来源
-  → mapper.updateById(entity)        → SQL UPDATE
+  → service.update(newEntity)        ← diff.after 写入 DB（仅 SET 非 null）
+  → mapper.updateById(entity)        → XML <update> 动态 SQL（<set> + <if>）
   → 包装 Diff<before, after>
 JSON Response
 ```
@@ -920,6 +929,16 @@ JSON Response
   }
 }
 ```
+
+**部分更新示例**（只传 1 个字段）：
+
+```bash
+curl -X PATCH http://localhost:8080/bid-handler-info/1 \
+  -H "Content-Type: application/json" \
+  -d '{"handlerName": "新名字"}'
+```
+
+响应：`data.before.handlerName = "张三"`, `data.after.handlerName = "新名字"`，其他字段保留 DB 原值。
 
 ---
 
@@ -943,9 +962,143 @@ URL {id} → @PathVariable
 
 ---
 
+#### `GET /bid-handler-info`（列表查询 + PageHelper 分页）
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | GET（无需 body） |
+| 完整 URL | `http://localhost:8080/bid-handler-info?page=1&size=10&sort=handler_id desc` |
+| 请求参数 | `@RequestParam(defaultValue="1") int page` / `@RequestParam(defaultValue="3") int size` / `@RequestParam(defaultValue="handler_id desc") String sort` |
+| 返回值 | `Result<PageInfo<BidHandlerInfo>>`（code=200 / code=400 参数错误） |
+
+**PageHelper 实现**：
+
+```java
+try {
+    PageHelper.startPage(page, size, sort);   // ThreadLocal 写入分页参数
+    List<BidHandlerInfo> list = service.listAll();  // 触发 SQL，自动加 LIMIT
+    return Result.success(new PageInfo<>(list), "查询成功");
+} catch (Exception e) {
+    return Result.error(400, "分页查询参数错误: " + e.getMessage());
+} finally {
+    PageHelper.clearPage();  // 关键：清理 ThreadLocal 防线程池污染
+}
+```
+
+**调用链路**：
+
+```
+URL ?page=1&size=10&sort=handler_id desc
+  → PageHelper.startPage(page, size, sort)   ← ThreadLocal 写入
+  → service.listAll() → mapper.selectAll()   ← PageHelper 自动追加 LIMIT
+  → PageInfo 包装（含总数/页数/当前页数据）
+  → 包装为 Result.success(pageInfo, "查询成功")
+  → finally { PageHelper.clearPage() }        ← 清理 ThreadLocal
+JSON Response
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "total": 8,
+    "list": [
+      {"handlerId":8,"handlerName":"...","companyName":"...","departmentName":"..."},
+      ...
+    ],
+    "pageNum": 1,
+    "pageSize": 3,
+    "pages": 3,
+    "hasNextPage": true
+  }
+}
+```
+
+---
+
 **待办**：
-- ⚠️ `createBidHandlerInfo` / `updateBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
-- 列表查询端点（GET /bid-handler-info）待设计分页机制（MyBatis-Plus PageHelper / 手动 LIMIT）
+- ⚠️ `createBidHandlerInfo` / `patchBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+- 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错），当前透传给 PageHelper（依赖其解析）
+
+---
+
+### 3.5 `BidWinningNotificationController`
+
+**文件**：`src/main/java/.../controller/BidWinningNotificationController.java`
+
+**职责**：定标通知 CRUD 端点（**5 端点已实现**），统一返回 `Result<T>` 包装。设计风格与 `BidHandlerInfoController` 完全一致。
+
+**统一响应格式**：（同 §3.4）
+
+#### 端点清单
+
+| Method | Path | 用途 | 返回类型 | 状态 |
+|--------|------|------|----------|------|
+| POST | `/create-bid-winning-notification` | 创建定标通知 | `Result<BidWinningNotification>` | ✅ |
+| GET | `/bid-winning-notification/{id}` | 按主键查询 | `Result<BidWinningNotification>` | ✅ |
+| **PATCH** | `/bid-winning-notification/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidWinningNotification>>` | ✅ |
+| DELETE | `/bid-winning-notification/{id}` | 按主键删除 | `Result<Void>` | ✅ |
+| GET | `/bid-winning-notification` | 列表查询（PageHelper 分页） | `Result<PageInfo<BidWinningNotification>>` | ✅ |
+
+#### 端点详解
+
+**POST /create-bid-winning-notification**
+
+| 项目 | 内容 |
+|------|------|
+| 请求 DTO | `BidWinningNotificationCreateRequest`（17 字段：3 必填 + 14 可选）|
+| 调用链 | JSON → DTO → Entity（17 字段拷贝）→ service.create() → mapper.insert() → MySQL INSERT + 自增回填 `notificationId` → Result.success(entity, "创建成功") |
+| 响应 | `Result<BidWinningNotification>`（code=200）|
+
+**GET /bid-winning-notification/{id}**
+
+| 项目 | 内容 |
+|------|------|
+| 请求参数 | `@PathVariable Integer id` |
+| 调用链 | URL → @PathVariable → service.getById(id) → mapper.selectById(id) → MySQL SELECT → resultMap 映射 |
+| 响应 | `Result<BidWinningNotification>`（code=200 成功 / code=404 不存在）|
+
+**PATCH /bid-winning-notification/{id}**
+
+| 项目 | 内容 |
+|------|------|
+| 请求 DTO | `BidWinningNotificationUpdateRequest`（17 字段，全部可选，无 `@NotBlank`/`@NotNull`）|
+| 调用链 | URL → @PathVariable → service.getById() 取 before → 构造 newEntity（id + 17 字段）→ service.update() → mapper.updateById() → XML 动态 SQL（仅 SET 非 null）→ 包装 Diff |
+| 响应 | `Result<Diff<BidWinningNotification>>`（code=200 / code=404）|
+
+**DELETE /bid-winning-notification/{id}**
+
+| 项目 | 内容 |
+|------|------|
+| 请求参数 | `@PathVariable Integer id` |
+| 调用链 | URL → @PathVariable → service.delete(id) → mapper.deleteById(id) → MySQL DELETE |
+| 响应 | `Result<Void>`（code=200 / code=404）|
+
+**GET /bid-winning-notification**（列表分页）
+
+| 项目 | 内容 |
+|------|------|
+| 请求参数 | `?pageNum=1&pageSize=10&sort=notification_id desc`（@RequestParam） |
+| 调用链 | URL → PageHelper.startPage(pageNum, pageSize, sort) → service.listAll() → PageHelper 加 LIMIT + COUNT → PageInfo 包装 → finally { clearPage() } |
+| 响应 | `Result<PageInfo<BidWinningNotification>>`（code=200 / code=400）|
+
+**与 §3.4 的差异点**：
+
+| 维度 | `BidHandlerInfoController` | `BidWinningNotificationController` |
+|------|---------------------------|---------------------------------|
+| 字段数 | 4 | 19 |
+| URL 前缀 | `/bid-handler-info` | `/bid-winning-notification` |
+| 业务复杂度 | 简单 CRUD | 含 6 个时间/金额/布尔字段 |
+| PATCH 端点 | 3 字段部分更新 | 17 字段部分更新 |
+| Mapper 复杂度 | 单表 4 字段 | 19 字段 + 动态 SQL |
+
+**待办**：
+- ⚠️ `createBidWinningNotification` / `patchBidWinningNotification` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效
+- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
 
 ---
 

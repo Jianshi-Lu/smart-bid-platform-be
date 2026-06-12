@@ -12,19 +12,19 @@ import java.util.List;
  *
  * <h3>在整个开发链路中的位置</h3>
  * <pre>
- *   ① 数据库表
+ *   ① 数据库表（bid_handler_info）
  *      ↓
- *   ② Entity（BidHandlerInfo）
+ *   ② Entity（BidHandlerInfo，含 @TableName / @TableId / @NotBlank / @NotNull）
  *      ↓
  *   ③ Mapper 接口（BidHandlerInfoMapper）
  *      ↓
- *   ④ Mapper XML（SQL 实现）
+ *   ④ Mapper XML（含 PATCH 动态 SQL）
  *      ↓
  *   ⑤ Service 层（本类，注入 Mapper 接口，业务编排）
  *      ↓
- *   ⑥ DTO（BidHandlerInfoCreateRequest）
+ *   ⑥ DTO（BidHandlerInfoCreateRequest / UpdateRequest）
  *      ↓
- *   ⑦ Controller（注入本 Service）
+ *   ⑦ Controller（注入本 Service，返回 Result 包装）
  * </pre>
  *
  * <h3>设计原则（与 Mapper 风格保持一致：手写、不继承 Plus）</h3>
@@ -32,7 +32,7 @@ import java.util.List;
  *   <li>本类<b>不继承</b> {@code IService<T>} —— 保持手写风格，方法签名可控</li>
  *   <li>本类<b>不继承</b> {@code ServiceImpl<Mapper, T>} —— 不用 Plus 提供的 service 增强</li>
  *   <li>直接注入 {@link BidHandlerInfoMapper}（接口），由 Spring 注入 XML 生成的代理实现</li>
- *   <li>当前只有简单 CRUD 转发，未来业务逻辑（如"按公司分组"）放这里</li>
+ *   <li>当前只有简单 CRUD 转发，未来业务逻辑（如"按公司分组"、"经办人离职归档"）放这里</li>
  * </ul>
  *
  * <h3>为什么用 {@code @Resource(jakarta)} 字段注入而非构造器注入？</h3>
@@ -44,17 +44,29 @@ import java.util.List;
  *       {@code @Resource} 默认按名称注入（与 {@code @Autowired} 默认按类型不同），当前只有一个 Mapper 实现时行为一致</li>
  * </ul>
  *
- * <h3>调用链路（以 create 为例）</h3>
+ * <h3>调用链路（以 patchBidHandlerInfo 为例）</h3>
  * <pre>
- *   Controller.create(request)
- *     → BidHandlerInfoService.create(entity)
- *       → BidHandlerInfoMapper.insert(entity)
- *         → BidHandlerInfoMapper.xml &lt;insert&gt; 标签
- *           → MySQL 真实 SQL 执行
+ *   Controller.patchBidHandlerInfo(id, request)
+ *     → BidHandlerInfoService.getById(id)         ← diff.before 来源
+ *     → 构造新 entity（id + 3 字段，null 字段不更新）
+ *     → BidHandlerInfoService.update(newEntity)
+ *       → BidHandlerInfoMapper.updateById(entity)
+ *         → BidHandlerInfoMapper.xml &lt;update&gt; 动态 SQL（&lt;set&gt; + &lt;if&gt;）
+ *           → MySQL 真实 SQL 执行（PATCH：只 SET 非 null 字段）
+ *     → Controller 包装 Diff&lt;before, after&gt;
  * </pre>
+ *
+ * <h3>PATCH 配合说明</h3>
+ * <ul>
+ *   <li>{@link #update(BidHandlerInfo)} 入参 entity 允许字段为 null</li>
+ *   <li>XML 动态 SQL 在 null 字段上跳过 SET（保留 DB 原值）</li>
+ *   <li>完整 PATCH 语义详见 {@link io.gitee.lujianshi.bidwinningbackend.dto.BidHandlerInfoUpdateRequest}</li>
+ * </ul>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper
  * @see io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController
+ * @see io.gitee.lujianshi.bidwinningbackend.dto.BidHandlerInfoCreateRequest
+ * @see io.gitee.lujianshi.bidwinningbackend.dto.BidHandlerInfoUpdateRequest
  */
 @Service
 public class BidHandlerInfoService {
@@ -65,17 +77,34 @@ public class BidHandlerInfoService {
     /**
      * 创建经办人
      *
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.create(request)
+     *     → BidHandlerInfoService.create(entity)
+     *       → BidHandlerInfoMapper.insert(entity)
+     *         → BidHandlerInfoMapper.xml &lt;insert&gt; 标签（INSERT + 自增回填）
+     * </pre>
+     *
      * @param entity 待创建实体（handlerId 字段可为空，DB 自增回填）
-     * @return 影响行数（1=成功）
+     * @return 影响行数（1=成功，0=失败）
      */
     public int create(BidHandlerInfo entity) {
         return mapper.insert(entity);
     }
 
     /**
-     * 按 ID 更新经办人
+     * 按 ID 部分更新经办人（PATCH 语义，配合 XML 动态 SQL）
      *
-     * @param entity 待更新实体（必须携带 handlerId）
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.patchBidHandlerInfo(id, request)
+     *     → BidHandlerInfoService.update(newEntity)
+     *       → BidHandlerInfoMapper.updateById(entity)
+     *         → BidHandlerInfoMapper.xml &lt;update&gt; 标签（&lt;set&gt; + &lt;if test="xxx != null"&gt;）
+     *         → 仅 SET 非 null 字段，null 字段保留 DB 原值
+     * </pre>
+     *
+     * @param entity 待更新实体（必须携带 handlerId；其他 3 字段为 null=不修改）
      * @return 影响行数（1=成功，0=记录不存在）
      */
     public int update(BidHandlerInfo entity) {
@@ -84,6 +113,14 @@ public class BidHandlerInfoService {
 
     /**
      * 按 ID 删除经办人
+     *
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.delete(id)
+     *     → BidHandlerInfoService.delete(id)
+     *       → BidHandlerInfoMapper.deleteById(id)
+     *         → BidHandlerInfoMapper.xml &lt;delete&gt; 标签
+     * </pre>
      *
      * @param id 主键 ID
      * @return 影响行数（1=成功，0=记录不存在）
@@ -95,6 +132,14 @@ public class BidHandlerInfoService {
     /**
      * 按 ID 查询单条经办人
      *
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.getById(id)
+     *     → BidHandlerInfoService.getById(id)
+     *       → BidHandlerInfoMapper.selectById(id)
+     *         → BidHandlerInfoMapper.xml &lt;select&gt; 标签（resultMap 映射）
+     * </pre>
+     *
      * @param id 主键 ID
      * @return 实体（未找到返回 null）
      */
@@ -103,9 +148,22 @@ public class BidHandlerInfoService {
     }
 
     /**
-     * 查询全部经办人
+     * 查询全部经办人（无分页）
      *
-     * @return 全部经办人列表
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.list(page, size, sort)
+     *     → BidHandlerInfoService.listAll()
+     *       → BidHandlerInfoMapper.selectAll()
+     *         → BidHandlerInfoMapper.xml &lt;select&gt; 标签
+     *         → PageHelper 自动追加 LIMIT（ThreadLocal 模式）
+     * </pre>
+     *
+     * <p><b>注意</b>：当前 selectAll 返回全表，由 PageHelper 在 SQL 层加 LIMIT 拦截。
+     * 实际数据量大时建议未来直接在 XML 写分页 SQL（{@code LIMIT page, size}），
+     * 或换用 MyBatis-Plus {@code Page<T>}。</p>
+     *
+     * @return 全部经办人列表（空表返回空 List 而非 null）
      */
     public List<BidHandlerInfo> listAll() {
         return mapper.selectAll();

@@ -20,19 +20,22 @@
 - Standard layout: `src/main/java`, `src/main/resources`, `src/test/java`
 - Source root package: `io.gitee.lujianshi.bidwinningbackend`
 - Layered architecture:
-  - `controller/` - HTTP 路由层（@RestController + @GetMapping / @PostMapping）
+  - `controller/` - HTTP 路由层（@RestController + @GetMapping / @PostMapping / @PatchMapping / @DeleteMapping）
     - HelloController - 演示 / 异步重定向
     - PlainTextMailController - 纯文本邮件发送
     - BidWinningMailController - HTML 中标通知书邮件发送
-    - BidHandlerInfoController - 经办人 CRUD（已实现 create / getById / update / delete，待补 listAll 分页）
+    - BidHandlerInfoController - 经办人 CRUD（5 端点已实现：create / getById / patch / delete / list）
+    - BidWinningNotificationController - 定标通知 CRUD（5 端点已实现：create / getById / patch / delete / list）
   - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
     - PlainTextMailRequest - 纯文本邮件请求
     - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
     - BidWinningListItem - 中标结果条目（独立顶层类）
     - BidHandlerInfoCreateRequest - 创建经办人请求（3 字段 + @NotBlank/@Size）
-    - BidHandlerInfoUpdateRequest - 更新经办人请求（独立 DTO，3 字段）
+    - BidHandlerInfoUpdateRequest - 更新经办人请求（PATCH DTO，3 字段仅 @Size，无 @NotBlank）
+    - BidWinningNotificationCreateRequest - 创建定标通知请求（17 字段：3 必填 + 14 可选）
+    - BidWinningNotificationUpdateRequest - 更新定标通知请求（PATCH DTO，17 字段全部可选）
     - Result<T> - 通用响应包装（code/message/data + success/error 工厂）
-    - Diff<T> - 通用 diff 包装（before/after，用于 update 端点）
+    - Diff<T> - 通用 diff 包装（before/after，用于 PATCH update 端点）
   - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
     - BidHandlerInfo - 经办人/招标负责人
     - BidWinningNotification - 定标通知主表
@@ -112,8 +115,14 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 | POST | /send-notification | application/json | 发送中标通知书 HTML 邮件（异步延迟5秒返回"发送成功"） |
 | POST | /create-bid-handler-info | application/json | 创建经办人（返回 `Result<BidHandlerInfo>`，code=200） |
 | GET | /bid-handler-info/{id} | - | 按主键查询单条经办人（`Result<BidHandlerInfo>`，code=200/404） |
-| PUT | /bid-handler-info/{id} | application/json | 按主键更新经办人（`Result<Diff<BidHandlerInfo>>` 含 before/after） |
+| PATCH | /bid-handler-info/{id} | application/json | 按主键**部分更新**经办人（`Result<Diff<BidHandlerInfo>>` 含 before/after；动态 SQL） |
 | DELETE | /bid-handler-info/{id} | - | 按主键删除经办人（`Result<Void>`，code=200/404） |
+| GET | /bid-handler-info | - | 列表查询（`Result<PageInfo<BidHandlerInfo>>`，PageHelper 分页；query 参数 `page` / `size` / `sort`） |
+| POST | /create-bid-winning-notification | application/json | 创建定标通知（17 字段，code=200） |
+| GET | /bid-winning-notification/{id} | - | 按主键查询单条定标通知（code=200/404） |
+| PATCH | /bid-winning-notification/{id} | application/json | 按主键**部分更新**定标通知（17 字段，code=200/404） |
+| DELETE | /bid-winning-notification/{id} | - | 按主键删除定标通知（code=200/404） |
+| GET | /bid-winning-notification | - | 列表查询定标通知（`Result<PageInfo<BidWinningNotification>>`，PageHelper 分页） |
 
 ## Email
 
@@ -174,23 +183,41 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 ### BidHandlerInfoUpdateRequest
 
 - 字段: 与 `BidHandlerInfoCreateRequest` 相同的 3 字段（独立 DTO，未来可加 `version` / `expectedUpdatedAt` 等）
-- 使用场景: PUT /bid-handler-info/{id}（按主键 ID 更新）
+- 使用场景: **PATCH** /bid-handler-info/{id}（按主键 ID **部分更新**）
 - 注意: ID 来自 URL `@PathVariable`，**不在 DTO 中**（RESTful 风格）
+- 校验: 仅有 `@Size`，**无 `@NotBlank`**（PATCH 语义下 null 是合法值，表示"不修改"）
+
+### BidWinningNotificationCreateRequest
+
+- 字段: 17 字段（3 必填 + 14 可选）
+  - 必填: `handlerId`（@NotNull）/ `projectNo`（@NotBlank + @Size(50)）/ `purchaseTaskNo`（@NotBlank + @Size(50)）
+  - 可选: platformCategory / biddingProcess / biddingMethod / purchaseMethod（@Size(50)）/ isFixedPrice / creditReportRequired（Boolean）/ targetCost / documentFee / deposit（BigDecimal）/ registrationDeadline / techBidDeadline / businessBidDeadline（LocalDateTime）/ biddingStatus（@Size(20)）/ notes
+- 使用场景: POST /create-bid-winning-notification（创建定标通知）
+- 校验: 当前 `createBidWinningNotification` 未加 `@Valid`，校验注解暂未生效
+
+### BidWinningNotificationUpdateRequest
+
+- 字段: 17 字段（PATCH 风格，**全部可选**）
+- 使用场景: **PATCH** /bid-winning-notification/{id}（按主键 ID 部分更新）
+- 注意: 排除 `notificationId`（由 URL `@PathVariable` 传入）/ `createdAt`（DB 维护）
+- 校验: 仅有 `@Size`，**无 `@NotBlank`/`@NotNull`**（PATCH 语义下 null=不修改）
 
 ### Result<T>（通用响应包装）
 
 - 字段: `code`（业务状态码）/ `message`（文字消息）/ `data`（业务数据载荷）
 - 静态工厂:
   - `Result.success(data, message)` — 成功响应（code=200）
-  - `Result.error(code, message)` — 业务失败（code 自定义，如 404）
-- 使用场景: 所有 BidHandlerInfo Controller 端点（统一返回结构）
+  - `Result.error(code, message)` — 业务失败（code 自定义，如 400/404）
+- 使用场景: 所有 `BidHandlerInfoController` 和 `BidWinningNotificationController` 端点（统一返回结构）
+- 业务码约定: 200=成功, 400=参数错误, 404=资源不存在
 - 链路位置: Service（业务结果）→ Controller（包装为 Result）→ Jackson（序列化为 JSON）→ 前端
 
 ### Diff<T>（通用 diff 包装）
 
 - 字段: `before`（修改前的实体）/ `after`（修改后的实体）
-- 使用场景: PUT /bid-handler-info/{id}（更新端点返回 before/after 对比）
+- 使用场景: PATCH update 端点（`BidHandlerInfoController.patchBidHandlerInfo` / `BidWinningNotificationController.patchBidWinningNotification`）返回 before/after 对比
 - 设计意图: 前端可直观看到"修改前 → 修改后"的完整数据
+- 泛型优势: 不同表可共用，Jackson 按 `T` 推断具体类型
 
 ## Entity（数据库实体）
 
@@ -208,7 +235,7 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 
 - 对应表: `bid_winning_notification`
 - 字段: 19 个字段（详见 `docs/database.md` 2.2 节）
-- Mapper 状态: ✅ 已实现，Service / DTO / Controller 待补
+- 完整 7 层链路: ✅ 已实现（DB → Entity → Mapper → XML → Service → DTO → Controller）
 
 ### BidWinningSupplierDetail
 
@@ -239,7 +266,8 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 - XML: `resources/mapper/BidWinningNotificationMapper.xml`
 - 方法: 5 个（同上模式）
 - 对应表: `bid_winning_notification`（19 字段）
-- 状态: ✅ Mapper 已实现，Service / DTO / Controller 待补
+- 状态: ✅ 完整 7 层 + 5 个 Controller 端点已实现
+- 特色: `updateById` 用动态 SQL（`<set> + <if test="xxx != null">`）实现 PATCH 语义
 
 ### BidWinningSupplierDetailMapper
 

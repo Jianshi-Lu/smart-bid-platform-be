@@ -56,6 +56,7 @@ import lombok.NoArgsConstructor;
  * @see io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService
  * @see docs/database.md
  */
+@SuppressWarnings("ALL")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
