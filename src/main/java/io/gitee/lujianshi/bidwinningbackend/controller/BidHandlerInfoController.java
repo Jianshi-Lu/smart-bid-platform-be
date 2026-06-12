@@ -9,6 +9,8 @@ import io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 经办人 Controller 层 — HTTP 入口
  *
@@ -208,5 +210,12 @@ public class BidHandlerInfoController {
         return entity != null
                 ? Result.success(entity, "查询成功")    // 找到
                 : Result.error(404, "记录不存在");   // 未找到
+    }
+    @GetMapping("/bid-handler-info")
+    public Result<List<BidHandlerInfo>> getAllBidHandlerInfo() {
+        List<BidHandlerInfo> list = service.listAll();
+        return list != null
+                ? Result.success(list, "查询成功")
+                : Result.error(404, "记录不存在");
     }
 }
