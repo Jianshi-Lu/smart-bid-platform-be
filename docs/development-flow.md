@@ -144,7 +144,7 @@ mybatis-plus:
 
 ### ⑤ Service 层
 
-**位置**：`src/main/java/.../service/BidHandlerInfoService.java`
+**位置**：`src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java`
 
 **职责**：业务逻辑编排。当前只做 CRUD 转发，未来业务逻辑（分组、聚合、复杂条件查询）放这里。
 
@@ -171,7 +171,7 @@ public class BidHandlerInfoService {
 
 ### ⑥ DTO 层
 
-**位置**：`src/main/java/.../dto/BidHandlerInfoCreateRequest.java`
+**位置**：`src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoCreateRequest.java`
 
 **职责**：HTTP 请求/响应的载体，与 Entity 分离。
 
@@ -204,7 +204,7 @@ public class BidHandlerInfoCreateRequest {
 ```
 ### ⑦ Controller 层
 
-**位置**：`src/main/java/.../controller/BidHandlerInfoController.java`
+**位置**：`src/main/java/.../controller/bidhandlerinfo/BidHandlerInfoController.java`
 
 **职责**：HTTP 入口。接收请求 → 校验 → 转换 DTO 到 Entity → 调用 Service → 返回 `Result<T>` 包装。
 
@@ -354,9 +354,9 @@ Postman
 | ② Entity | `src/main/java/.../entity/BidHandlerInfo.java` | Java ↔ DB 映射 |
 | ③ Mapper 接口 | `src/main/java/.../mapper/BidHandlerInfoMapper.java` | 方法签名 |
 | ④ Mapper XML | `src/main/resources/mapper/BidHandlerInfoMapper.xml` | SQL 实现 |
-| ⑤ Service | `src/main/java/.../service/BidHandlerInfoService.java` | 业务编排 |
-| ⑥ DTO | `src/main/java/.../dto/BidHandlerInfoCreateRequest.java` | 请求载体 |
-| ⑦ Controller | `src/main/java/.../controller/BidHandlerInfoController.java` | HTTP 入口 |
+| ⑤ Service | `src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java` | 业务编排 |
+| ⑥ DTO | `src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoCreateRequest.java` | 请求载体 |
+| ⑦ Controller | `src/main/java/.../controller/bidhandlerinfo/BidHandlerInfoController.java` | HTTP 入口 |
 
 ---
 
@@ -432,7 +432,7 @@ public interface XxxMapper {
 </delete>
 
 <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-    SELECT <所有字段>
+    SELECT 所有字段
     FROM xxx
     WHERE pk_column IN
     <foreach collection="ids" item="id" open="(" close=")" separator=",">

@@ -21,24 +21,48 @@
 - Source root package: `io.gitee.lujianshi.bidwinningbackend`
 - Layered architecture:
   - `controller/` - HTTP 路由层（@RestController + @GetMapping / @PostMapping / @PatchMapping / @DeleteMapping）
-    - HelloController - 演示 / 异步重定向
-    - PlainTextMailController - 纯文本邮件发送
-    - BidWinningMailController - HTML 中标通知书邮件发送
-    - BidHandlerInfoController - 经办人 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
-    - BidWinningNotificationController - 定标通知 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
-  - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
-    - PlainTextMailRequest - 纯文本邮件请求
-    - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
-    - BidWinningListItem - 中标结果条目（独立顶层类）
-    - BidHandlerInfoCreateRequest - 创建经办人请求（3 字段 + @NotBlank/@Size）
-    - BidHandlerInfoUpdateRequest - 更新经办人请求（PATCH DTO，3 字段仅 @Size，无 @NotBlank）
-    - BidWinningNotificationCreateRequest - 创建定标通知请求（17 字段：3 必填 + 14 可选）
-    - BidWinningNotificationUpdateRequest - 更新定标通知请求（PATCH DTO，17 字段全部可选）
-    - BidHandlerInfoBatchDeleteRequest - 批量删除经办人请求（独立 DTO，1 字段 List<Integer> ids + @NotEmpty + @Size max=500）
-    - BidWinningNotificationBatchDeleteRequest - 批量删除定标通知请求（独立 DTO，结构同上）
-    - BidWinningSupplierDetailBatchDeleteRequest - 批量删除中标结果明细请求（**预留**，等 SupplierDetail Controller 启用）
-    - Result<T> - 通用响应包装（code/message/data + success/error 工厂）
-    - Diff<T> - 通用 diff 包装（before/after，用于 PATCH update 端点）
+    - `bidhandlerinfo/` - 经办人 Controller
+      - BidHandlerInfoController - 经办人 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
+    - `bidwinningnotification/` - 定标通知 Controller
+      - BidWinningNotificationController - 定标通知 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
+    - `bidwinningsupplierdetail/` - 中标结果明细 Controller
+      - BidWinningSupplierDetailController - （**空 stub**，待 7 层链路打通后实现）
+    - `mail/` - 邮件 Controller
+      - HelloController - 演示 / 异步重定向
+      - PlainTextMailController - 纯文本邮件发送
+      - BidWinningMailController - HTML 中标通知书邮件发送
+  - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor），按业务域分子包
+    - `bidhandlerinfo/`
+      - BidHandlerInfoCreateRequest - 创建经办人请求（3 字段 + @NotBlank/@Size）
+      - BidHandlerInfoUpdateRequest - 更新经办人请求（PATCH DTO，3 字段仅 @Size，无 @NotBlank）
+      - BidHandlerInfoBatchDeleteRequest - 批量删除经办人请求（独立 DTO，1 字段 List<Integer> ids + @NotEmpty + @Size max=500）
+    - `bidwinningnotification/`
+      - BidWinningNotificationCreateRequest - 创建定标通知请求（17 字段：3 必填 + 14 可选）
+      - BidWinningNotificationUpdateRequest - 更新定标通知请求（PATCH DTO，17 字段全部可选）
+      - BidWinningNotificationBatchDeleteRequest - 批量删除定标通知请求（独立 DTO，结构同上）
+    - `bidwinningsupplierdetail/`
+      - BidWinningSupplierDetailBatchDeleteRequest - 批量删除中标结果明细请求（**预留**，等 SupplierDetail Controller 启用）
+    - `mail/`
+      - PlainTextMailRequest - 纯文本邮件请求
+      - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
+      - BidWinningListItem - 中标结果条目（独立顶层类）
+    - `common/`
+      - Result<T> - 通用响应包装（code/message/data + success/error 工厂）
+      - Diff<T> - 通用 diff 包装（before/after，用于 PATCH update 端点）
+  - `service/` - 业务逻辑层（@Service），按业务域分子包
+    - `bidhandlerinfo/`
+      - BidHandlerInfoService - 经办人 CRUD 业务编排
+    - `bidwinningnotification/`
+      - BidWinningNotificationService - 定标通知 CRUD 业务编排
+    - `bidwinningsupplierdetail/`
+      - BidWinningSupplierDetailService - （**空 stub**，待实现）
+    - `mail/`
+      - HelloService - 演示业务
+      - PlainTextMailSender - 纯文本邮件发送
+      - BidWinningMailSender - HTML 邮件发送
+      - BidWinningTemplateFiller - Thymeleaf 模板填充
+      - MailLoggingService - 邮件日志格式化
+      - StaticResourceSearcher - 模板文件搜索
   - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
     - BidHandlerInfo - 经办人/招标负责人
     - BidWinningNotification - 定标通知主表

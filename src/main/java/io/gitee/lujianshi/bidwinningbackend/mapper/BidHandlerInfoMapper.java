@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
+import io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo.BidHandlerInfoController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -67,8 +68,8 @@ import java.util.List;
  * </ul>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo
- * @see io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService
- * @see io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController
+ * @see io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService
+ * @see BidHandlerInfoController
  */
 @Mapper
 public interface BidHandlerInfoMapper {

@@ -12,7 +12,7 @@
 BidWinningBackendApplication.java:27
 ```
 
-```java
+```text
 public static void main(String[] args) {
     SpringApplication.run(BidWinningBackendApplication.class, args);
 }
@@ -50,7 +50,7 @@ Spring Boot 4.x 在 `META-INF/spring/org.springframework.boot.autoconfigure.Auto
 
 #### 阶段 3：创建 `ApplicationContext`（IOC 容器）
 
-```java
+```text
 // Spring Boot 内部简化逻辑
 DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 ApplicationContext context = new AnnotationConfigApplicationContext(beanFactory);
@@ -70,7 +70,7 @@ Spring Boot 默认使用嵌入式 Tomcat（NioEndpoint）。
 
 ### 1.3 `@SpringBootApplication` 三合一注解原理
 
-```java
+```text
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
@@ -193,7 +193,7 @@ Spring Boot 默认使用嵌入式 Tomcat。启动流程如下：
 
 #### 步骤 1：创建 Tomcat 实例
 
-```java
+```text
 Tomcat tomcat = new Tomcat();
 tomcat.setPort(8079);  // 从 application.properties 读取
 tomcat.getConnector();  // 初始化 connector（NIO 模式）
@@ -256,7 +256,7 @@ DispatcherServlet.doDispatch(HttpServletRequest, HttpServletResponse)
 
 ### 1.7 `@EnableAsync` 异步机制
 
-```java
+```text
 @EnableAsync   // BidWinningBackendApplication.java:24
 public class BidWinningBackendApplication { ... }
 ```
@@ -275,7 +275,7 @@ public class BidWinningBackendApplication { ... }
 
 #### 本项目中的 @Async 使用
 
-```java
+```text
 // HelloService.java
 @Async
 public void fetchAfterDelay() {
@@ -335,7 +335,7 @@ Bean 创建 → 检查字段/构造函数上的 @Autowired → 从容器中查�
 
 ### 2.1 `PlainTextMailRequest`
 
-**文件**：`src/main/java/.../dto/PlainTextMailRequest.java`
+**文件**：`src/main/java/.../dto/mail/PlainTextMailRequest.java`
 
 **Lombok 注解**：
 
@@ -360,9 +360,9 @@ Bean 创建 → 检查字段/构造函数上的 @Autowired → 从容器中查�
 
 ### 2.2 `BidWinningMailRequest`
 
-**文件**：`src/main/java/.../dto/BidWinningMailRequest.java`
+**文件**：`src/main/java/.../dto/mail/BidWinningMailRequest.java`
 
-```java
+```text
 public class BidWinningMailRequest extends PlainTextMailRequest {
     private String projectCode;                        // 项目编号
     private String handlerName;                        // 经办人
@@ -458,7 +458,7 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 
 ### 2.4 `Result<T>` 通用响应包装
 
-**文件**：`src/main/java/.../dto/Result.java`
+**文件**：`src/main/java/.../dto/common/Result.java`
 
 **设计目标**：所有 Controller 端点统一返回 `Result<T>`，前端解析结构一致；HTTP 状态码只表示传输层状态（200/400/500），**业务状态由 `code` 字段表达**。
 
@@ -472,7 +472,7 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
 
 **静态工厂**：
 
-```java
+```text
 // 成功响应（含数据）
 public static <T> Result<T> success(T data, String message)
 // e.g. Result.success(entity, "创建成功")
@@ -510,7 +510,7 @@ Service（业务结果）→ Controller（包装为 Result）→ Jackson（序�
 
 ### 2.5 `Diff<T>` 通用 diff 包装
 
-**文件**：`src/main/java/.../dto/Diff.java`
+**文件**：`src/main/java/.../dto/common/Diff.java`
 
 **设计目标**：用于展示 update 操作前后的实体对比，前端可直观看到"修改前 → 修改后"的完整数据。
 
@@ -543,9 +543,9 @@ Service（业务结果）→ Controller（包装为 Result）→ Jackson（序�
 ### 2.6 批量删除 DTO 模式（每端点独立 DTO + data 返实体列表）
 
 **文件**：
-- `src/main/java/.../dto/BidHandlerInfoBatchDeleteRequest.java`
-- `src/main/java/.../dto/BidWinningNotificationBatchDeleteRequest.java`
-- `src/main/java/.../dto/BidWinningSupplierDetailBatchDeleteRequest.java`（**预留**，等 SupplierDetail Controller 启用）
+- `src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoBatchDeleteRequest.java`
+- `src/main/java/.../dto/bidwinningnotification/BidWinningNotificationBatchDeleteRequest.java`
+- `src/main/java/.../dto/bidwinningsupplierdetail/BidWinningSupplierDetailBatchDeleteRequest.java`（**预留**，等 SupplierDetail Controller 启用）
 
 **设计目标**：每端点独立 DTO，符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"。
 
@@ -650,7 +650,7 @@ Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controlle
 
 ### 3.1 `HelloController`
 
-**文件**：`src/main/java/.../controller/HelloController.java`
+**文件**：`src/main/java/.../controller/mail/HelloController.java`
 
 **类注解**：`@RestController = @Controller + @ResponseBody`
 
@@ -660,7 +660,7 @@ Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controlle
 
 #### 3.1.1 `GET /hello`
 
-```java
+```text
 @GetMapping("/hello")
 public String hello() {
     return helloService.hello();
@@ -679,7 +679,7 @@ public String hello() {
 
 #### 3.1.2 `GET /access-url`
 
-```java
+```text
 @GetMapping("/access-url")
 public void accessUrl(HttpServletResponse response) throws IOException {
     helloService.accessUrl(response);
@@ -700,7 +700,7 @@ public void accessUrl(HttpServletResponse response) throws IOException {
 
 #### 3.1.3 `POST /fetch-url`
 
-```java
+```text
 @PostMapping("/fetch-url")
 public String fetchUrl() {
     helloService.fetchAfterDelay();   // @Async，触发后立即返回，不等待
@@ -723,11 +723,11 @@ public String fetchUrl() {
 
 ### 3.2 `PlainTextMailController`
 
-**文件**：`src/main/java/.../controller/PlainTextMailController.java`
+**文件**：`src/main/java/.../controller/mail/PlainTextMailController.java`
 
 #### `POST /send-email`
 
-```java
+```text
 @PostMapping("/send-email")
 public void sendEmail(PlainTextMailRequest request) {
     plainTextMailSender.sendEmail(request);
@@ -760,11 +760,11 @@ PlainTextMailRequest 对象完整构建后，传入 Controller 方法
 
 ### 3.3 `BidWinningMailController`
 
-**文件**：`src/main/java/.../controller/BidWinningMailController.java`
+**文件**：`src/main/java/.../controller/mail/BidWinningMailController.java`
 
 #### `POST /send-notification`
 
-```java
+```text
 @PostMapping("/send-notification")
 public String sendNotification(@RequestBody BidWinningMailRequest request) {
     String htmlContent = bidWinningTemplateFiller.processTemplate(request);
@@ -875,7 +875,7 @@ Content-Type: application/json
 
 ### 3.4 `BidHandlerInfoController`
 
-**文件**：`src/main/java/.../controller/BidHandlerInfoController.java`
+**文件**：`src/main/java/.../controller/bidhandlerinfo/BidHandlerInfoController.java`
 
 **职责**：经办人 CRUD 端点（**6 端点已实现**），统一返回 `Result<T>` 包装。
 
@@ -993,7 +993,7 @@ URL {id} → @PathVariable 注入
 
 **PATCH 流程**：
 
-```java
+```text
 // 1. 查原始 entity（diff.before 来源）
 BidHandlerInfo before = service.getById(id);
 if (before == null) return Result.error(404, "记录不存在");
@@ -1019,7 +1019,7 @@ return Result.success(new Diff<>(before, after), "更新成功");
 URL {id} → @PathVariable
   → service.getById(id)              ← diff.before 来源
   → service.update(newEntity)        ← diff.after 写入 DB（仅 SET 非 null）
-  → mapper.updateById(entity)        → XML <update> 动态 SQL（<set> + <if>）
+  → mapper.updateById(entity)        → XML &lt;update&gt; 动态 SQL（&lt;set&gt; + &lt;if&gt;）
   → 包装 Diff<before, after>
 JSON Response
 ```
@@ -1080,7 +1080,7 @@ URL {id} → @PathVariable
 
 **PageHelper 实现**：
 
-```java
+```text
 try {
     PageHelper.startPage(page, size, sort);   // ThreadLocal 写入分页参数
     List<BidHandlerInfo> list = service.listAll();  // 触发 SQL，自动加 LIMIT
@@ -1184,7 +1184,7 @@ JSON Response
 
 ### 3.5 `BidWinningNotificationController`
 
-**文件**：`src/main/java/.../controller/BidWinningNotificationController.java`
+**文件**：`src/main/java/.../controller/bidwinningnotification/BidWinningNotificationController.java`
 
 **职责**：定标通知 CRUD 端点（**6 端点已实现**），统一返回 `Result<T>` 包装。设计风格与 `BidHandlerInfoController` 完全一致。
 
@@ -1308,7 +1308,7 @@ JSON Response
 
 ### 4.1 `HelloService`
 
-**文件**：`src/main/java/.../service/HelloService.java`
+**文件**：`src/main/java/.../service/mail/HelloService.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1318,7 +1318,7 @@ JSON Response
 | `fetchUrl()` | 无 | `custom.url` 配置值（String） | `@Value` 注入配置 | 返回配置值 |
 
 **注入的配置**：
-```java
+```text
 @Value("${server.port}")    private int port;       // 8079
 @Value("${custom.url}")    private String url;      // https://baidu.com
 ```
@@ -1329,7 +1329,7 @@ JSON Response
 
 ### 4.2 `PlainTextMailSender`
 
-**文件**：`src/main/java/.../service/PlainTextMailSender.java`
+**文件**：`src/main/java/.../service/mail/PlainTextMailSender.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1337,7 +1337,7 @@ JSON Response
 
 **`sendEmail()` 内部流程**：
 
-```java
+```text
 public void sendEmail(PlainTextMailRequest request) {
     SimpleMailMessage message = new SimpleMailMessage();    // 1. 创建邮件消息对象
     message.setFrom(senderEmail);                            // 2. 强制使用配置发件人（防止 from 欺骗）
@@ -1382,7 +1382,7 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 ### 4.3 `StaticResourceSearcher`
 
-**文件**：`src/main/java/.../service/StaticResourceSearcher.java`
+**文件**：`src/main/java/.../service/mail/StaticResourceSearcher.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1390,7 +1390,7 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 **`validateTemplateExists()` 内部流程**：
 
-```java
+```text
 public void validateTemplateExists(String templateName) {
     try {
         // 1. 扫描 classpath:/templates/*.html 下的所有模板文件
@@ -1425,7 +1425,7 @@ public void validateTemplateExists(String templateName) {
 
 **`extractTemplateName()` 内部流程**：
 
-```java
+```text
 private String extractTemplateName(Resource resource) {
     try {
         String path = resource.getURL().getPath();
@@ -1450,7 +1450,7 @@ private String extractTemplateName(Resource resource) {
 
 ### 4.4 `BidWinningMailSender`
 
-**文件**：`src/main/java/.../service/BidWinningMailSender.java`
+**文件**：`src/main/java/.../service/mail/BidWinningMailSender.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1458,7 +1458,7 @@ private String extractTemplateName(Resource resource) {
 
 **`sendHtmlEmail()` 内部流程**：
 
-```java
+```text
 public void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
     MimeMessage mimeMessage = mailSender.createMimeMessage();
     // 1. mailSender（JavaMailSenderImpl）通过 Session 创建 MimeMessage
@@ -1496,7 +1496,7 @@ public void sendHtmlEmail(String to, String subject, String htmlContent) throws 
 
 ### 4.5 `BidWinningTemplateFiller`
 
-**文件**：`src/main/java/.../service/BidWinningTemplateFiller.java`
+**文件**：`src/main/java/.../service/mail/BidWinningTemplateFiller.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1504,7 +1504,7 @@ public void sendHtmlEmail(String to, String subject, String htmlContent) throws 
 
 **`processTemplate()` 内部流程**：
 
-```java
+```text
 public String processTemplate(BidWinningMailRequest request) {
     // Step 1: 读取用户传入的模板文件名（不含 .html 后缀）
     String templateName = request.getTemplateName();  // 例如 "bid-winning-notification2"
@@ -1580,7 +1580,7 @@ OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
 
 ### 4.6 `MailLoggingService`
 
-**文件**：`src/main/java/.../service/MailLoggingService.java`
+**文件**：`src/main/java/.../service/mail/MailLoggingService.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|-------------|----------|
@@ -1671,7 +1671,7 @@ Controller（@Valid 触发校验）
 
 **`@MapperScan` 启动类配置**：
 
-```java
+```text
 @SpringBootApplication
 @MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")
 public class BidWinningBackendApplication { ... }
@@ -1714,7 +1714,7 @@ mybatis-plus:
 
 **`execute()` 内部流程**：
 
-```java
+```text
 public static void execute(Runnable task, long delayMillis) {
     new Thread(() -> {                              // 1. 创建新线程（Lambda 实现 Runnable）
         try {
