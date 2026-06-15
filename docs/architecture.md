@@ -1,6 +1,8 @@
 # 项目架构文档
 
 > 本文档深入分析 bid-winning-backend 项目的内部架构，涵盖 Spring Boot 启动流程、实体类设计、Controller 层、Service 层和工具类的实现细节。
+>
+> **对外 API 契约**：前端联调请查阅 [`docs/api.md`](api.md)（22 端点完整文档，含请求/响应字段表与 curl 示例）。本文档聚焦于**内部实现**视角。
 
 ---
 

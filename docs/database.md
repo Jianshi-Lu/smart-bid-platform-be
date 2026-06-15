@@ -3,6 +3,8 @@
 > 本文档描述 bid-winning-backend 项目的数据库表结构。所有表通过 `src/main/resources/sql/ddl/` 下的脚本管理，脚本文件名采用 **Flyway 兼容的版本号格式**（V1__xxx.sql），便于未来切换到 Flyway / Liquibase 等迁移工具时无需改名。
 >
 > **当前状态**：**未实际启用 Flyway**，表结构需 DBA 或开发者手动执行 `sql/ddl/` 下的脚本。引入 Flyway 的步骤见第 5 节待办。
+>
+> **对外 API 契约**：前端联调请查阅 [`docs/api.md`](api.md)。本文档聚焦于**表结构与字段**视角。
 
 ---
 
