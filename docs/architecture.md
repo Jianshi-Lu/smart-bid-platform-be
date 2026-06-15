@@ -642,7 +642,7 @@ Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controlle
 **当前使用范围**：
 - `BidHandlerInfoController.batchDeleteBidHandlerInfo` ← 用 `BidHandlerInfoBatchDeleteRequest`
 - `BidWinningNotificationController.batchDeleteBidWinningNotification` ← 用 `BidWinningNotificationBatchDeleteRequest`
-- 未来扩展：`BidWinningSupplierDetailController`（待 7 层链路打通，预留 DTO 已就绪）
+- `BidWinningSupplierDetailController.batchDeleteBidWinningSupplierDetail` ← 用 `BidWinningSupplierDetailBatchDeleteRequest`（**已启用**）
 
 ---
 
@@ -1300,6 +1300,39 @@ JSON Response
 
 **待办**：
 - ⚠️ `createBidWinningNotification` / `patchBidWinningNotification` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效
+- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+
+---
+
+### 3.6 `BidWinningSupplierDetailController`
+
+**文件**：`src/main/java/.../controller/bidwinningsupplierdetail/BidWinningSupplierDetailController.java`
+
+**职责**：中标结果明细 CRUD 端点（**6 端点已实现**），统一返回 `Result<T>` 包装。设计风格与 `BidHandlerInfoController` / `BidWinningNotificationController` 完全一致。
+
+**端点清单**：
+
+| Method | Path | 用途 | 返回类型 | 状态 |
+|--------|------|------|----------|------|
+| POST | `/create-bid-winning-supplier-detail` | 创建中标结果明细 | `Result<BidWinningSupplierDetail>` | ✅ |
+| GET | `/bid-winning-supplier-detail/{id}` | 按主键查询 | `Result<BidWinningSupplierDetail>` | ✅ |
+| **PATCH** | `/bid-winning-supplier-detail/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidWinningSupplierDetail>>` | ✅ |
+| DELETE | `/bid-winning-supplier-detail/{id}` | 按主键删除 | `Result<Void>` | ✅ |
+| GET | `/bid-winning-supplier-detail` | 列表查询（PageHelper 分页） | `Result<PageInfo<BidWinningSupplierDetail>>` | ✅ |
+| POST | `/bid-winning-supplier-detail/batch-delete` | 按主键 ID 列表批量删除 | `Result<List<BidWinningSupplierDetail>>` | ✅（p3 升级版）|
+
+**与 §3.4/§3.5 的差异点**：
+
+| 维度 | `BidHandlerInfoController` | `BidWinningNotificationController` | `BidWinningSupplierDetailController` |
+|------|---------------------------|-----------------------------------|--------------------------------------|
+| 字段数 | 4 | 19 | **4** |
+| URL 前缀 | `/bid-handler-info` | `/bid-winning-notification` | **`/bid-winning-supplier-detail`** |
+| PATCH 端点 | 3 字段部分更新 | 17 字段部分更新 | **3 字段部分更新** |
+| Mapper 复杂度 | 单表 4 字段 | 19 字段 + 动态 SQL | **4 字段 + PATCH 动态 SQL** |
+
+**待办**：
+- ⚠️ 当前未加 `@Valid`，DTO 上 `@NotNull` / `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错）
 - 统一异常处理（`GlobalExceptionHandler` 尚未实现）
 
 ---

@@ -169,7 +169,7 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 - [x] 引入 MyBatis-Plus 框架
 - [x] **BidHandlerInfo 端到端 7 层链路打通 + 5 个 Controller 端点**（POST create / GET getById / PATCH update / DELETE delete / GET list）
 - [x] **BidWinningNotification 端到端 7 层链路打通 + 5 个 Controller 端点**（PATCH 语义 + 动态 SQL + 17 字段 DTO）
-- [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路
+- [x] **BidWinningSupplierDetail 端到端 7 层链路打通 + 6 个 Controller 端点**（PATCH 语义 + 动态 SQL + 3 字段 DTO + 批量删除 p3 升级版）
 - [ ] 新增 `GlobalExceptionHandler` 统一异常处理（`@Valid` 校验失败统一 400 响应）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充）
 - [ ] 解决 Java 字段与 DB 字段命名不一致问题（`projectNo` vs `projectCode` 等）
@@ -200,7 +200,6 @@ Controller（@Valid 触发校验）
 ```
 
 **当前已实现**：
-- `BidHandlerInfo` 完整 7 层 + 5 个 Controller 端点（`POST /create-bid-handler-info` / `GET /bid-handler-info/{id}` / `PATCH /bid-handler-info/{id}` / `DELETE /bid-handler-info/{id}` / `GET /bid-handler-info`）
-- `BidWinningNotification` 完整 7 层 + 5 个 Controller 端点（PATCH 风格 + 17 字段动态 SQL）
-
-**待复制实现**：`BidWinningSupplierDetail`（按 7 层模式复制即可，4 字段最简实现）
+- `BidHandlerInfo` 完整 7 层 + 6 个 Controller 端点（含 `POST /bid-handler-info/batch-delete`，p3 升级版返实体列表）
+- `BidWinningNotification` 完整 7 层 + 6 个 Controller 端点（PATCH 风格 + 17 字段动态 SQL + 批量删除）
+- `BidWinningSupplierDetail` 完整 7 层 + 6 个 Controller 端点（PATCH 风格 + 3 字段动态 SQL + 批量删除）

@@ -26,7 +26,7 @@
     - `bidwinningnotification/` - 定标通知 Controller
       - BidWinningNotificationController - 定标通知 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
     - `bidwinningsupplierdetail/` - 中标结果明细 Controller
-      - BidWinningSupplierDetailController - （**空 stub**，待 7 层链路打通后实现）
+      - BidWinningSupplierDetailController - 中标结果明细 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
     - `mail/` - 邮件 Controller
       - HelloController - 演示 / 异步重定向
       - PlainTextMailController - 纯文本邮件发送
@@ -41,7 +41,9 @@
       - BidWinningNotificationUpdateRequest - 更新定标通知请求（PATCH DTO，17 字段全部可选）
       - BidWinningNotificationBatchDeleteRequest - 批量删除定标通知请求（独立 DTO，结构同上）
     - `bidwinningsupplierdetail/`
-      - BidWinningSupplierDetailBatchDeleteRequest - 批量删除中标结果明细请求（**预留**，等 SupplierDetail Controller 启用）
+      - BidWinningSupplierDetailCreateRequest - 创建中标结果明细请求（3 字段：notificationId 必填 + supplierName @NotBlank/@Size + amount 必填）
+      - BidWinningSupplierDetailUpdateRequest - 更新中标结果明细请求（PATCH DTO，3 字段仅 @Size，无 @NotBlank/@NotNull）
+      - BidWinningSupplierDetailBatchDeleteRequest - 批量删除中标结果明细请求（独立 DTO，结构同上）
     - `mail/`
       - PlainTextMailRequest - 纯文本邮件请求
       - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
@@ -55,7 +57,7 @@
     - `bidwinningnotification/`
       - BidWinningNotificationService - 定标通知 CRUD 业务编排
     - `bidwinningsupplierdetail/`
-      - BidWinningSupplierDetailService - （**空 stub**，待实现）
+      - BidWinningSupplierDetailService - 中标结果明细 CRUD 业务编排
     - `mail/`
       - HelloService - 演示业务
       - PlainTextMailSender - 纯文本邮件发送
@@ -152,6 +154,12 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 | DELETE | /bid-winning-notification/{id} | - | 按主键删除定标通知（code=200/404） |
 | GET | /bid-winning-notification | - | 列表查询定标通知（`Result<PageInfo<BidWinningNotification>>`，PageHelper 分页） |
 | POST | /bid-winning-notification/batch-delete | application/json | 批量删除定标通知（`Result<List<BidWinningNotification>>`，data=实际删除的实体列表；p3 升级版） |
+| POST | /create-bid-winning-supplier-detail | application/json | 创建中标结果明细（3 字段，code=200） |
+| GET | /bid-winning-supplier-detail/{id} | - | 按主键查询单条中标结果明细（code=200/404） |
+| PATCH | /bid-winning-supplier-detail/{id} | application/json | 按主键**部分更新**中标结果明细（3 字段，code=200/404） |
+| DELETE | /bid-winning-supplier-detail/{id} | - | 按主键删除中标结果明细（code=200/404） |
+| GET | /bid-winning-supplier-detail | - | 列表查询中标结果明细（`Result<PageInfo<BidWinningSupplierDetail>>`，PageHelper 分页） |
+| POST | /bid-winning-supplier-detail/batch-delete | application/json | 批量删除中标结果明细（`Result<List<BidWinningSupplierDetail>>`，data=实际删除的实体列表；p3 升级版） |
 
 ## Email
 
@@ -237,7 +245,7 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 - 当前 3 个 DTO（结构完全相同，但**类型独立**）:
   - `BidHandlerInfoBatchDeleteRequest` — 批量删除经办人（专用 `/bid-handler-info/batch-delete`）
   - `BidWinningNotificationBatchDeleteRequest` — 批量删除定标通知（专用 `/bid-winning-notification/batch-delete`）
-  - `BidWinningSupplierDetailBatchDeleteRequest` — **预留**，等 SupplierDetail Controller 启用
+  - `BidWinningSupplierDetailBatchDeleteRequest` — **已启用**，专用 `/bid-winning-supplier-detail/batch-delete`（Controller 已实现）
 - 字段: `ids`（`List<Integer>`，待删除主键 ID 列表）
 - 校验: `@NotEmpty`（ids 不能为空）+ `@Size(max=500)`（单次上限 500 条，防大批量误操作与长 SQL 锁表）
 - 响应: 永远 200，`Result<List<Entity>>` data=实际删除的**实体列表**（p3 升级版；多 1 次 SELECT，PK 索引，毫秒级）
@@ -284,7 +292,7 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 
 - 对应表: `bid_winning_supplier_detail`
 - 字段: `detailId` / `notificationId` / `supplierName` / `amount`
-- Mapper 状态: ✅ 已实现，Service / DTO / Controller 待补
+- 完整 7 层链路: ✅ 已实现（DB → Entity → Mapper → XML → Service → DTO → Controller）
 
 ## Mapper（持久化层）
 
@@ -316,9 +324,9 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 
 - 接口: `mapper/BidWinningSupplierDetailMapper.java`
 - XML: `resources/mapper/BidWinningSupplierDetailMapper.xml`
-- 方法: 5 个（同上模式）
+- 方法: 5 个（同上模式）+ `deleteByIds` + `selectByIds`（共 7 个方法）
 - 对应表: `bid_winning_supplier_detail`（4 字段，最简实现）
-- 状态: ✅ Mapper 已实现，Service / DTO / Controller 待补
+- 状态: ✅ 完整 7 层 + 6 个 Controller 端点已实现（含 PATCH 动态 SQL + 批量删除）
 
 ## 端到端开发流程
 

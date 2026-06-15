@@ -55,15 +55,21 @@
     </insert>
 
     <!--
-      按 ID 更新：传入 entity 必须携带 detailId
+      按 ID 更新（PATCH 风格动态 SQL）：
+      - 传入 entity 必须携带 detailId（WHERE 条件）
+      - 使用 <set> + <if> 实现 PATCH 语义：
+        * 字段为 null → 不更新（保留 DB 原值）
+        * 字段非 null → 更新
     -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail">
         UPDATE bid_winning_supplier_detail
-        SET notification_id = #{notificationId},
-            supplier_name    = #{supplierName},
-            amount           = #{amount}
-        WHERE detail_id     = #{detailId}
+        <set>
+            <if test="notificationId != null">notification_id = #{notificationId},</if>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="amount != null">amount = #{amount},</if>
+        </set>
+        WHERE detail_id = #{detailId}
     </update>
 
     <!--
@@ -90,6 +96,23 @@
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT detail_id, notification_id, supplier_name, amount
         FROM bid_winning_supplier_detail
+    </select>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM bid_winning_supplier_detail
+        WHERE detail_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT detail_id, notification_id, supplier_name, amount
+        FROM bid_winning_supplier_detail
+        WHERE detail_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
     </select>
 
 </mapper>

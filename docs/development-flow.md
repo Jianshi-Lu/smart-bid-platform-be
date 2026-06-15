@@ -389,23 +389,23 @@ Postman
 - 复用 `Result.success(...)` / `Result.error(400/404, "...")` 工厂
 - 列表查询用 `PageHelper.startPage` + `clearPage`（finally 必加）
 
-### BidWinningSupplierDetail（待复制）
+### BidWinningSupplierDetail（已实现）
 
 | 步骤 | 复用点 | 当前状态 |
 |------|--------|----------|
 | ① DB 脚本 | V5 已有 | ✅ |
 | ② Entity | 已有 `BidWinningSupplierDetail`（4 字段最简）| ✅ |
-| ③ Mapper 接口 | 复制 `BidWinningNotificationMapper.java` 改名 | ✅ |
-| ④ Mapper XML | 复制 `BidWinningNotificationMapper.xml` 改名 + 改 SQL | ✅ |
-| ⑤ Service | 复制 `BidWinningNotificationService.java` 改名 | ⏳ 待复制 |
-| ⑥ DTO | 复制 `BidWinningNotificationCreateRequest.java` 改名 + 3 字段 | ⏳ 待复制 |
-| ⑦ Controller | 复制 `BidWinningNotificationController.java` 改名 | ⏳ 待复制 |
+| ③ Mapper 接口 | 复制 `BidWinningNotificationMapper.java` 改名 | ✅（含 `deleteByIds` + `selectByIds`，共 7 方法）|
+| ④ Mapper XML | 复制 `BidWinningNotificationMapper.xml` 改名 + 改 SQL | ✅（含 PATCH 动态 SQL `<set> + <if>`）|
+| ⑤ Service | 复制 `BidWinningNotificationService.java` 改名 | ✅（6 方法：create/update/delete/getById/listAll/deleteByIds）|
+| ⑥ DTO | 复制 `BidWinningNotificationCreateRequest.java` 改名 + 3 字段 | ✅（CreateRequest + UpdateRequest + BatchDeleteRequest）|
+| ⑦ Controller | 复制 `BidWinningNotificationController.java` 改名 | ✅（6 端点）|
 
 ---
 
 ## 6. 批量删除模式（p3 升级版 + 每端点独立 DTO + data 返实体列表）
 
-> 适用范围：所有需要按主键 ID 列表删除的 Controller（当前已实现：`BidHandlerInfoController` / `BidWinningNotificationController`；未来扩展：`BidWinningSupplierDetailController`）
+> 适用范围：所有需要按主键 ID 列表删除的 Controller（当前已实现：`BidHandlerInfoController` / `BidWinningNotificationController` / `BidWinningSupplierDetailController`）
 
 ### 6.1 4 层代码模板（按从上到下顺序）
 
@@ -480,7 +480,7 @@ public Result<List<Xxx>> batchDeleteXxx(@Valid @RequestBody XxxBatchDeleteReques
 |------|-----|---------------|
 | `BidHandlerInfo` | `BidHandlerInfoBatchDeleteRequest` | `POST /bid-handler-info/batch-delete` |
 | `BidWinningNotification` | `BidWinningNotificationBatchDeleteRequest` | `POST /bid-winning-notification/batch-delete` |
-| `BidWinningSupplierDetail` | `BidWinningSupplierDetailBatchDeleteRequest`（**预留**） | `POST /bid-winning-supplier-detail/batch-delete`（待实现） |
+| `BidWinningSupplierDetail` | `BidWinningSupplierDetailBatchDeleteRequest`（**已启用**） | `POST /bid-winning-supplier-detail/batch-delete`（✅ 已实现） |
 
 **DTO 结构**（3 个文件内容完全相同，但**类型独立**）：
 
@@ -563,7 +563,7 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 
 ## 7. 后续待办
 
-- [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller）
+- [x] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller，6 端点含批量删除 p3 升级版）
 - [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
 - [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 上 `@NotBlank` / `@Size` 校验失效）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）

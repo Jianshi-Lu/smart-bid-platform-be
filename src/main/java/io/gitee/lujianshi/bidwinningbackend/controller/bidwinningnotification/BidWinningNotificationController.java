@@ -11,6 +11,7 @@ import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
 import io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification.BidWinningNotificationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -117,6 +118,7 @@ public class BidWinningNotificationController {
      * @return {@code Result<BidWinningNotification>}（code=200，含自增 notificationId 的 Entity）
      */
     @PostMapping("/create-bid-winning-notification")
+    @Transactional(rollbackFor = Exception.class)
     public Result<BidWinningNotification> createBidWinningNotification(
             @RequestBody BidWinningNotificationCreateRequest request) {
         BidWinningNotification entity = new BidWinningNotification();
@@ -193,6 +195,7 @@ public class BidWinningNotificationController {
      * @return {@code Result<Diff<BidWinningNotification>>}（code=200 含 before/after / code=404）
      */
     @PatchMapping("/bid-winning-notification/{id}")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
             @PathVariable Integer id,
             @RequestBody BidWinningNotificationUpdateRequest request) {
@@ -249,6 +252,7 @@ public class BidWinningNotificationController {
      * @return {@code Result<Void>}（code=200 / code=404，data 始终为 null）
      */
     @DeleteMapping("/bid-winning-notification/{id}")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> deleteBidWinningNotification(@PathVariable Integer id) {
         int rows = service.delete(id);
         return rows > 0
@@ -256,7 +260,40 @@ public class BidWinningNotificationController {
                 : Result.error(404, "记录不存在");
     }
 
-
+    /**
+     * 批量删除定标通知（按主键 ID 列表）
+     *
+     * <p>执行链路：</p>
+     * <pre>
+     *   POST /bid-winning-notification/batch-delete（Content-Type: application/json）
+     *     → @Valid 触发 @NotEmpty 校验（ids 不能为空，max=500）
+     *     → service.deleteByIds(ids)
+     *       → mapper.selectByIds(ids)         ← 知道哪些 ID 真的存在
+     *       → mapper.deleteByIds(existingIds) ← 真删
+     *     → 返回删掉的实体列表
+     *     → 包装为 Result&lt;List&lt;BidWinningNotification&gt;&gt;
+     * </pre>
+     *
+     * <p><b>设计：升级 p3（返删掉的实体列表）</b>：</p>
+     * <ul>
+     *   <li>永远 200，<b>不</b>区分"全部不存在"与"部分不存在"</li>
+     *   <li>{@code data} = 实际删除的实体列表（前端展示用，无需自己再查"哪些存在"）</li>
+     *   <li>不存在的 ID：不在 data 中，前端 diff 自己请求的 ids 即可知道 missing</li>
+     *   <li><b>多 1 次 SELECT</b>（PK 索引，毫秒级），换 response payload 实用性</li>
+     *   <li><b>不</b>做完整性校验 / <b>不</b>做级联 / <b>不</b>加事务</li>
+     *   <li><b>不</b>做孤儿清理：{@code bid_winning_supplier_detail} 中引用本表 {@code notification_id} 的行会变孤儿</li>
+     *   <li>DB 物理顺序（无 ORDER BY），最小实现</li>
+     * </ul>
+     *
+     * @param request 批量删除请求（{@code ids} 非空，1-500 条）
+     * @return {@code Result<List<BidWinningNotification>>} — code=200，data=实际删除的实体列表
+     */
+    @PostMapping("/bid-winning-notification/batch-delete")
+    @Transactional(rollbackFor = Exception.class)
+    public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
+        List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());
+        return Result.success(deleted, "批量删除完成");
+    }
 
     /**
      * 列表查询定标通知（分页）
@@ -294,39 +331,5 @@ public class BidWinningNotificationController {
         } finally {
             PageHelper.clearPage();
         }
-    }
-
-    /**
-     * 批量删除定标通知（按主键 ID 列表）
-     *
-     * <p>执行链路：</p>
-     * <pre>
-     *   POST /bid-winning-notification/batch-delete（Content-Type: application/json）
-     *     → @Valid 触发 @NotEmpty 校验（ids 不能为空，max=500）
-     *     → service.deleteByIds(ids)
-     *       → mapper.selectByIds(ids)         ← 知道哪些 ID 真的存在
-     *       → mapper.deleteByIds(existingIds) ← 真删
-     *     → 返回删掉的实体列表
-     *     → 包装为 Result&lt;List&lt;BidWinningNotification&gt;&gt;
-     * </pre>
-     *
-     * <p><b>设计：升级 p3（返删掉的实体列表）</b>：</p>
-     * <ul>
-     *   <li>永远 200，<b>不</b>区分"全部不存在"与"部分不存在"</li>
-     *   <li>{@code data} = 实际删除的实体列表（前端展示用，无需自己再查"哪些存在"）</li>
-     *   <li>不存在的 ID：不在 data 中，前端 diff 自己请求的 ids 即可知道 missing</li>
-     *   <li><b>多 1 次 SELECT</b>（PK 索引，毫秒级），换 response payload 实用性</li>
-     *   <li><b>不</b>做完整性校验 / <b>不</b>做级联 / <b>不</b>加事务</li>
-     *   <li><b>不</b>做孤儿清理：{@code bid_winning_supplier_detail} 中引用本表 {@code notification_id} 的行会变孤儿</li>
-     *   <li>DB 物理顺序（无 ORDER BY），最小实现</li>
-     * </ul>
-     *
-     * @param request 批量删除请求（{@code ids} 非空，1-500 条）
-     * @return {@code Result<List<BidWinningNotification>>} — code=200，data=实际删除的实体列表
-     */
-    @PostMapping("/bid-winning-notification/batch-delete")
-    public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
-        List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());
-        return Result.success(deleted, "批量删除完成");
     }
 }

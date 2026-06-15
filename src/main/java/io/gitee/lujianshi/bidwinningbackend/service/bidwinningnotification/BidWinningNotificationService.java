@@ -6,6 +6,7 @@ import io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -91,6 +92,7 @@ public class BidWinningNotificationService {
      * @return 影响行数（1=成功，0=失败）
      */
     public int create(BidWinningNotification entity) {
+        entity.setCreatedAt(LocalDateTime.now());
         return mapper.insert(entity);
     }
 

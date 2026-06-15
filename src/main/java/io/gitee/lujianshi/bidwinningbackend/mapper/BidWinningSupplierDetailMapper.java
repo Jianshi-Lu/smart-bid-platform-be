@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -68,7 +69,8 @@ import java.util.List;
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
  * @see io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper
- * @see docs/ database.md
+ *
+ * <p>项目级文档：{@code docs/database.md} §2.3</p>
  */
 @Mapper
 public interface BidWinningSupplierDetailMapper {
@@ -124,4 +126,20 @@ public interface BidWinningSupplierDetailMapper {
      * @return 全部中标明细列表（空表返回空 List 而非 null）
      */
     List<BidWinningSupplierDetail> selectAll();
+
+    /**
+     * 按主键列表批量删除中标结果明细
+     *
+     * @param ids 待删除的主键 ID 列表
+     * @return 影响行数
+     */
+    int deleteByIds(@Param("ids") List<Integer> ids);
+
+    /**
+     * 按主键列表查询中标结果明细
+     *
+     * @param ids 待查询的主键 ID 列表
+     * @return 存在的明细列表
+     */
+    List<BidWinningSupplierDetail> selectByIds(@Param("ids") List<Integer> ids);
 }
