@@ -217,6 +217,7 @@ public class BidHandlerInfoCreateRequest {
 | **PATCH** | `/bid-handler-info/{id}` | 按 ID **部分更新**（带 diff） | ✅ 已实现 |
 | DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ✅ 已实现 |
 | GET | `/bid-handler-info` | 列表查询（PageHelper 分页） | ✅ 已实现 |
+| POST | `/bid-handler-info/batch-delete` | 按 ID 列表批量删除（p3 升级版，data 返实体列表） | ✅ 已实现 |
 
 **统一返回格式**：所有端点返 `Result<T>`（`code`/`message`/`data`），具体见 `docs/architecture.md` §2.4。
 
@@ -332,7 +333,7 @@ Postman
   ↓ 收到 {code:200, message:"创建成功", data:{handlerId:1, handlerName:"张三", ...}}
 ```
 
-**5 个端点差异点速查**：
+**6 个端点差异点速查**：
 
 | 端点 | 入口 | 调用 Service | 包装 Result |
 |------|------|------------|-------------|
@@ -341,6 +342,7 @@ Postman
 | **PATCH** | @PathVariable id + @RequestBody DTO | `getById(id)` + `update(after)` | `Result.success(new Diff(before, after), "更新成功")` |
 | DELETE | @PathVariable id | `delete(id)` | `Result.success(null, "删除成功")` / `Result.error(404, ...)` |
 | GET (list) | @RequestParam page/size/sort | `listAll()` (PageHelper 拦截) | `Result.success(pageInfo, "查询成功")` / `Result.error(400, ...)` |
+| **POST (batch)** | @RequestBody XxxBatchDeleteRequest | `deleteByIds(ids)` | `Result.success(deleted, "批量删除完成")`（p3 升级版：data=删掉的实体列表）|
 
 ---
 
@@ -401,7 +403,165 @@ Postman
 
 ---
 
-## 6. 后续待办
+## 6. 批量删除模式（p3 升级版 + 每端点独立 DTO + data 返实体列表）
+
+> 适用范围：所有需要按主键 ID 列表删除的 Controller（当前已实现：`BidHandlerInfoController` / `BidWinningNotificationController`；未来扩展：`BidWinningSupplierDetailController`）
+
+### 6.1 4 层代码模板（按从上到下顺序）
+
+#### ① Mapper 接口
+
+```java
+@Mapper
+public interface XxxMapper {
+    // ... 其他 5 个方法 ...
+    int deleteByIds(@Param("ids") List<Integer> ids);
+    List<Xxx> selectByIds(@Param("ids") List<Integer> ids);
+}
+```
+
+#### ② Mapper XML
+
+```xml
+<delete id="deleteByIds" parameterType="java.util.List">
+    DELETE FROM xxx
+    WHERE pk_column IN
+    <foreach collection="ids" item="id" open="(" close=")" separator=",">
+        #{id}
+    </foreach>
+</delete>
+
+<select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+    SELECT <所有字段>
+    FROM xxx
+    WHERE pk_column IN
+    <foreach collection="ids" item="id" open="(" close=")" separator=",">
+        #{id}
+    </foreach>
+</select>
+```
+
+#### ③ Service（p3 升级版 — 返删掉的实体列表）
+
+```java
+public List<Xxx> deleteByIds(List<Integer> ids) {
+    if (ids == null || ids.isEmpty()) {
+        return List.of();
+    }
+    // 1. SELECT 存在的行（PK 索引，毫秒级）
+    List<Xxx> existing = mapper.selectByIds(ids);
+    // 2. 删掉它们
+    if (!existing.isEmpty()) {
+        List<Integer> existingIds = existing.stream()
+                .map(Xxx::getId)   // 或 getXxxId()
+                .toList();
+        mapper.deleteByIds(existingIds);
+    }
+    // 3. 返回删掉的实体行（前端展示用）
+    return existing;
+}
+```
+
+#### ④ Controller
+
+```java
+@PostMapping("/xxx/batch-delete")
+public Result<List<Xxx>> batchDeleteXxx(@Valid @RequestBody XxxBatchDeleteRequest request) {
+    List<Xxx> deleted = service.deleteByIds(request.getIds());
+    return Result.success(deleted, "批量删除完成");
+}
+```
+
+### 6.2 DTO 命名规范（每端点独立）
+
+**命名模式**：`<EntityName>BatchDeleteRequest`（实体名 + "BatchDelete" + "Request"）
+
+| 实体 | DTO | Controller 端点 |
+|------|-----|---------------|
+| `BidHandlerInfo` | `BidHandlerInfoBatchDeleteRequest` | `POST /bid-handler-info/batch-delete` |
+| `BidWinningNotification` | `BidWinningNotificationBatchDeleteRequest` | `POST /bid-winning-notification/batch-delete` |
+| `BidWinningSupplierDetail` | `BidWinningSupplierDetailBatchDeleteRequest`（**预留**） | `POST /bid-winning-supplier-detail/batch-delete`（待实现） |
+
+**DTO 结构**（3 个文件内容完全相同，但**类型独立**）：
+
+```java
+@Data
+public class XxxBatchDeleteRequest {
+    @NotEmpty(message = "ids 不能为空")
+    @Size(max = 500, message = "单次批量删除不能超过 500 条")
+    private List<Integer> ids;
+}
+```
+
+**不复用 DTO 的理由**：
+
+| 风险 | 说明 |
+|------|------|
+| 端点耦合 | 改一个端点的 DTO 会影响所有共用 DTO 的端点 |
+| OpenAPI/Swagger 失真 | 共用 DTO 导致 schema 合并成 1 个，前端 codegen 失真 |
+| 端点独立演化 | 部分端点可能加 `cascade: true`、`reason: "audit"` 等端点专属字段 |
+| 命名误导 | 共用 DTO 的名字带"BatchDelete"会暗示绑定特定语义 |
+| 阿里规范 | 《Java 开发手册》"推荐每 API 入口对应独立 DTO" |
+
+### 6.3 响应格式（p3 升级版 — data 放实体列表）
+
+| 场景 | code | message | data |
+|------|------|---------|------|
+| 任意 ids（部分/全部/全空） | 200 | "批量删除完成" | `List<Entity>`（实际删除的实体列表，DB 物理顺序） |
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "批量删除完成",
+  "data": [
+    {"handlerId": 2, "handlerName": "李四", "companyName": "...", "departmentName": "..."},
+    {"handlerId": 3, "handlerName": "王五", "companyName": "...", "departmentName": "..."}
+  ]
+}
+```
+
+**前端 diff 用法**：
+```js
+const requested = [1, 2, 3];
+const deleted = response.data;                          // 实际删除的实体列表
+const deletedIds = deleted.map(item => item.handlerId);  // [2, 3]
+const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
+```
+
+### 6.4 设计取舍（p3 升级版）
+
+| 决策 | 理由 |
+|------|------|
+| ✅ 返实体列表 | data = `List<Entity>`，前端展示更友好，无需自己再查"哪些存在" |
+| ✅ 多 1 次 SELECT | `selectByIds` 先查存在行，PK 索引，毫秒级；500 条以内几乎无感 |
+| ✅ 删存在行 | `deleteByIds(existingIds)`，不依赖 SELECT 的"无副作用"假设 |
+| ❌ 事务封装 | 不加 `@Transactional`；罕见 race 自洽：data 返的行 = 实际删的行（数量一致）|
+| ❌ 级联删除 | 不做；应用层不保证外键关系 |
+| ❌ 完整性校验 | 不做；MySQL IN 自然忽略不存在的 ID |
+| ❌ 排序 | 不加 `ORDER BY`；DB 物理顺序，最小实现 |
+| ❌ 返回 `failed[]` | 不返；前端 diff 自己请求的 ids 即可 |
+| ❌ 共享 DTO | 避免端点间耦合，符合阿里规范"每 API 入口对应独立 DTO" |
+
+**race condition 自洽说明**：
+- 如果 SELECT 后到 DELETE 前有人删了某行 X，SELECT 已包含 X（因为 SELECT 之前 X 存在）
+- DELETE 时 X 已被别人删了，DELETE 不会重复删
+- data 返回的 X 行**仍然有效**（X 的数据是我们 SELECT 时拿到的）
+- 不会出现"data 返 5 行但实际删 4 行"这种不一致
+
+### 6.5 未来扩展点（升级路径）
+
+- **升级 A**：引入 `PartialResult<T>` 通用 DTO（多 1 次 SELECT，返回 successful[] + failed[]），省去前端 diff
+- **升级 B**：对有外键引用的表，加 Service 跨 Mapper 编排（先删明细再删主表，加 `@Transactional`）
+- **升级 C**：加异步批处理（任务队列拆分 1000+ 的大批量删除）
+- **升级 D**：某端点专属字段（如 `cascade: true`），直接在对应 XxxBatchDeleteRequest 加字段
+
+详见 [docs/architecture.md §2.6 批量删除 DTO 模式](architecture.md#26-批量删除-dto-模式每端点独立-dto--data-返实体列表)。
+
+---
+
+## 7. 后续待办
 
 - [ ] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller）
 - [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）

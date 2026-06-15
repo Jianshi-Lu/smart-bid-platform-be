@@ -24,8 +24,8 @@
     - HelloController - 演示 / 异步重定向
     - PlainTextMailController - 纯文本邮件发送
     - BidWinningMailController - HTML 中标通知书邮件发送
-    - BidHandlerInfoController - 经办人 CRUD（5 端点已实现：create / getById / patch / delete / list）
-    - BidWinningNotificationController - 定标通知 CRUD（5 端点已实现：create / getById / patch / delete / list）
+    - BidHandlerInfoController - 经办人 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
+    - BidWinningNotificationController - 定标通知 CRUD（6 端点已实现：create / getById / patch / delete / list / batch-delete）
   - `dto/` - 数据传输对象（@Data + @NoArgsConstructor + @AllArgsConstructor）
     - PlainTextMailRequest - 纯文本邮件请求
     - BidWinningMailRequest - 中标通知书请求（extends PlainTextMailRequest）
@@ -34,6 +34,9 @@
     - BidHandlerInfoUpdateRequest - 更新经办人请求（PATCH DTO，3 字段仅 @Size，无 @NotBlank）
     - BidWinningNotificationCreateRequest - 创建定标通知请求（17 字段：3 必填 + 14 可选）
     - BidWinningNotificationUpdateRequest - 更新定标通知请求（PATCH DTO，17 字段全部可选）
+    - BidHandlerInfoBatchDeleteRequest - 批量删除经办人请求（独立 DTO，1 字段 List<Integer> ids + @NotEmpty + @Size max=500）
+    - BidWinningNotificationBatchDeleteRequest - 批量删除定标通知请求（独立 DTO，结构同上）
+    - BidWinningSupplierDetailBatchDeleteRequest - 批量删除中标结果明细请求（**预留**，等 SupplierDetail Controller 启用）
     - Result<T> - 通用响应包装（code/message/data + success/error 工厂）
     - Diff<T> - 通用 diff 包装（before/after，用于 PATCH update 端点）
   - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
@@ -118,11 +121,13 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 | PATCH | /bid-handler-info/{id} | application/json | 按主键**部分更新**经办人（`Result<Diff<BidHandlerInfo>>` 含 before/after；动态 SQL） |
 | DELETE | /bid-handler-info/{id} | - | 按主键删除经办人（`Result<Void>`，code=200/404） |
 | GET | /bid-handler-info | - | 列表查询（`Result<PageInfo<BidHandlerInfo>>`，PageHelper 分页；query 参数 `page` / `size` / `sort`） |
+| POST | /bid-handler-info/batch-delete | application/json | 批量删除经办人（`Result<List<BidHandlerInfo>>`，data=实际删除的实体列表；p3 升级版） |
 | POST | /create-bid-winning-notification | application/json | 创建定标通知（17 字段，code=200） |
 | GET | /bid-winning-notification/{id} | - | 按主键查询单条定标通知（code=200/404） |
 | PATCH | /bid-winning-notification/{id} | application/json | 按主键**部分更新**定标通知（17 字段，code=200/404） |
 | DELETE | /bid-winning-notification/{id} | - | 按主键删除定标通知（code=200/404） |
 | GET | /bid-winning-notification | - | 列表查询定标通知（`Result<PageInfo<BidWinningNotification>>`，PageHelper 分页） |
+| POST | /bid-winning-notification/batch-delete | application/json | 批量删除定标通知（`Result<List<BidWinningNotification>>`，data=实际删除的实体列表；p3 升级版） |
 
 ## Email
 
@@ -201,6 +206,20 @@ dev 环境通过以下任一方式注入 `MYSQL_*` 环境变量：
 - 使用场景: **PATCH** /bid-winning-notification/{id}（按主键 ID 部分更新）
 - 注意: 排除 `notificationId`（由 URL `@PathVariable` 传入）/ `createdAt`（DB 维护）
 - 校验: 仅有 `@Size`，**无 `@NotBlank`/`@NotNull`**（PATCH 语义下 null=不修改）
+
+### 批量删除 DTO（每端点独立 DTO 模式）
+
+- 命名规范: `<EntityName>BatchDeleteRequest`（实体名 + "BatchDelete" + "Request"）
+- 当前 3 个 DTO（结构完全相同，但**类型独立**）:
+  - `BidHandlerInfoBatchDeleteRequest` — 批量删除经办人（专用 `/bid-handler-info/batch-delete`）
+  - `BidWinningNotificationBatchDeleteRequest` — 批量删除定标通知（专用 `/bid-winning-notification/batch-delete`）
+  - `BidWinningSupplierDetailBatchDeleteRequest` — **预留**，等 SupplierDetail Controller 启用
+- 字段: `ids`（`List<Integer>`，待删除主键 ID 列表）
+- 校验: `@NotEmpty`（ids 不能为空）+ `@Size(max=500)`（单次上限 500 条，防大批量误操作与长 SQL 锁表）
+- 响应: 永远 200，`Result<List<Entity>>` data=实际删除的**实体列表**（p3 升级版；多 1 次 SELECT，PK 索引，毫秒级）
+- 设计取舍: 不做级联 / 不加事务 / 不做完整性校验（应用层不保证外键关系）
+- 排序: DB 物理顺序（无 ORDER BY），最小实现
+- **不复用 DTO 的理由**: 避免端点间耦合（改一个端点的 DTO 不应影响其他端点），符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"
 
 ### Result<T>（通用响应包装）
 

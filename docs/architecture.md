@@ -540,6 +540,112 @@ Service（业务结果）→ Controller（包装为 Result）→ Jackson（序�
 
 ---
 
+### 2.6 批量删除 DTO 模式（每端点独立 DTO + data 返实体列表）
+
+**文件**：
+- `src/main/java/.../dto/BidHandlerInfoBatchDeleteRequest.java`
+- `src/main/java/.../dto/BidWinningNotificationBatchDeleteRequest.java`
+- `src/main/java/.../dto/BidWinningSupplierDetailBatchDeleteRequest.java`（**预留**，等 SupplierDetail Controller 启用）
+
+**设计目标**：每端点独立 DTO，符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"。
+
+**命名规范**：`<EntityName>BatchDeleteRequest`（实体名 + "BatchDelete" + "Request"）
+
+**字段**（3 个 DTO 结构完全相同，但**类型独立**）：
+
+| 字段 | 类型 | 必填 | 校验 | 说明 |
+|------|------|------|------|------|
+| `ids` | `List<Integer>` | ✅ | `@NotEmpty` + `@Size(max=500)` | 待删除的主键 ID 列表 |
+
+**校验规则**：
+- `@NotEmpty`：ids 列表不能为 null 或空（`@NotEmpty` 同时校验 null 和 empty）
+- `@Size(max=500)`：单次最多 500 条，防止大批量误操作与长 SQL 锁表
+
+**响应语义（p3 升级版 — data 放实体列表）**：
+
+| 场景 | code | message | data |
+|------|------|---------|------|
+| 成功（含删除的实体） | 200 | "批量删除完成" | `List<Entity>`（实际删除的实体列表，DB 物理顺序） |
+| ids 为空（@NotEmpty 失败） | — | — | `MethodArgumentNotValidException` → 由 `GlobalExceptionHandler` 返 400（待实现） |
+| ids 超 500（@Size 失败） | — | — | 同上 |
+| ids 部分/全部不存在 | 200 | "批量删除完成" | `List<Entity>` 只含**实际存在并被删的**实体 |
+
+**调用示例**：
+
+```http
+POST /bid-handler-info/batch-delete
+Content-Type: application/json
+
+{ "ids": [1, 2, 3] }     // 假设 2 和 3 存在，1 不存在
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "批量删除完成",
+  "data": [
+    {"handlerId": 2, "handlerName": "李四", "companyName": "...", "departmentName": "..."},
+    {"handlerId": 3, "handlerName": "王五", "companyName": "...", "departmentName": "..."}
+  ]
+}
+```
+
+**前端 diff 用法**：
+```js
+const requested = [1, 2, 3];
+const deleted = response.data;                          // 实际删除的实体列表
+const deletedIds = deleted.map(item => item.handlerId);  // [2, 3]
+const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
+```
+
+**p3 升级版的设计取舍**：
+
+| 项 | 决策 | 理由 |
+|----|------|------|
+| ✅ 返实体列表 | data = `List<Entity>` | 前端展示更友好，无需自己再查"哪些存在" |
+| ✅ 多 1 次 SELECT | `selectByIds` 先查存在行 | PK 索引，毫秒级；500 条以内几乎无感 |
+| ✅ 删存在行 | `deleteByIds(existingIds)` | 不依赖 SELECT 的"无副作用"假设 |
+| ❌ 事务封装 | 不加 `@Transactional` | 罕见 race 自洽：data 返的行 = 实际删的行（数量一致）|
+| ❌ 级联删除 | 不做 | 应用层不保证外键关系 |
+| ❌ 完整性校验 | 不做 | MySQL IN 自然忽略不存在的 ID |
+| ❌ 排序 | 不加 `ORDER BY` | DB 物理顺序，最小实现 |
+| ❌ 返回 `failed[]` | 不返 | 前端 diff 自己请求的 ids 即可 |
+
+**race condition 自洽说明**：
+- 如果 SELECT 后到 DELETE 前有人删了某行 X，SELECT 已包含 X（因为 SELECT 之前 X 存在）
+- DELETE 时 X 已被别人删了，DELETE 不会重复删
+- data 返回的 X 行**仍然有效**（X 的数据是我们 SELECT 时拿到的）
+- 不会出现"data 返 5 行但实际删 4 行"这种不一致
+
+**不复用 DTO 的理由**：
+
+| 风险 | 说明 |
+|------|------|
+| 端点耦合 | 改一个端点的 DTO 会影响所有共用 DTO 的端点 |
+| OpenAPI/Swagger 失真 | 共用 DTO 导致 schema 合并成 1 个，前端 codegen 失真 |
+| 端点独立演化 | 部分端点可能加 `cascade: true`、`reason: "audit"` 等端点专属字段 |
+| 命名误导 | 共用 DTO 的名字带"BatchDelete"会暗示绑定特定语义 |
+
+**与 `PartialResult<T>` 的取舍**（未来扩展）：
+- `PartialResult<T>` 提供 `successful[]` + `failed[]` 详细反馈，省去前端 diff
+- p3 升级版选**实体列表**（更常用），前端要 failed 自己算
+- `PartialResult<T>` 后续可加（如某端点专门要 failed 信息）
+
+**链路位置**：
+
+```
+Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controller（包装为 Result<List<Entity>>）→ Jackson → 前端
+```
+
+**当前使用范围**：
+- `BidHandlerInfoController.batchDeleteBidHandlerInfo` ← 用 `BidHandlerInfoBatchDeleteRequest`
+- `BidWinningNotificationController.batchDeleteBidWinningNotification` ← 用 `BidWinningNotificationBatchDeleteRequest`
+- 未来扩展：`BidWinningSupplierDetailController`（待 7 层链路打通，预留 DTO 已就绪）
+
+---
+
 ## 3. Controller 层
 
 ### 3.1 `HelloController`
@@ -771,7 +877,7 @@ Content-Type: application/json
 
 **文件**：`src/main/java/.../controller/BidHandlerInfoController.java`
 
-**职责**：经办人 CRUD 端点（**5 端点已实现**），统一返回 `Result<T>` 包装。
+**职责**：经办人 CRUD 端点（**6 端点已实现**），统一返回 `Result<T>` 包装。
 
 **统一响应格式**（所有端点）：
 
@@ -795,6 +901,7 @@ Content-Type: application/json
 | **PATCH** | `/bid-handler-info/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidHandlerInfo>>` | ✅ |
 | DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` | ✅ |
 | GET | `/bid-handler-info` | 列表查询（PageHelper 分页） | `Result<PageInfo<BidHandlerInfo>>` | ✅ |
+| POST | `/bid-handler-info/batch-delete` | 按主键 ID 列表批量删除 | `Result<List<BidHandlerInfo>>` | ✅（p3 升级版）|
 
 **PATCH 语义（RFC 5789）**：
 - 调用方传哪些字段，update 端点就更新哪些字段
@@ -1019,6 +1126,55 @@ JSON Response
 
 ---
 
+#### `POST /bid-handler-info/batch-delete`（批量删除，p3 升级版）
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | POST |
+| 完整 URL | `http://localhost:8080/bid-handler-info/batch-delete` |
+| Content-Type | `application/json`（`@RequestBody` + `@Valid` 触发校验） |
+| 请求参数 | `BidHandlerInfoBatchDeleteRequest`（`{ "ids": [1, 2, 3] }`，`@NotEmpty` + `@Size(max=500)`） |
+| 返回值 | `Result<List<BidHandlerInfo>>`（code=200，data=实际删除的实体列表） |
+
+**调用链路**：
+
+```
+URL POST /bid-handler-info/batch-delete + JSON {ids:[1,2,3]}
+  → @Valid 触发 @NotEmpty/@Size 校验
+  → service.deleteByIds(ids)
+    → mapper.selectByIds(ids)         ← 知道哪些 ID 真的存在
+    → mapper.deleteByIds(existingIds) ← 真删
+  → 返删掉的实体列表
+  → 包装为 Result.success(deleted, "批量删除完成")
+JSON Response
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "批量删除完成",
+  "data": [
+    {"handlerId": 2, "handlerName": "李四", "companyName": "...", "departmentName": "..."},
+    {"handlerId": 3, "handlerName": "王五", "companyName": "...", "departmentName": "..."}
+  ]
+}
+```
+
+**p3 升级版说明**：
+- 永远 200，**不**区分"全部不存在"与"部分不存在"
+- `data` = 实际删除的**实体列表**（前端展示用，无需自己再查"哪些存在"）
+- 不存在的 ID：不在 data 中，前端 diff 自己请求的 ids 即可知道 missing
+- **多 1 次 SELECT**（PK 索引，毫秒级），换 response payload 实用性
+- **不**做完整性校验 / **不**做级联 / **不**加事务
+- 本表 `bid_handler_info` 无外键引用，p3 升级版无副作用
+- DB 物理顺序（无 ORDER BY），最小实现
+
+**详细设计**：见 §2.6 批量删除 DTO 模式
+
+---
+
 **待办**：
 - ⚠️ `createBidHandlerInfo` / `patchBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
 - 统一异常处理（`GlobalExceptionHandler` 尚未实现）
@@ -1030,7 +1186,7 @@ JSON Response
 
 **文件**：`src/main/java/.../controller/BidWinningNotificationController.java`
 
-**职责**：定标通知 CRUD 端点（**5 端点已实现**），统一返回 `Result<T>` 包装。设计风格与 `BidHandlerInfoController` 完全一致。
+**职责**：定标通知 CRUD 端点（**6 端点已实现**），统一返回 `Result<T>` 包装。设计风格与 `BidHandlerInfoController` 完全一致。
 
 **统一响应格式**：（同 §3.4）
 
@@ -1043,6 +1199,7 @@ JSON Response
 | **PATCH** | `/bid-winning-notification/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidWinningNotification>>` | ✅ |
 | DELETE | `/bid-winning-notification/{id}` | 按主键删除 | `Result<Void>` | ✅ |
 | GET | `/bid-winning-notification` | 列表查询（PageHelper 分页） | `Result<PageInfo<BidWinningNotification>>` | ✅ |
+| POST | `/bid-winning-notification/batch-delete` | 按主键 ID 列表批量删除 | `Result<List<BidWinningNotification>>` | ✅（p3 升级版）|
 
 #### 端点详解
 
@@ -1095,6 +1252,51 @@ JSON Response
 | 业务复杂度 | 简单 CRUD | 含 6 个时间/金额/布尔字段 |
 | PATCH 端点 | 3 字段部分更新 | 17 字段部分更新 |
 | Mapper 复杂度 | 单表 4 字段 | 19 字段 + 动态 SQL |
+
+#### `POST /bid-winning-notification/batch-delete`（批量删除，p3 升级版）
+
+| 项目 | 内容 |
+|------|------|
+| HTTP 方法 | POST |
+| 完整 URL | `http://localhost:8080/bid-winning-notification/batch-delete` |
+| Content-Type | `application/json`（`@RequestBody` + `@Valid` 触发校验） |
+| 请求参数 | `BidWinningNotificationBatchDeleteRequest`（`{ "ids": [1, 2, 3] }`，`@NotEmpty` + `@Size(max=500)`） |
+| 返回值 | `Result<List<BidWinningNotification>>`（code=200，data=实际删除的实体列表） |
+
+**调用链路**：
+
+```
+URL POST /bid-winning-notification/batch-delete + JSON {ids:[1,2,3]}
+  → @Valid 触发 @NotEmpty/@Size 校验
+  → service.deleteByIds(ids)
+    → mapper.selectByIds(ids)         ← 知道哪些 ID 真的存在
+    → mapper.deleteByIds(existingIds) ← 真删
+  → 返删掉的实体列表
+  → 包装为 Result.success(deleted, "批量删除完成")
+JSON Response
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "message": "批量删除完成",
+  "data": [
+    {"notificationId": 2, "projectNo": "WB20260325017", "handlerId": 1, ...},
+    {"notificationId": 3, "projectNo": "WB20260325018", "handlerId": 1, ...}
+  ]
+}
+```
+
+**p3 升级版 + 逻辑外键注意**：
+- 永远 200，**不**区分"全部不存在"与"部分不存在"
+- `data` = 实际删除的**实体列表**（19 字段全查）
+- **不**做完整性校验 / **不**做级联 / **不**加事务
+- ⚠️ **逻辑外键孤儿风险**：`bid_winning_supplier_detail.notification_id` 是逻辑外键，删除本表后明细行会变孤儿。p3 升级版**不**做孤儿清理，由应用层负责（未来可加 Service 跨 Mapper 编排）
+- DB 物理顺序（无 ORDER BY），最小实现
+
+**详细设计**：见 §2.6 批量删除 DTO 模式
 
 **待办**：
 - ⚠️ `createBidWinningNotification` / `patchBidWinningNotification` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效

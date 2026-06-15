@@ -68,7 +68,7 @@ import java.util.List;
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
  * @see io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper
- * @see docs/database.md
+ * @see docs/ database.md
  */
 @Mapper
 public interface BidWinningSupplierDetailMapper {

@@ -168,4 +168,43 @@ public class BidWinningNotificationService {
     public List<BidWinningNotification> listAll() {
         return mapper.selectAll();
     }
+
+    /**
+     * 批量删除定标通知（按主键 ID 列表）
+     *
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.batchDeleteBidWinningNotification(request)
+     *     → Service.deleteByIds(ids)
+     *       → Mapper.deleteByIds(ids)
+     *         → XML &lt;delete&gt; + &lt;foreach&gt; → MySQL DELETE
+     * </pre>
+     *
+     * <p><b>设计：最小实现（p3 方案）</b></p>
+     * <ul>
+     *   <li><b>不</b>做事务封装：单条 SQL 自动事务，DB 层保证原子性</li>
+     *   <li><b>不</b>做级联删除：本表 {@code notification_id} 在 {@code bid_winning_supplier_detail} 中是<b>逻辑外键</b>，删除本表后明细行变孤儿，由应用层负责（未来可加）</li>
+     *   <li><b>不</b>做完整性校验：列表中不存在的 ID 不会报错，由 MySQL IN 自然忽略</li>
+     *   <li>空列表 / null 在 Service 层拦截返 0，避免 Mapper XML 拼接出非法 SQL</li>
+     * </ul>
+     *
+     * @param ids 待删除的主键 ID 列表
+     * @return 实际删除的定标通知实体列表（不存在的 ID 不会出现在结果中；空列表时返空 List）
+     */
+    public List<BidWinningNotification> deleteByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        // 1. SELECT 存在的行（PK 索引，毫秒级）
+        List<BidWinningNotification> existing = mapper.selectByIds(ids);
+        // 2. 删掉它们
+        if (!existing.isEmpty()) {
+            List<Integer> existingIds = existing.stream()
+                    .map(BidWinningNotification::getNotificationId)
+                    .toList();
+            mapper.deleteByIds(existingIds);
+        }
+        // 3. 返回删掉的实体行（前端展示用）
+        return existing;
+    }
 }

@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -67,7 +68,7 @@ import java.util.List;
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification
  * @see io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService
- * @see docs/database.md
+ * @see docs/ database.md
  */
 @Mapper
 public interface BidWinningNotificationMapper {
@@ -128,4 +129,52 @@ public interface BidWinningNotificationMapper {
      * @return 全部定标通知列表（空表返回空 List 而非 null）
      */
     List<BidWinningNotification> selectAll();
+
+    /**
+     * 按主键列表批量删除定标通知
+     *
+     * 对应 XML：{@code <delete id="deleteByIds" parameterType="java.util.List">}
+     * 用 {@code <foreach>} 拼接 {@code WHERE notification_id IN (...)} 子句。
+     *
+     * <p>调用链：</p>
+     * <pre>
+     *   Controller.batchDeleteBidWinningNotification(request)
+     *     → Service.deleteByIds(ids)
+     *       → Mapper.deleteByIds(ids)
+     *         → XML &lt;delete&gt; + &lt;foreach&gt; → MySQL DELETE（单条 IN SQL）
+     * </pre>
+     *
+     * <p><b>注意</b>：本方法为<b>最小实现</b>，不预判一致性 / 不级联 / 不做事务。
+     * 如果 {@code notification_id} 被 {@code bid_winning_supplier_detail} 引用（逻辑外键），
+     * 删主表后明细行会变孤儿，由应用层负责完整性（未来可加）。</p>
+     *
+     * @param ids 待删除的主键 ID 列表（不允许 null/empty，由 Service 层拦截）
+     * @return 影响行数（实际删除条数；列表中不存在的 ID 不会被计数）
+     */
+    int deleteByIds(@Param("ids") List<Integer> ids);
+
+    /**
+     * 按主键列表查询定标通知（用于批量删除前知道哪些 ID 真的存在）
+     *
+     * 对应 XML：{@code <select id="selectByIds" parameterType="java.util.List">}
+     * 用 {@code <foreach>} 拼接 {@code WHERE notification_id IN (...)} 子句。
+     *
+     * <p>调用链：</p>
+     * <pre>
+     *   Service.deleteByIds(ids)
+     *     → Mapper.selectByIds(ids)         ← 知道哪些 ID 真的存在
+     *       → XML &lt;select&gt; + &lt;foreach&gt; → MySQL SELECT（PK 索引，毫秒级）
+     *     → Mapper.deleteByIds(existingIds)
+     *     → 返回删掉的实体列表
+     * </pre>
+     *
+     * <p><b>用途</b>：批量删除端点的"返回实际删除的实体列表"——前端展示用。
+     * 列表中不存在的 ID 不会出现在结果中（IN 自然不匹配）。</p>
+     *
+     * <p><b>排序</b>：DB 物理顺序（无 {@code ORDER BY}），最小实现。</p>
+     *
+     * @param ids 待查询的主键 ID 列表（不允许 null/empty，由 Service 层拦截）
+     * @return 存在的定标通知列表（不存在的 ID 不会返回；空列表时返空 List）
+     */
+    List<BidWinningNotification> selectByIds(@Param("ids") List<Integer> ids);
 }

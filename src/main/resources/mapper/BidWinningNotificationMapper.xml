@@ -143,4 +143,42 @@
         FROM bid_winning_notification
     </select>
 
+    <!--
+      批量删除（按主键列表）：用 <foreach> 拼接 IN 子句
+      - 传 null / 空列表时，调用方 Service 拦截返 0，不进入 SQL
+      - 列表中不存在的 ID 不会报错（IN 不会匹配到任何行，影响行数相应减少）
+      - 单条 SQL 一次完成，由 MySQL 自动事务保证原子性
+      - 配合 BatchDeleteRequest 使用（最大 500 条由 DTO @Size 限制）
+      - 注意：本表 notification_id 在 bid_winning_supplier_detail 中是逻辑外键，
+        删除本表后明细行会变孤儿（应用层不保证完整性，p3 最小实现）
+    -->
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM bid_winning_notification
+        WHERE notification_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!--
+      按主键列表查询（用于批量删除前置查询，知道哪些 ID 真的存在）
+      - 用 <foreach> 拼接 IN 子句
+      - 列表中不存在的 ID 不会出现在结果中（IN 自然不匹配）
+      - 单次查询，PK 索引，毫秒级
+      - 配合 deleteByIds 使用：先 selectByIds 拿存在行 → deleteByIds 删它们 → 返回删掉的行
+      - 排序：DB 物理顺序（无 ORDER BY），最小实现
+      - 19 字段全查（含 created_at），用 BaseResultMap 映射
+    -->
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
+               document_fee, deposit, credit_report_required, registration_deadline,
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+        FROM bid_winning_notification
+        WHERE notification_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
 </mapper>
