@@ -173,8 +173,30 @@ public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCr
 **性能与可靠性**：
 - 邮件发送在异步线程池中执行（`AsyncTaskManager.execute(...)`），不阻塞接口响应
 - 邮件失败仅日志告警（`System.err.println`），**不影响**业务结果
-- 完整执行链路（5 步传参与验证 + 4 步异步发送）：见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)
-- AOP 切面开发模式（4 步标准开发）：见 [docs/development-flow.md §8](development-flow.md#8-aop-切面开发模式4-步标准开发)
+
+**响应时间（主线程 vs 后台子线程分离）**：
+
+接口响应时间 ≈ 主线程耗时 ≈ **微秒级**（不含邮件发送），因为：
+- AOP 切面方法中 `AsyncTaskManager.execute(...)` 内部仅 `new Thread(...).start()`（**立即返回**）
+- 实际 SMTP 发送（1-3 秒）发生在**后台子线程**，与主线程完全并行
+- 前端在邮件发送完成前就已收到 200 OK 响应
+
+| 模式 | 主线程耗时 | 接口响应 |
+|------|----------|---------|
+| 同步发送（不用 AsyncTaskManager） | 1-3 秒（SMTP 阻塞主线程）| 慢 |
+| **异步发送（当前实现）** | **~微秒级** | **快（200 OK）** |
+
+**详细时序**：
+- Step 1：Controller 业务代码执行，return Result
+- Step 2：触发 @AfterReturning 切面（主线程未放行）
+  - Step 2.1：切面前半段（~微秒级，instanceof 验证 + 反射 + JSON 序列化 + 主题）
+  - Step 2.2：`AsyncTaskManager.execute(...)` 提交异步任务，主线程仅 `new Thread + .start()`，**瞬间**完成
+- Step 3：切面方法全部执行完毕（return）
+- Step 4：Spring 代理对象放行，Spring MVC 序列化 Result 为 JSON，**HTTP 响应完成**
+- Step 5（**与 Step 3-4 并行**）：后台子线程执行 sleep(0) + 邮件发送全流程
+
+完整执行链路：见 [docs/architecture.md §7.4](architecture.md#74-完整业务执行生命周期5-步精确时序--主子线程分离)
+AOP 切面开发模式：见 [docs/development-flow.md §8](development-flow.md#8-aop-切面开发模式4-步标准开发)
 
 **生产占位邮箱**：`ops@company.com` 为占位符，实际部署需替换为真实邮箱。
 

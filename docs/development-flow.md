@@ -655,7 +655,46 @@ public class BidWinningBackendApplication { }
 | 2 | `Object result` | `instanceof Result<?>` 验证（防御性编程）|
 | 3 | `SendEmailOnSuccess anno` | `anno.to()` / `anno.subject()` / `anno.templateName()` |
 
-### 8.4 防坑指南（核心设计规范）
+### 8.4 主线程 / 后台子线程分离的精确时序（以 CrudResultEmailAspect 为例）
+
+**核心理解**：AOP 切面方法在主线程中执行（~微秒级），但实际的副作用（邮件发送）在后台子线程中执行（1-3 秒）。
+
+```
+┌─ 主线程（HTTP 请求处理）──────────────────────────────────┐
+│ Step 1. Controller 业务执行完毕，return Result             │
+│ Step 2. 触发 @AfterReturning 切面（主线程<b>未</b>放行）    │
+│   ├─ 2.1 切面前半段（~微秒级）                              │
+│   │   → instanceof 验证 + 反射推断 + JSON 序列化 + 构造主题 │
+│   └─ 2.2 AsyncTaskManager.execute(...)                     │
+│       → 主线程仅 new Thread + .start()，<b>瞬间</b>完成     │
+│ Step 3. 切面方法全部执行完毕（return）                      │
+│ Step 4. Spring 代理对象放行                                │
+│   → Spring MVC 序列化 Result 为 JSON                       │
+│   → TCP 发送回前端 → <b>此时接口响应完成</b>                │
+└──────────────────────────────────────────────────────────┘
+
+┌─ 后台子线程（与主线程 Step 3-4 <b>并行</b>）────────────┐
+│ Step 5. sleep(0) + 邮件发送全流程                          │
+│   → 可能在主线程 Step 4 <b>之后</b>才完成                 │
+│   → 前端<b>不感知</b>邮件是否发送成功                      │
+└──────────────────────────────────────────────────────────┘
+```
+
+**为什么这样设计**：
+
+| 模式 | 主线程耗时 | 接口响应 |
+|------|----------|---------|
+| 同步发送 | 1-3 秒（SMTP 阻塞主线程）| 慢 |
+| **异步发送（当前实现）** | **~微秒级**（仅 new Thread）| **快（200 OK）** |
+
+**关键：Step 2.2 的 `AsyncTaskManager.execute(...)` 是非阻塞调用**
+- 内部执行 `new Thread(runnable).start()`
+- 构造 Thread 对象（微秒级）+ 调用 .start()（**立即返回**，不等待子线程）
+- 主线程这行代码 ≈ 微秒级完成 → 继续往下走
+
+---
+
+### 8.5 防坑指南（核心设计规范）
 
 | 规范 | 原因 |
 |------|------|
@@ -665,7 +704,7 @@ public class BidWinningBackendApplication { }
 | **弱化强类型** | `instanceof` 校验避免 ClassCastException |
 | **argNames 绑定** | 编译期字节码保留形参名，让 Spring 能正确注入 |
 
-### 8.5 完整文件清单（参考实现）
+### 8.6 完整文件清单（参考实现）
 
 | # | 路径 | 角色 |
 |---|------|------|

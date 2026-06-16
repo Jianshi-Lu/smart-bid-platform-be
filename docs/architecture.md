@@ -2056,26 +2056,80 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 - SOURCE：编译器直接丢弃 → AOP 失效
 - 只有 RUNTIME 才能让 Spring 通过 `Method.getAnnotation(...)` 读取到注解实例
 
-### 7.4 完整业务执行生命周期（从 HTTP 到邮件发送）
+### 7.4 完整业务执行生命周期（5 步精确时序 + 主/子线程分离）
 
-主线程与异步线程**分离**的完整链路：
+主线程与异步线程**分离**的完整链路（**核心理解：AOP 切面在主线程中执行，但邮件发送在后台子线程异步执行**）：
 
-1. **前端调用**：`POST /create-bid-handler-info`，携带请求体
-2. **Tomcat 接收**：Spring `DispatcherServlet` 路由到 Controller **代理对象**
-3. **核心业务执行**（Target）：代理对象调用 `createBidHandlerInfo`
-   - `new BidHandlerInfo()` 设值
-   - `service.create(entity)` 落库
-   - 组装 `Result.success(entity, "创建成功")` 并 `return`
-4. **切面拦截**（AOP Intercept）：方法正常 `return` → 触发 `@AfterReturning`
-   - 代理对象把 `JoinPoint` / `result` / `anno` 三个参数传给 `handleAfterReturning`
-5. **切面业务处理**（主线程）：提取方法名、推断 operation、序列化 JSON、构造 subject
-   - 关键点：`AsyncTaskManager.execute(...)` 提交异步任务 → **主线程立即返回**
-6. **响应前端**：代理对象把 Result 序列化为 JSON → 前端瞬间收到 200
-7. **异步邮件发送**（工作线程，0 ms 延迟）：
-   - 校验模板存在
-   - 渲染 Thymeleaf Context
-   - `SpringTemplateEngine.process()` 生成 HTML
-   - `BidWinningMailSender.sendHtmlEmail()` 通过 SMTP 发送
+```
+┌─ 主线程（HTTP 请求处理）─────────────────────────────────────┐
+│                                                              │
+│ Step 1. Controller 内部业务执行完毕，构造 Result 对象，return │
+│         → service.create(entity) 落库                        │
+│         → 组装 Result<Entity> 对象                            │
+│         → 走到 return（此时 Result 已构造，<b>还没</b>返回前端）│
+│                                                              │
+│ Step 2. 触发 @AfterReturning 切面（主线程<b>未</b>放行）       │
+│         ┌─ 2.1 切面前半段（同步，~微秒级）                     │
+│         │    → Spring AOP 注入 3 个参数：                    │
+│         │       JoinPoint / Object result / SendEmailOnSuccess│
+│         │    → instanceof Result<?> 验证                      │
+│         │    → 反射推断 endpoint/operation                    │
+│         │    → fastjson2 序列化 Result.data                  │
+│         │    → 构造邮件主题 subject                           │
+│         │                                                    │
+│         └─ 2.2 切面后半段：AsyncTaskManager.execute(...) 提交  │
+│              ├─ 主线程：new Thread(runnable).start()         │
+│              │   ├─ 构造 Thread 对象（微秒级）                │
+│              │   └─ 调用 .start()（<b>立即返回</b>，不等待子线程）│
+│              │   → 主线程这行代码"瞬间"完成                    │
+│              │                                                │
+│              └─ 后台子线程<b>已启动</b>（与主线程并行）        │
+│                  └─ 此时主线程继续往下走                       │
+│                                                              │
+│ Step 3. 切面方法全部执行完毕（handleAfterReturning return）     │
+│                                                              │
+│ Step 4. Spring AOP 代理对象放行                              │
+│         → Spring MVC 拿到原始 Result 对象                    │
+│         → Jackson/fastjson 序列化为 JSON                     │
+│         → DispatcherServlet 写入 HTTP Response               │
+│         → TCP 发送回前端                                     │
+│         → <b>此时接口响应完成</b>（前端收到 200 OK + JSON）   │
+│                                                              │
+│ === 主线程生命周期结束（HTTP 请求处理完毕）===                │
+└──────────────────────────────────────────────────────────────┘
+
+┌─ 后台子线程（与主线程 Step 3-4 <b>并行</b>）─────────────────┐
+│                                                              │
+│ Step 5. 后台子线程并行执行（sleep(0) + 邮件发送全流程）         │
+│         ├─ 子线程从 Thread.sleep(0) 醒来（几乎立即）          │
+│         ├─ 5.1 模板存在性校验                                │
+│         ├─ 5.2 构造 Thymeleaf Context                         │
+│         ├─ 5.3 SpringTemplateEngine.process() 渲染 HTML        │
+│         ├─ 5.4 BidWinningMailSender.sendHtmlEmail() SMTP 发送 │
+│         ├─ try-catch 兜底（失败仅日志告警）                    │
+│         └─ 子线程生命周期结束                                │
+│                                                              │
+│ 关键：步骤 5 可能在主线程 Step 4 <b>之后</b>才完成              │
+│      → 前端<b>不感知</b>邮件是否发送成功                      │
+│      → 子线程异常被隔离，不影响主线程的 Result 返回           │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**关键时序要点**：
+
+| 要点 | 说明 |
+|------|------|
+| **Step 2.2 非阻塞** | `new Thread(...).start()` 内部仅构造 Thread 对象（微秒级）+ 调用 .start()（立即返回），主线程这行代码 ≈ 微秒级完成，**不会**等待子线程 |
+| **Step 5 异步并行** | 后台子线程可能还要花 1-3 秒完成 SMTP 发送，此时前端已经收到 200 OK 响应 |
+| **异常隔离** | 子线程异常被 try-catch 捕获 → 仅日志告警 → 不会反向传播到主线程 → 不会导致 HTTP 500 |
+| **用户感知** | 前端调用接口后只看到 `Result.success(...)`，**不感知**邮件是否发送成功，邮件是后台"附带"的副作用 |
+
+**对比同步 vs 异步**：
+
+| 模式 | 主线程耗时 | 邮件失败影响 | 接口响应 |
+|------|----------|------------|---------|
+| 同步发送（不用 AsyncTaskManager） | 1-3 秒（被 SMTP 阻塞）| HTTP 500 风险 | 慢 |
+| **异步发送（当前实现）** | **~微秒级** | **仅日志告警** | **快（200 OK）** |
 
 ### 7.5 5 步传参与验证（同步，主线程）
 

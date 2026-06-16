@@ -36,6 +36,84 @@ import java.time.format.DateTimeFormatter;
  *   <li>如果需要异常时也触发，用 {@code @AfterThrowing}；如果需要完全控制，用 {@code @Around}</li>
  * </ul>
  *
+ * <h3>完整业务执行链路（5 步精确时序 + 主线程 / 后台子线程分离）</h3>
+ *
+ * <h4>主线程时间线（HTTP 请求 → 响应）</h4>
+ * <pre>
+ *   Step 1. Controller 内部业务执行完毕
+ *         → service.create(entity) 落库
+ *         → 组装 Result&lt;Entity&gt; 对象
+ *         → 走到 return（此时 Result 已构造完毕，但<b>还没</b>返回给前端）
+ *
+ *   Step 2. 触发 @AfterReturning 切面（主线程<b>未</b>放行，<b>未</b>返回前端）
+ *         ┌─ 2.1 切面前半段：参数注入 + 验证 + 反射推断 + 序列化 JSON
+ *         │    → JoinPoint / Object result / SendEmailOnSuccess anno 注入
+ *         │    → instanceof Result&lt;?&gt; 验证
+ *         │    → MethodSignature 反射推断 endpoint/operation
+ *         │    → fastjson2 序列化 Result.data
+ *         │    → 构造邮件主题 subject
+ *         │
+ *         └─ 2.2 切面后半段：{@code AsyncTaskManager.execute(runnable, 0)}
+ *              ├─ 主线程：{@code new Thread(runnable).start()}
+ *              │   ├─ 构造 Thread 对象（CPU 时间 ≈ 微秒级）
+ *              │   └─ 调用 .start()（立即返回，<b>不</b>等待子线程）
+ *              │   → 主线程这行代码"瞬间"完成
+ *              │
+ *              └─ 后台子线程已启动（与主线程<b>并行</b>）
+ *                  ├─ 子线程调用 {@code Thread.sleep(0)}（延迟 0 ms，立即返回）
+ *                  └─ 子线程执行 runnable.run()：校验模板 + 渲染 + 发邮件
+ *                  （注：以上发生在<b>新线程</b>，与主线程完全独立）
+ *
+ *   Step 3. 切面方法全部执行完毕（主线程<b>走完</b> handleAfterReturning 全部代码）
+ *         → 切面方法 return
+ *
+ *   Step 4. Spring AOP 代理对象放行（主线程从切面返回到原始调用栈）
+ *         → Spring MVC 拿到原始 Result 对象
+ *         → Jackson/fastjson 序列化为 JSON
+ *         → 通过 DispatcherServlet 写入 HTTP Response
+ *         → TCP 发送回前端浏览器
+ *         → <b>此时接口响应完成</b>（前端收到 200 OK 和 JSON body）
+ *
+ *   === 主线程生命周期结束（HTTP 请求处理完毕）===
+ * </pre>
+ *
+ * <h4>后台子线程时间线（异步邮件发送）</h4>
+ * <pre>
+ *   Step 5. 后台子线程<b>并行</b>执行（与主线程步骤 3-4 <b>同时</b>进行）
+ *         ├─ 子线程从 {@code Thread.sleep(0)} 醒来（几乎立即）
+ *         ├─ 5.1 {@code staticResourceSearcher.validateTemplateExists(templateName)} → 模板校验
+ *         ├─ 5.2 构造 Thymeleaf Context（注入 subject/endpoint/operation/timestamp/result*）
+ *         ├─ 5.3 {@code templateEngine.process(templateName, context)} → 渲染 HTML
+ *         ├─ 5.4 {@code bidWinningMailSender.sendHtmlEmail(to, subject, htmlContent)} → SMTP 发送
+ *         ├─ try-catch 兜底（邮件失败仅日志告警，<b>不影响</b>主业务）
+ *         └─ 子线程生命周期结束
+ * </pre>
+ *
+ * <h4>关键时序要点（主线程 vs 后台子线程）</h4>
+ * <ul>
+ *   <li><b>主线程步骤 2.2 调用的 {@code AsyncTaskManager.execute(...)} 不阻塞</b>
+ *     <ul>
+ *       <li>{@code new Thread(...).start()} 是非阻塞调用，<b>立刻</b>返回</li>
+ *       <li>主线程这行代码的执行时间 ≈ 微秒级（仅创建 Thread 对象 + 调用 start）</li>
+ *       <li>实际邮件发送的耗时（1-3 秒 SMTP I/O）发生在<b>子线程</b></li>
+ *     </ul>
+ *   </li>
+ *   <li><b>步骤 5（后台子线程）可能仍在执行时，前端已经收到响应</b>
+ *     <ul>
+ *       <li>主线程在 Step 4 完成后即返回（HTTP 响应已发）</li>
+ *       <li>子线程可能还要花 1-3 秒完成 SMTP 发送</li>
+ *       <li>前端 <b>不感知</b> 邮件是否发送成功（异步 + try-catch 兜底）</li>
+ *     </ul>
+ *   </li>
+ *   <li><b>异常隔离</b>
+ *     <ul>
+ *       <li>子线程异常被 try-catch 捕获 → 仅日志告警</li>
+ *       <li>不会反向传播到主线程（不会导致 HTTP 500）</li>
+ *       <li>不会影响 Result 对象的正确返回</li>
+ *     </ul>
+ *   </li>
+ * </ul>
+ *
  * <h3>完整执行链路（5 步传参与验证 + 4 步异步发送）</h3>
  * <pre>
  * Spring 代理对象（"秘书"）调用 {@code handleAfterReturning} 方法，传入 3 个参数：
@@ -159,11 +237,11 @@ public class CrudResultEmailAspect {
      * <h3>执行时机（{@code @AfterReturning} 语义）</h3>
      * <ul>
      *   <li>仅当目标方法<b>正常返回</b>时触发（无异常）</li>
-     *   <li>返回值已生成但还未返回给调用方时执行</li>
+     *   <li>返回值已生成但还未返回给调用方时异步执行</li>
      *   <li>异常情况下不执行（异常由 {@code @AfterThrowing} 处理）</li>
      * </ul>
      *
-     * <h3>5 步传参与验证（同步，主线程）</h3>
+     * <h3>5 步传参与验证（同步，主线程 — Step 2.1）</h3>
      * <ol>
      *   <li>{@code instanceof Result<?>} 验证（防御性编程）</li>
      *   <li>反射提取 method 签名，推断 endpoint/operation</li>
@@ -172,13 +250,72 @@ public class CrudResultEmailAspect {
      *   <li>{@code AsyncTaskManager.execute(...)} 提交异步任务</li>
      * </ol>
      *
-     * <h3>4 步异步发送（工作线程，延迟 0 ms）</h3>
+     * <h3>4 步异步发送（工作线程，延迟 0 ms — Step 5）</h3>
      * <ol>
      *   <li>{@code StaticResourceSearcher.validateTemplateExists()} 模板存在性校验</li>
      *   <li>构造 Thymeleaf Context 注入变量</li>
      *   <li>{@code SpringTemplateEngine.process()} 渲染 HTML</li>
      *   <li>{@code BidWinningMailSender.sendHtmlEmail()} SMTP 发送</li>
      * </ol>
+     *
+     * <h3>主线程 / 后台子线程分离的精确时序</h3>
+     * <pre>
+     *   ┌─ 主线程（HTTP 请求处理）─────────────────────┐
+     *   │ Step 1. Controller 业务执行完毕，return Result  │
+     *   │ Step 2. 触发 @AfterReturning 切面                │
+     *   │   ├─ 2.1 切面前半段（同步，~微秒级）              │
+     *   │   │   → instanceof 验证                       │
+     *   │   │   → 反射推断 endpoint/operation            │
+     *   │   │   → fastjson2 序列化 JSON                  │
+     *   │   │   → 构造 subject                           │
+     *   │   └─ 2.2 AsyncTaskManager.execute(...) 提交     │
+     *   │       → 主线程仅完成"new Thread + .start()"     │
+     *   │       → 这行代码<b>瞬间</b>完成（非阻塞）        │
+     *   │ Step 3. 切面方法全部执行完毕（return）         │
+     *   │ Step 4. Spring 代理对象放行                    │
+     *   │   → Spring MVC 拿到 Result                     │
+     *   │   → Jackson/fastjson 序列化为 JSON             │
+     *   │   → DispatcherServlet 写入 HTTP Response       │
+     *   │   → TCP 发送回前端                             │
+     *   │   → <b>此时接口响应完成</b>（前端收到 200）     │
+     *   └──────────────────────────────────────────┘
+     *
+     *   ┌─ 后台子线程（与主线程并行）────────────────┐
+     *   │ Step 5. 子线程从 Thread.sleep(0) 醒来         │
+     *   │   ├─ 5.1 模板存在性校验                      │
+     *   │   ├─ 5.2 构造 Thymeleaf Context                │
+     *   │   ├─ 5.3 SpringTemplateEngine 渲染 HTML        │
+     *   │   ├─ 5.4 SMTP 发送邮件                       │
+     *   │   └─ try-catch 兜底（失败仅日志告警）          │
+     *   │   → 可能在主线程 Step 4 <b>之后</b>才完成      │
+     *   │   → 前端<b>不感知</b>邮件是否发送成功          │
+     *   └──────────────────────────────────────────┘
+     * </pre>
+     *
+     * <h3>关键时序要点</h3>
+     * <ul>
+     *   <li><b>主线程 Step 2.2 的 {@code AsyncTaskManager.execute(...)} 是非阻塞调用</b>
+     *     <ul>
+     *       <li>{@code new Thread(runnable).start()} 内部：构造 Thread 对象（微秒级）+ 调用 .start()（立即返回）</li>
+     *       <li>主线程这行代码的执行时间 ≈ 微秒级</li>
+     *       <li><b>不会</b>等待子线程完成，<b>不会</b>阻塞主线程</li>
+     *     </ul>
+     *   </li>
+     *   <li><b>Step 5（后台子线程）可能仍在执行时，前端已经收到响应</b>
+     *     <ul>
+     *       <li>主线程在 Step 4 完成后即返回（HTTP 响应已发）</li>
+     *       <li>子线程可能还要花 1-3 秒完成 SMTP 发送</li>
+     *       <li>前端 <b>不感知</b> 邮件是否发送成功（异步 + try-catch 兜底）</li>
+     *     </ul>
+     *   </li>
+     *   <li><b>异常隔离</b>
+     *     <ul>
+     *       <li>子线程异常被 try-catch 捕获 → 仅日志告警</li>
+     *       <li>不会反向传播到主线程（不会导致 HTTP 500）</li>
+     *       <li>不会影响 Result 对象的正确返回</li>
+     *     </ul>
+     *   </li>
+     * </ul>
      */
     @AfterReturning(
             pointcut = "@annotation(anno)",
@@ -211,7 +348,10 @@ public class CrudResultEmailAspect {
                             LocalDateTime.now().format(TS_FMT))
                     : anno.subject();
 
-            // 5. 提交异步任务（主线程立即返回，不阻塞业务响应）
+            // 5. 提交异步任务（主线程<b>立即</b>返回，不阻塞业务响应）
+            //    关键：AsyncTaskManager.execute(...) 内部执行 new Thread(...).start()，
+            //    启动子线程后<b>立刻</b>返回，主线程这行代码 ~微秒级完成。
+            //    子线程的 sleep(0) + 邮件发送全流程发生在<b>新线程</b>，与主线程完全并行。
             final String to = anno.to();
             final String templateName = anno.templateName();
             final String finalSubject = subject;
