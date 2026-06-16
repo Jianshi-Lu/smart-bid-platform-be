@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller.bidwinningsupplierdetail
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailUpdateRequest;
@@ -146,6 +147,8 @@ public class BidWinningSupplierDetailController {
      * @param request 前端传入的创建参数（3 字段含 @NotNull/@NotBlank/@Size 校验，**当前未启用 @Valid**）
      * @return {@code Result<BidWinningSupplierDetail>} 包含 data（Entity）和 message（"创建成功"）
      */
+    // 业务操作成功后通过 AOP 切面（CrudResultEmailAspect）异步发送邮件通知
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-winning-supplier-detail")
     public Result<BidWinningSupplierDetail> createBidWinningSupplierDetail(
             @RequestBody BidWinningSupplierDetailCreateRequest request) {
@@ -173,6 +176,7 @@ public class BidWinningSupplierDetailController {
      * @param id 主键 ID（从 URL 路径 {@code {id}} 自动注入）
      * @return {@code Result<BidWinningSupplierDetail>} — code=200 成功（含 entity） / code=404 记录不存在
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-supplier-detail/{id}")
     public Result<BidWinningSupplierDetail> getByIdBidWinningSupplierDetail(@PathVariable Integer id) {
         BidWinningSupplierDetail entity = service.getById(id);
@@ -201,6 +205,7 @@ public class BidWinningSupplierDetailController {
      * @param request 3 字段（null=不修改）
      * @return {@code Result<Diff<BidWinningSupplierDetail>>} 包含 before（DB 原值）和 after（更新后）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-winning-supplier-detail/{id}")
     public Result<Diff<BidWinningSupplierDetail>> patchBidWinningSupplierDetail(
             @PathVariable Integer id,
@@ -237,6 +242,7 @@ public class BidWinningSupplierDetailController {
      * @param id 主键 ID（从 URL 路径 {@code {id}} 自动注入）
      * @return {@code Result<Void>} — code=200 删除成功 / code=404 记录不存在
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-winning-supplier-detail/{id}")
     public Result<Void> deleteBidWinningSupplierDetail(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -265,6 +271,7 @@ public class BidWinningSupplierDetailController {
      * @param sort 排序字段（默认 {@code "detail_id desc"}，空格分隔）
      * @return {@code Result<PageInfo<BidWinningSupplierDetail>>}（code=200 / code=400）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-supplier-detail")
     public Result<PageInfo<BidWinningSupplierDetail>> listBidWinningSupplierDetail(
             @RequestParam(defaultValue = "1") int pageNum,
@@ -308,6 +315,7 @@ public class BidWinningSupplierDetailController {
      * @param request 批量删除请求（{@code ids} 非空，1-500 条）
      * @return {@code Result<List<BidWinningSupplierDetail>>} — code=200，data=实际删除的实体列表
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-winning-supplier-detail/batch-delete")
     public Result<List<BidWinningSupplierDetail>> batchDeleteBidWinningSupplierDetail(
             @Valid @RequestBody BidWinningSupplierDetailBatchDeleteRequest request) {

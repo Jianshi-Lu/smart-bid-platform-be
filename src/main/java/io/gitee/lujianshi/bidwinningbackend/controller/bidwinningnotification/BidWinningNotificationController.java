@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller.bidwinningnotification;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationUpdateRequest;
@@ -117,6 +118,8 @@ public class BidWinningNotificationController {
      * @param request 17 字段（3 @NotBlank/@NotNull 必填 + 14 可选）
      * @return {@code Result<BidWinningNotification>}（code=200，含自增 notificationId 的 Entity）
      */
+    // 业务操作成功后通过 AOP 切面（CrudResultEmailAspect）异步发送邮件通知
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-winning-notification")
     @Transactional(rollbackFor = Exception.class)
     public Result<BidWinningNotification> createBidWinningNotification(
@@ -161,6 +164,7 @@ public class BidWinningNotificationController {
      * @param id 主键 ID（@PathVariable 注入）
      * @return {@code Result<BidWinningNotification>}（code=200 / code=404）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-notification/{id}")
     public Result<BidWinningNotification> getByIdBidWinningNotification(@PathVariable Integer id) {
         BidWinningNotification entity = service.getById(id);
@@ -194,6 +198,7 @@ public class BidWinningNotificationController {
      * @param request 17 字段（PATCH 可选，null=不修改）
      * @return {@code Result<Diff<BidWinningNotification>>}（code=200 含 before/after / code=404）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-winning-notification/{id}")
     @Transactional(rollbackFor = Exception.class)
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
@@ -251,6 +256,7 @@ public class BidWinningNotificationController {
      * @param id 主键 ID（@PathVariable 注入）
      * @return {@code Result<Void>}（code=200 / code=404，data 始终为 null）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-winning-notification/{id}")
     @Transactional(rollbackFor = Exception.class)
     public Result<Void> deleteBidWinningNotification(@PathVariable Integer id) {
@@ -288,6 +294,7 @@ public class BidWinningNotificationController {
      * @param request 批量删除请求（{@code ids} 非空，1-500 条）
      * @return {@code Result<List<BidWinningNotification>>} — code=200，data=实际删除的实体列表
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-winning-notification/batch-delete")
     @Transactional(rollbackFor = Exception.class)
     public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
@@ -315,6 +322,7 @@ public class BidWinningNotificationController {
      * @param sort 排序字段（默认 {@code "notification_id desc"}，空格分隔）
      * @return {@code Result<PageInfo<BidWinningNotification>>}（code=200 / code=400）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-notification")
     public Result<PageInfo<BidWinningNotification>> listBidWinningNotification(
             @RequestParam(defaultValue = "1") int pageNum,

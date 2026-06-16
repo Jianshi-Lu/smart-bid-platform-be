@@ -566,8 +566,116 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 ## 7. 后续待办
 
 - [x] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller，6 端点含批量删除 p3 升级版）
+- [x] AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect` + crud-result 模板）— 详见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)
 - [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
 - [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 上 `@NotBlank` / `@Size` 校验失效）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）
 - [ ] 单元测试（Mapper / Service / Controller）
-- [ ] API 文档（`docs/api.md`）
+- [x] API 文档（`docs/api.md`）
+
+---
+
+## 8. AOP 切面开发模式（4 步标准开发）
+
+> 适用范围：所有需要**横切关注点**（Cross-cutting Concerns）的功能，包括：
+> - 操作日志记录、邮件通知、短信通知
+> - 接口限流、敏感数据脱敏、分布式锁
+> - 接口耗时统计、统一异常处理
+
+### 8.1 何时用 AOP（适用场景判断）
+
+当你发现某段逻辑（如日志、鉴权、缓存、通知）**散落在多个 Controller 或 Service** 中，且代码**高度重复**时，就该用切面。
+
+**反例**（不要用 AOP）：
+- 核心业务逻辑（算钱、扣库存）→ 写在 Service
+- 一次性逻辑（仅 1 个端点用到）→ 写在 Controller
+
+### 8.2 标准 4 步开发流程
+
+#### Step 1：定义注解（打标签）
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)   // 必须 RUNTIME
+public @interface SendEmailOnSuccess {
+    String to();
+    String subject() default "";
+    String templateName() default "crud-result";
+}
+```
+
+**关键**：`@Retention(RetentionPolicy.RUNTIME)` 必填，否则 Spring AOP 反射读不到。
+
+#### Step 2：定义切面类（写逻辑）
+
+```java
+@Aspect
+@Component
+public class CrudResultEmailAspect {
+    @AfterReturning(
+        pointcut = "@annotation(anno)",     // 拦截带注解的方法
+        returning = "result",                 // 绑定返回值
+        argNames = "joinPoint, result, anno"  // 形参名（编译期保留）
+    )
+    public void handleAfterReturning(JoinPoint joinPoint, Object result,
+                                     SendEmailOnSuccess anno) {
+        // 切面逻辑
+    }
+}
+```
+
+#### Step 3：确定增强时机（Advice）
+
+| Advice | 时机 | 典型场景 |
+|--------|------|---------|
+| `@Before` | 方法执行前 | 鉴权、参数校验 |
+| `@AfterReturning` | 方法正常返回后 | 邮件通知、成功日志 |
+| `@AfterThrowing` | 方法抛异常后 | 异常告警收集 |
+| `@Around` | 环绕（最强）| 耗时统计、分布式锁、限流 |
+
+**本项目用 `@AfterReturning`**，因为邮件通知仅在成功时发。
+
+#### Step 4：启动类开启 AOP
+
+```java
+@SpringBootApplication
+@EnableAsync
+@EnableAspectJAutoProxy   // ← 新增
+@MapperScan("...")
+public class BidWinningBackendApplication { }
+```
+
+### 8.3 5 步传参与验证流程（以 CrudResultEmailAspect 为例）
+
+代理对象调用 `handleAfterReturning(JoinPoint, Object, SendEmailOnSuccess)` 传入 3 个参数：
+
+| # | 参数 | 验证/使用 |
+|---|------|----------|
+| 1 | `JoinPoint joinPoint` | `MethodSignature` + `Method` 反射推断 endpoint |
+| 2 | `Object result` | `instanceof Result<?>` 验证（防御性编程）|
+| 3 | `SendEmailOnSuccess anno` | `anno.to()` / `anno.subject()` / `anno.templateName()` |
+
+### 8.4 防坑指南（核心设计规范）
+
+| 规范 | 原因 |
+|------|------|
+| **try-catch 兜底** | 切面代码**绝对不能**因自身报错导致主业务回滚 |
+| **耗时操作异步化** | SMTP / HTTP / DB 等网络 I/O 必须丢线程池 |
+| **防代理失效** | 类内部 A→B 调用，B 上的注解**不会**触发切面（跳过了"秘书"）|
+| **弱化强类型** | `instanceof` 校验避免 ClassCastException |
+| **argNames 绑定** | 编译期字节码保留形参名，让 Spring 能正确注入 |
+
+### 8.5 完整文件清单（参考实现）
+
+| # | 路径 | 角色 |
+|---|------|------|
+| 1 | `annotation/SendEmailOnSuccess.java` | 注解 |
+| 2 | `aspect/CrudResultEmailAspect.java` | 切面 |
+| 3 | `templates/crud-result-notification.html` | 邮件模板 |
+| 4 | `BidWinningBackendApplication.java` | 加 `@EnableAspectJAutoProxy` |
+| 5 | 3 业务 Controller × 6 端点 | 贴 `@SendEmailOnSuccess` |
+| 6 | `pom.xml` | 加 `org.aspectj:aspectjweaver` |
+
+**Spring Boot 4 注意**：`spring-boot-starter-aop` starter 在 SB4 已**不存在**，需直接引 `aspectjweaver`（parent BOM 4.0.6 管理版本）。
+
+详细执行链路 / 5 步传参 / 技术栈协同：见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)

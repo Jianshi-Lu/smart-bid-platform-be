@@ -65,17 +65,24 @@
       - BidWinningTemplateFiller - Thymeleaf 模板填充
       - MailLoggingService - 邮件日志格式化
       - StaticResourceSearcher - 模板文件搜索
+  - `annotation/` - 自定义注解
+    - SendEmailOnSuccess - 业务操作成功后邮件通知标记（@Target(METHOD) + @Retention(RUNTIME)）
+  - `aspect/` - Spring AOP 切面
+    - CrudResultEmailAspect - @AfterReturning 拦截 @SendEmailOnSuccess 注解方法，自动异步发邮件
   - `entity/` - 数据库实体（@Data + @NoArgsConstructor + @AllArgsConstructor，纯 POJO）
     - BidHandlerInfo - 经办人/招标负责人
     - BidWinningNotification - 定标通知主表
     - BidWinningSupplierDetail - 中标结果明细
   - `utils/` - 工具类
-    - AsyncTaskManager - 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
+    - AsyncTaskManager - 延迟异步任务执行器（纯 Java 线程，非 Spring Bean，AOP 邮件通知异步发送依赖此工具）
   - `templates/` - Thymeleaf 模板文件（src/main/resources/templates/）
+    - bid-winning-notification.html - 中标通知书模板（BidWinningMailController 使用）
+    - crud-result-notification.html - CRUD 结果通知模板（CrudResultEmailAspect 使用）
 
 ## Entry Point
 
 - `BidWinningBackendApplication.java` — Spring Boot 启动入口（纯 bootstrap，无路由）
+  - 启用注解：`@SpringBootApplication` + `@EnableAsync` + `@EnableAspectJAutoProxy` + `@MapperScan`
 - Dev server: `http://localhost:8080`
 - 配置端口: `server.port=8080`（application-dev.yml）
 

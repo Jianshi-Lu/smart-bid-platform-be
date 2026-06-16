@@ -2015,6 +2015,128 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 
 ---
 
+## 7. AOP 切面（业务操作后邮件通知）
+
+### 7.1 为什么需要 AOP（横切关注点 Cross-cutting Concerns）
+
+邮件通知是典型的**横切关注点**：
+- 18 个业务 Controller 端点都需要"操作成功后发邮件"
+- 如果写在每个 Controller，会重复 18 段
+- AOP 切面统一处理：Controller 业务代码 **0 改动**，只需贴一个 `@SendEmailOnSuccess` 注解
+
+**其他横切场景**（可参考本类扩展）：
+- 操作日志记录（`@Before` + MethodSignature）
+- 接口限流（`@Around` + Redis）
+- 敏感数据脱敏（`@AfterReturning` + 处理 Result.data）
+- 分布式锁（`@Around`）
+
+### 7.2 为什么 `@SendEmailOnSuccess` 注解能自动拦截
+
+**注解本身只是"静态标记"（元数据），没有任何执行能力**。生效靠 **Spring AOP 动态代理机制** + **Bean 生命周期**：
+
+1. **收集标记**：Spring Boot 启动扫描所有类
+   - 看到 `@Aspect` → 知道 `CrudResultEmailAspect` 是切面
+   - 看到 `pointcut = "@annotation(anno)"` → 记下规则："谁的方法上贴了 `@SendEmailOnSuccess`，就拦截谁"
+2. **生成代理对象（"秘书"）**：Spring 看到 Controller 方法贴了注解 → 在内存里动态生成 Controller 的代理对象
+3. **偷梁换柱**：HTTP 请求实际打到"秘书"上，不是原始"老板"
+4. **拦截执行**：
+   - "秘书"让"老板"执行核心业务（落库 + 组装 Result）
+   - "老板"返回 Result → "秘书"看到标签 → 触发 `@AfterReturning` 切面逻辑（发邮件）
+   - "秘书"把 Result 返回给前端
+
+### 7.3 注解设计要点
+
+| 元注解 | 取值 | 原因 |
+|--------|------|------|
+| `@Target(ElementType.METHOD)` | METHOD | 限制只能贴方法（编译期 IDE 拦截误用）|
+| `@Retention(RetentionPolicy.RUNTIME)` | **RUNTIME** | **必须 RUNTIME**，否则 Spring AOP 反射读不到（CLASS/SOURCE 都会丢失）|
+
+**为什么 RUNTIME 必需**：
+- CLASS：编译进 `.class` 但 JVM 加载时丢弃 → AOP 失效
+- SOURCE：编译器直接丢弃 → AOP 失效
+- 只有 RUNTIME 才能让 Spring 通过 `Method.getAnnotation(...)` 读取到注解实例
+
+### 7.4 完整业务执行生命周期（从 HTTP 到邮件发送）
+
+主线程与异步线程**分离**的完整链路：
+
+1. **前端调用**：`POST /create-bid-handler-info`，携带请求体
+2. **Tomcat 接收**：Spring `DispatcherServlet` 路由到 Controller **代理对象**
+3. **核心业务执行**（Target）：代理对象调用 `createBidHandlerInfo`
+   - `new BidHandlerInfo()` 设值
+   - `service.create(entity)` 落库
+   - 组装 `Result.success(entity, "创建成功")` 并 `return`
+4. **切面拦截**（AOP Intercept）：方法正常 `return` → 触发 `@AfterReturning`
+   - 代理对象把 `JoinPoint` / `result` / `anno` 三个参数传给 `handleAfterReturning`
+5. **切面业务处理**（主线程）：提取方法名、推断 operation、序列化 JSON、构造 subject
+   - 关键点：`AsyncTaskManager.execute(...)` 提交异步任务 → **主线程立即返回**
+6. **响应前端**：代理对象把 Result 序列化为 JSON → 前端瞬间收到 200
+7. **异步邮件发送**（工作线程，0 ms 延迟）：
+   - 校验模板存在
+   - 渲染 Thymeleaf Context
+   - `SpringTemplateEngine.process()` 生成 HTML
+   - `BidWinningMailSender.sendHtmlEmail()` 通过 SMTP 发送
+
+### 7.5 5 步传参与验证（同步，主线程）
+
+代理对象调用 `handleAfterReturning(JoinPoint, Object, SendEmailOnSuccess)` 传入 3 个参数：
+
+| # | 参数 | 来源 | 验证/使用 |
+|---|------|------|-----------|
+| 1 | `JoinPoint joinPoint` | Spring AOP 自动注入 | `MethodSignature` + `Method` 反射推断 endpoint |
+| 2 | `Object result` | `returning = "result"` 绑定 | `instanceof Result<?>` 验证（防御性编程）|
+| 3 | `SendEmailOnSuccess anno` | 反射读取方法注解 | `anno.to()` / `anno.subject()` / `anno.templateName()` |
+
+**5 步同步处理**：
+1. `instanceof Result<?>` 验证（弱化强类型依赖）
+2. 反射提取 method 签名，推断 endpoint/operation
+3. fastjson2 序列化 `Result.data` 为 JSON
+4. 构造 subject（注解覆盖 or 默认格式）
+5. `AsyncTaskManager.execute(...)` 提交异步任务
+
+### 7.6 4 步异步发送（工作线程，0 ms 延迟）
+
+异步任务内部独立 try-catch 兜底：
+
+1. `StaticResourceSearcher.validateTemplateExists()` 模板存在性校验
+2. 构造 Thymeleaf Context 注入变量（subject/endpoint/operation/timestamp/result*）
+3. `SpringTemplateEngine.process(templateName, context)` 渲染 HTML
+4. `BidWinningMailSender.sendHtmlEmail(to, subject, html)` SMTP 发送
+
+### 7.7 技术栈协同
+
+| 技术 | 角色 |
+|------|------|
+| **Spring AOP / AspectJ** | 横向拦截（`@Aspect` + `@AfterReturning`）|
+| **Java 反射** | 动态获取方法元信息（`MethodSignature`）|
+| **fastjson2** | 实体转 JSON 字符串（`JSON.toJSONString`）|
+| **Thymeleaf** | 模板引擎渲染 HTML（`SpringTemplateEngine`）|
+| **AsyncTaskManager** | 异步线程池（`AsyncTaskManager.execute`）|
+| **JavaMailSender** | SMTP 协议发邮件（`BidWinningMailSender`）|
+
+### 7.8 关键设计规范（防坑指南）
+
+| 规范 | 原因 |
+|------|------|
+| **必须 try-catch 兜底** | 切面代码绝对不能因自身报错导致主业务回滚；邮件失败就失败日志告警 |
+| **耗时操作必须异步** | SMTP 网络 I/O 耗时 1-3 秒；同步会拖慢接口响应 |
+| **防代理失效** | 只有 Spring 注入对象调用方法时 AOP 才生效；类内部 A→B 调用 B 上的注解不会触发（跳过了"秘书"）|
+| **弱化强类型依赖** | `instanceof Result<?>` 校验避免 ClassCastException；不要预设拦截方法一定返回某类型 |
+| **参数名绑定** | `@AfterReturning(argNames = "joinPoint, result, anno")` 让编译器字节码保留形参名 |
+
+### 7.9 完整文件清单
+
+| # | 路径 | 角色 |
+|---|------|------|
+| 1 | `annotation/SendEmailOnSuccess.java` | 注解（贴在方法上）|
+| 2 | `aspect/CrudResultEmailAspect.java` | 切面（拦截注解方法）|
+| 3 | `templates/crud-result-notification.html` | 邮件 HTML 模板 |
+| 4 | `BidWinningBackendApplication.java` | 启动类加 `@EnableAspectJAutoProxy` |
+| 5 | 3 业务 Controller × 6 端点 | 贴 `@SendEmailOnSuccess(to = "ops@company.com")` |
+| 6 | `pom.xml` | 加 `org.aspectj:aspectjweaver`（Spring Boot 4 没有 starter-aop）|
+
+---
+
 ## 附录：关键术语表
 
 | 术语 | 全称 | 解释 |

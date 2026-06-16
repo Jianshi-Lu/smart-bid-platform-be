@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoUpdateRequest;
@@ -124,6 +125,8 @@ public class BidHandlerInfoController {
      * @param request 前端传入的经办人创建参数（{@code @NotBlank}/{@code @Size} 校验定义在 DTO 上，当前未启用 @Valid，需后续补充）
      * @return {@code Result<BidHandlerInfo>} 包含 data（Entity）和 message（"创建成功"）
      */
+    // 业务操作成功后通过 AOP 切面（CrudResultEmailAspect）异步发送邮件通知
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-handler-info")
     public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
@@ -151,6 +154,7 @@ public class BidHandlerInfoController {
      * @param id 经办人主键 ID（从 URL 路径 {@code {id}} 自动注入）
      * @return {@code Result<Void>} — code=200 删除成功 / code=404 记录不存在
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-handler-info/{id}")
     public Result<Void> deleteBidHandlerInfo(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -179,6 +183,7 @@ public class BidHandlerInfoController {
      * @param request 3 字段（handlerName/companyName/departmentName，null=不修改）
      * @return {@code Result<Diff<BidHandlerInfo>>} 包含 before（DB 原值）和 after（更新后）
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-handler-info/{id}")
     public Result<Diff<BidHandlerInfo>> patchBidHandlerInfo(
             @PathVariable Integer id,
@@ -222,6 +227,7 @@ public class BidHandlerInfoController {
      * @param id 经办人主键 ID（从 URL 路径 {@code {id}} 自动注入）
      * @return {@code Result<BidHandlerInfo>} — code=200 成功（含 entity） / code=404 记录不存在
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-handler-info/{id}")
     public Result<BidHandlerInfo> getByIdBidHandlerInfo(@PathVariable Integer id) {
         BidHandlerInfo entity = service.getById(id);
@@ -229,6 +235,8 @@ public class BidHandlerInfoController {
                 ? Result.success(entity, "查询成功")    // 找到
                 : Result.error(404, "记录不存在");   // 未找到
     }
+
+    @SendEmailOnSuccess(to = "jianshi.lu@outlook.com")
     @GetMapping("/bid-handler-info")
     public Result<PageInfo<BidHandlerInfo>> getAllBidHandlerInfo(
         @RequestParam(defaultValue = "1") int page,        // 1-based（PageHelper 默认）
@@ -279,6 +287,7 @@ public class BidHandlerInfoController {
      * @param request 批量删除请求（{@code ids} 非空，1-500 条）
      * @return {@code Result<List<BidHandlerInfo>>} — code=200，data=实际删除的实体列表
      */
+    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-handler-info/batch-delete")
     public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody BidHandlerInfoBatchDeleteRequest request) {
         List<BidHandlerInfo> deleted = service.deleteByIds(request.getIds());

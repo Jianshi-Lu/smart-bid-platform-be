@@ -83,6 +83,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Spring AOP 切面支持（@Aspect / @AfterReturning 等） -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+        </dependency>
+
         <!-- HTML to Markdown：copy-down -->
         <dependency>
             <groupId>io.github.furstenheim</groupId>
@@ -109,6 +115,7 @@
             <artifactId>pagehelper-spring-boot-starter</artifactId>
             <version>4.1.0</version>
         </dependency>
+        
 
         </dependencies>
 

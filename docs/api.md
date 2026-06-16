@@ -135,6 +135,49 @@
 | 金额（DECIMAL） | JSON 数字（BigDecimal 序列化） | `67500.00` |
 | 布尔（TINYINT(1)） | JSON 布尔 | `true` / `false` |
 
+### 1.7 业务操作后邮件通知（AOP 切面）
+
+业务 Controller 端点标注 `@SendEmailOnSuccess(to = "...")` 后，AOP 切面（`CrudResultEmailAspect`）会在方法正常返回后**异步**发送邮件通知。
+
+**触发条件**：
+- 方法正常返回（异常不触发）
+- 返回值必须是 `Result<T>` 类型（切面做 `instanceof` 校验）
+
+**当前已启用端点**：3 个业务 Controller × 6 端点 = 18 处
+- `BidHandlerInfoController`：create / getById / patch / delete / list / batchDelete
+- `BidWinningNotificationController`：create / getById / patch / delete / list / batchDelete
+- `BidWinningSupplierDetailController`：create / getById / patch / delete / list / batchDelete
+
+**邮件内容**（HTML 模板 `crud-result-notification.html`）：
+- 操作类型徽章（CREATE / UPDATE / DELETE / BATCH_DELETE，颜色区分）
+- 业务码（`Result.code`） + 消息（`Result.message`）
+- 返回数据 JSON（`Result.data` 经 fastjson2 序列化）
+- 接口路径（HTTP method + 类名#方法名）
+- 时间戳
+
+**示例注解**：
+
+```java
+@SendEmailOnSuccess(to = "ops@company.com")
+@PostMapping("/create-bid-handler-info")
+public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
+    // 业务代码... 成功后自动发邮件
+}
+```
+
+**注解参数**：
+- `to`（必填）：收件人邮箱
+- `subject`（可选）：自定义邮件主题，默认 `[业务操作通知] {endpoint} {operation} - {timestamp}`
+- `templateName`（可选）：Thymeleaf 模板名，默认 `crud-result`
+
+**性能与可靠性**：
+- 邮件发送在异步线程池中执行（`AsyncTaskManager.execute(...)`），不阻塞接口响应
+- 邮件失败仅日志告警（`System.err.println`），**不影响**业务结果
+- 完整执行链路（5 步传参与验证 + 4 步异步发送）：见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)
+- AOP 切面开发模式（4 步标准开发）：见 [docs/development-flow.md §8](development-flow.md#8-aop-切面开发模式4-步标准开发)
+
+**生产占位邮箱**：`ops@company.com` 为占位符，实际部署需替换为真实邮箱。
+
 ---
 
 ## 2. 演示接口
