@@ -7,11 +7,14 @@ import io.gitee.lujianshi.bidwinningbackend.service.mail.BidWinningMailSender;
 import io.gitee.lujianshi.bidwinningbackend.service.mail.StaticResourceSearcher;
 import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
@@ -258,7 +261,7 @@ public class CrudResultEmailAspect {
      *   <li>{@code BidWinningMailSender.sendHtmlEmail()} SMTP 发送</li>
      * </ol>
      *
-     * <h3>主线程 / 后台子线程分离的精确时序</h3>
+     * <h3>主线程 / 后台子线程分离的时序</h3>
      * <pre>
      *   ┌─ 主线程（HTTP 请求处理）─────────────────────┐
      *   │ Step 1. Controller 业务执行完毕，return Result  │
@@ -348,11 +351,13 @@ public class CrudResultEmailAspect {
                             LocalDateTime.now().format(TS_FMT))
                     : anno.subject();
 
-            // 5. 提交异步任务（主线程<b>立即</b>返回，不阻塞业务响应）
+            // 5. 确定收件人邮箱（优先级：Target-Email-Address header > 注解 to() > 配置默认值）
+            String to = resolveRecipient(anno);
+            //    提交异步任务（主线程立即返回，不阻塞业务响应）
             //    关键：AsyncTaskManager.execute(...) 内部执行 new Thread(...).start()，
-            //    启动子线程后<b>立刻</b>返回，主线程这行代码 ~微秒级完成。
-            //    子线程的 sleep(0) + 邮件发送全流程发生在<b>新线程</b>，与主线程完全并行。
-            final String to = anno.to();
+            //    启动子线程后立刻返回，主线程这行代码 ~微秒级完成。
+            //    子线程的 sleep(0) + 邮件发送全流程发生在新线程，与主线程完全并行。
+            final String finalTo = to;
             final String templateName = anno.templateName();
             final String finalSubject = subject;
             final String finalOperation = operation;
@@ -381,10 +386,10 @@ public class CrudResultEmailAspect {
                     // 5.3 渲染 HTML 模板
                     String htmlContent = templateEngine.process(templateName, context);
                     // 5.4 SMTP 发送邮件
-                    bidWinningMailSender.sendHtmlEmail(to, finalSubject, htmlContent);
-                    System.out.println("[CRUD-EMAIL] 发送成功: to=" + to);
+                    bidWinningMailSender.sendHtmlEmail(finalTo, finalSubject, htmlContent);
+                    System.out.println("[CRUD-EMAIL] 发送成功: to=" + finalTo);
                 } catch (Exception e) {
-                    System.err.println("[CRUD-EMAIL] 发送失败: to=" + to
+                    System.err.println("[CRUD-EMAIL] 发送失败: to=" + finalTo
                             + ", error=" + e.getMessage());
                 }
             }, 3000);
@@ -415,5 +420,22 @@ public class CrudResultEmailAspect {
         if (endpoint.startsWith("PATCH")) return "UPDATE";
         if (endpoint.startsWith("DELETE")) return "DELETE";
         return "QUERY";
+    }
+
+    /**
+     * 确定收件人邮箱（优先级：Target-Email-Address header > 注解 to() > 配置默认值）
+     */
+    private String resolveRecipient(SendEmailOnSuccess anno) {
+        try {
+            HttpServletRequest request = ((ServletRequestAttributes)
+                    RequestContextHolder.currentRequestAttributes()).getRequest();
+            String headerEmail = request.getHeader("Target-Email-Address");
+            if (headerEmail != null && !headerEmail.isBlank()) {
+                return headerEmail;
+            }
+        } catch (IllegalStateException e) {
+            // 非 HTTP 上下文（如测试）忽略，fallback 到注解 to()
+        }
+        return anno.to();
     }
 }
