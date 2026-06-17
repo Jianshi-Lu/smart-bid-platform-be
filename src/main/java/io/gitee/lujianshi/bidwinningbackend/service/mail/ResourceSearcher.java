@@ -12,14 +12,14 @@ import java.util.Arrays;
  *
  * 职责：
  * - 验证模板文件是否存在于 classpath:/templates/ 目录（精确匹配）
- * - 为 BidWinningTemplateFiller 提供模板存在性校验
+ * - 为 TemplateFiller 提供模板存在性校验
  *
  * 设计说明：
  * - validateTemplateExists() 负责精确搜索 templates/ 目录，不存在则抛异常（不 fallback）
  * - ResourcePatternResolver 在 {@code @Resource} 注入时自动使用 PathMatchingResourcePatternResolver 实现
  */
 @Service
-public class StaticResourceSearcher {
+public class ResourceSearcher {
 
     @jakarta.annotation.Resource
     private ResourcePatternResolver resourcePatternResolver;

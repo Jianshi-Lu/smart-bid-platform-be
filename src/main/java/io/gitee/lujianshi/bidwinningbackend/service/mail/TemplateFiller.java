@@ -16,7 +16,7 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
  * 模板选择链路（完整执行流程）：
  * 1. Controller 调用 processTemplate(request)
  * 2. 从 request.getTemplateName() 取出模板文件名（不含 .html）
- * 3. 调用 StaticResourceSearcher.validateTemplateExists(templateName)
+ * 3. 调用 ResourceSearcher.validateTemplateExists(templateName)
  *    - 验证通过 → 继续
  *    - 验证失败 → 抛出 IllegalArgumentException，不 fallback，不使用默认模板
  * 4. 构建 Thymeleaf Context，放入 projectCode / handlerName / bidWinningList
@@ -24,13 +24,13 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
  * 6. 返回渲染后的 HTML 字符串
  */
 @Service
-public class BidWinningTemplateFiller {
+public class TemplateFiller {
 
     @jakarta.annotation.Resource
     private SpringTemplateEngine templateEngine;
 
     @jakarta.annotation.Resource
-    private StaticResourceSearcher staticResourceSearcher;
+    private ResourceSearcher staticResourceSearcher;
 
     /**
      * 处理模板：用 BidWinningMailRequest 数据填充 Thymeleaf 模板
