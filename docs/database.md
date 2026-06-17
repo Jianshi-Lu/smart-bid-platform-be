@@ -112,7 +112,7 @@
 
 **业务关系**：
 - 一条定标通知可对应多条中标明细（一对多）
-- 与 `BidWinningMailRequest.bidWinningList` 字段一一对应
+- 与 `BidWinningMailRequest.bidWinningList` 字段一一对应（用于 `/send-notification` 邮件模板）
 
 ---
 
@@ -148,6 +148,7 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）存在�
 |----------------------|---------------------|---------|
 | `BidWinningNotification.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` ⚠️ |
 | `BidWinningNotification.handlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念） | `handler_id` |
+| `BidWinningNotification.handlerId` | `BidHandlerInfo.handlerId` | `handler_id` |
 | `BidWinningSupplierDetail.supplierName` | `BidWinningListItem.supplierName` | `supplier_name` |
 | `BidWinningSupplierDetail.amount` | `BidWinningListItem.bidWinningAmount` | `amount` ⚠️ |
 

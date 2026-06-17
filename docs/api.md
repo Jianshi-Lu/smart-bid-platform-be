@@ -13,15 +13,14 @@
 | Base URL（dev） | `http://192.168.76.177:8080`                                                                   |
 | Base URL（test） | `192.168.76.177:8080`                                                                     |
 | Base URL（prod） | N/A                                                                                       |
-| 请求体格式 | `application/json; charset=utf-8`（除 `/send-email` 使用 `application/x-www-form-urlencoded`） |
+| 请求体格式 | `application/json; charset=utf-8`（所有端点统一） |
 | 字符编码 | UTF-8                                                                                     |
 
 ### 0.1 接口速览
 
 | 模块       | 端点数    | 说明                                                         |
 |----------|--------|------------------------------------------------------------|
-| 服务运行状态测试 | 3      | `GET /hello`、`GET /access-url`、`POST /fetch-url`           |
-| 邮件发送     | 2      | `POST /send-email`（纯文本）、`POST /send-notification`（HTML 模板） |
+| 服务状态 + 邮件测试 | 3      | `GET /service-status`、`POST /send-email`（纯文本）、`POST /send-notification`（HTML 模板） |
 | 经办人      | 6      | `bid_handler_info` 表 CRUD + 批量删除                           |
 | 定标通知     | 6      | `bid_winning_notification` 表 CRUD + 批量删除                   |
 | 中标结果明细   | 6      | `bid_winning_supplier_detail` 表 CRUD + 批量删除                |
@@ -187,10 +186,9 @@ curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
 
 ## 2. 服务状态接口（测试用）
 
+### 2.1 `GET /service-status`
 
-### 2.1 `GET /hello`
-
-**简述**：返回固定字符串
+**简述**：Spring 服务存活探活，返回固定字符串
 
 **请求**：无
 
@@ -199,36 +197,8 @@ curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
 ```
 Content-Type: text/plain;charset=UTF-8
 
-Hello World!
+Service is up and running.
 ```
-
----
-
-### 2.2 `GET /access-url`
-
-**简述**：重定向到 `application.yml` 中 `custom.url` 配置的 URL
-
-**请求**：无
-
-**响应**：HTTP 302 重定向
-
----
-
-### 2.3 `POST /fetch-url`
-
-**简述**：触发 3 秒延迟任务 + 立即返回`application.yml` 中 `custom.url` 配置的 URL
-
-**请求**：无 body
-
-**响应**：
-
-```
-Content-Type: text/plain;charset=UTF-8
-
-https://baidu.com
-```
-
-调用 `HelloService.fetchAfterDelay()`，3 秒后在控制台打印"获取地址成功"。
 
 ---
 
@@ -238,26 +208,31 @@ https://baidu.com
 
 **简述**：发送纯文本邮件（同步）
 
-**请求体**：URL-encoded（form）
+**请求体**：JSON（raw）
 
-**请求参数**（form 表单）：
+**请求体**（`PlainTextMailRequest`）：
 
-| 参数 | 类型 | 必填 | 说明 |
+| 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `to` | String | 是 | 收件人邮箱 |
 | `subject` | String | 是 | 邮件主题 |
 | `content` | String | 是 | 邮件正文（纯文本） |
+| `from` | String | 否 | **实际无效**，发件人固定从配置 `spring.mail.username` 读取，本字段保留仅为兼容 |
 
-> **注意**：`from` 字段由后端从 `spring.mail.username` 配置中读取（默认`1649681371@qq.com`），请求中传入的 `from` 被忽略。
+**响应**：
 
-**响应**：void（HTTP 200，body 为空）
+```
+Content-Type: text/plain;charset=UTF-8
+
+Email sent successfully.
+```
 
 **示例**：
 
 ```bash
 curl -X POST http://192.168.76.177:8080/send-email \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "to=user@example.com&subject=测试&content=Hello"
+  -H "Content-Type: application/json" \
+  -d '{"to":"user@example.com","subject":"测试","content":"Hello"}'
 ```
 
 ---

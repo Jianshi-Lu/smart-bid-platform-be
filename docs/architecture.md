@@ -2,7 +2,7 @@
 
 > 本文档深入分析 bid-winning-backend 项目的内部架构，涵盖 Spring Boot 启动流程、实体类设计、Controller 层、Service 层和工具类的实现细节。
 >
-> **对外 API 契约**：前端联调请查阅 [`docs/api.md`](api.md)（22 端点完整文档，含请求/响应字段表与 curl 示例）。本文档聚焦于**内部实现**视角。
+> **对外 API 契约**：前端联调请查阅 [`docs/api.md`](api.md)（21 端点完整文档，含请求/响应字段表与 curl 示例）。本文档聚焦于**内部实现**视角。
 
 ---
 
@@ -109,17 +109,17 @@ public @interface SpringBootApplication {
 
 | 类 | 注解 |
 |----|------|
-| `HelloService` | `@Service` |
-| `PlainTextMailSender` | `@Service` |
-| `StaticResourceSearcher` | `@Service` |
-| `BidWinningMailSender` | `@Service` |
-| `BidWinningTemplateFiller` | `@Service` |
-| `MailLoggingService` | `@Service` |
+| `MailService` | `@Service` |
+| `TemplateFiller` | `@Service` |
+| `ResourceSearcher` | `@Service` |
 | `BidHandlerInfoService` | `@Service` |
-| `HelloController` | `@RestController`（含 `@Controller`） |
-| `PlainTextMailController` | `@RestController`（含 `@Controller`） |
-| `BidWinningMailController` | `@RestController`（含 `@Controller`） |
+| `BidWinningNotificationService` | `@Service` |
+| `BidWinningSupplierDetailService` | `@Service` |
+| `StatusCheckController` | `@RestController`（含 `@Controller`） |
 | `BidHandlerInfoController` | `@RestController`（含 `@Controller`） |
+| `BidWinningNotificationController` | `@RestController`（含 `@Controller`） |
+| `BidWinningSupplierDetailController` | `@RestController`（含 `@Controller`） |
+| `CrudResultEmailAspect` | `@Aspect`（AOP 切面，代理 Controller 调用） |
 | `BidWinningBackendApplication` | `@Configuration`（隐含） |
 
 `AsyncTaskManager` **没有**任何上述注解，它是一个纯静态工具类，不归 Spring 容器管理。
@@ -147,7 +147,7 @@ public @interface SpringBootApplication {
 
 **关键结果**：
 ```
-JavaMailSender mailSender  ← PlainTextMailSender / BidWinningMailSender 通过 @Autowired 注入
+JavaMailSender mailSender  ← MailService 通过 @Autowired 注入
 ```
 
 #### 1.5.2 `ThymeleafAutoConfiguration`
@@ -165,7 +165,7 @@ JavaMailSender mailSender  ← PlainTextMailSender / BidWinningMailSender 通过
 
 **关键结果**：
 ```
-SpringTemplateEngine templateEngine  ← BidWinningTemplateFiller 通过 @Autowired 注入
+SpringTemplateEngine templateEngine  ← TemplateFiller 通过 @Autowired 注入
 ```
 
 #### 1.5.3 `WebMvcAutoConfiguration`
@@ -183,7 +183,7 @@ SpringTemplateEngine templateEngine  ← BidWinningTemplateFiller 通过 @Autowi
 **关键结果**：
 ```
 DispatcherServlet  ← 所有 HTTP 请求的入口
-RequestMappingHandlerMapping  ← /hello → HelloController.hello() 的映射关系在此注册
+RequestMappingHandlerMapping  ← /service-status → StatusCheckController.serviceStatus() 的映射关系在此注册
 RequestMappingHandlerAdapter  ← 调用 Controller 方法的适配器
 ```
 
@@ -212,7 +212,7 @@ Spring Boot 将 `DispatcherServlet` 注册到 Tomcat 的 `Context` 中：
 ```
 DispatcherServlet  ←  url-mapping: /
                         ↓
-                接收所有 HTTP 请求（POST /send-email, GET /hello 等）
+                接收所有 HTTP 请求（POST /send-email, GET /service-status 等）
 ```
 
 #### 步骤 4：启动 NIO Endpoint
@@ -238,7 +238,7 @@ DispatcherServlet.doDispatch(HttpServletRequest, HttpServletResponse)
   ├─ 1. HandlerMapping.getHandler(request)
   │     ↓
   │     遍历所有 HandlerMapping 实现（默认 RequestMappingHandlerMapping）
-  │     根据 HTTP method + URL 匹配到对应的 HandlerMethod（HelloController.hello）
+  │     根据 HTTP method + URL 匹配到对应的 HandlerMethod（StatusCheckController.serviceStatus）
   │     返回 HandlerExecutionChain（包含 Handler + Interceptor列表）
   │
   ├─ 2. HandlerAdapter.supports(handler) → RequestMappingHandlerAdapter
@@ -246,7 +246,7 @@ DispatcherServlet.doDispatch(HttpServletRequest, HttpServletResponse)
   ├─ 3. HandlerAdapter.handle(request, response, handler)
   │     ↓
   │     → ArgumentResolvers：根据参数类型，从 request 中解析参数值
-  │        例如：BidWinningMailController.sendNotification(BidWinningMailRequest request)
+  │        例如：StatusCheckController.sendNotification(BidWinningMailRequest request)
   │        → Spring 通过 data binding 将 form-data 字段映射到 BidWinningMailRequest 对象
   │     → HandlerMethod.invoke()：调用 Controller 方法
   │     → ReturnValueHandlers：将方法返回值转换为响应（直接写入 body 或渲染视图）
@@ -278,7 +278,7 @@ public class BidWinningBackendApplication { ... }
 #### 本项目中的 @Async 使用
 
 ```text
-// HelloService.java
+// Service 层注解读取原理演示
 @Async
 public void fetchAfterDelay() {
     AsyncTaskManager.execute(() -> { ... }, 3000);
@@ -290,7 +290,7 @@ Spring AOP 代理在调用 `fetchAfterDelay()` 时：
 - 而是将任务提交到 `SimpleAsyncTaskExecutor`（`@EnableAsync` 默认使用的执行器）
 - 主线程立即返回，3 秒后在新线程中打印"获取地址成功"
 
-**注意**：`HelloService.fetchAfterDelay()` 内部又调用了 `AsyncTaskManager.execute()`，相当于在 `@Async` 新线程中再次创建新线程（双重异步，存在设计冗余）。
+**注意**：早期 `HelloService.fetchAfterDelay()` 内部调用了 `AsyncTaskManager.execute()` 形成双重异步。该服务已下线（`StatusCheckController` 仅保留 `serviceStatus` / `sendEmail` / `sendNotification` 三个测试端点），不再存在此问题。
 
 ---
 
@@ -312,15 +312,16 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 |------|---------|------|
 | 1 | `JavaMailSenderImpl` | 无（由 `MailSenderAutoConfiguration` 创建） |
 | 2 | `SpringTemplateEngine` | 无（由 `ThymeleafAutoConfiguration` 创建） |
-| 3 | `HelloService` | `@Value` 注入配置值 |
-| 4 | `PlainTextMailSender` | `JavaMailSender`、`@Value` |
-| 5 | `StaticResourceSearcher` | `ResourcePatternResolver` |
-| 6 | `BidWinningMailSender` | `JavaMailSender`、`@Value` |
-| 7 | `BidWinningTemplateFiller` | `SpringTemplateEngine` |
-| 8 | `MailLoggingService` | 无 |
-| 9 | `HelloController` | `HelloService` |
-| 10 | `PlainTextMailController` | `PlainTextMailSender` |
-| 11 | `BidWinningMailController` | `BidWinningTemplateFiller`、`BidWinningMailSender`、`MailLoggingService` |
+| 3 | `MailService` | `JavaMailSender`、`@Value` |
+| 4 | `ResourceSearcher` | `ResourcePatternResolver` |
+| 5 | `TemplateFiller` | `SpringTemplateEngine`、`ResourceSearcher` |
+| 6 | `BidHandlerInfoService` | `BidHandlerInfoMapper` |
+| 7 | `BidWinningNotificationService` | `BidWinningNotificationMapper` |
+| 8 | `BidWinningSupplierDetailService` | `BidWinningSupplierDetailMapper` |
+| 9 | `StatusCheckController` | `MailService`、`TemplateFiller` |
+| 10 | `BidHandlerInfoController` | `BidHandlerInfoService` |
+| 11 | `BidWinningNotificationController` | `BidWinningNotificationService` |
+| 12 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
 | 12 | `BidHandlerInfoMapper` | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
 | 13 | `BidHandlerInfoService` | `BidHandlerInfoMapper`（`@Resource` 注入） |
 | 14 | `BidHandlerInfoController` | `BidHandlerInfoService`（`@Resource` 注入） |
@@ -354,9 +355,9 @@ Bean 创建 → 检查字段/构造函数上的 @Autowired → 从容器中查�
 | `to` | String | 收件人邮箱地址 |
 | `from` | String | 发件人邮箱地址（**当前未实际使用**，发件人固定为配置中的 `spring.mail.username`） |
 | `subject` | String | 邮件主题 |
-| `content` | String | 邮件内容（纯文本，`PlainTextMailSender` 使用） |
+| `content` | String | 邮件内容（纯文本，`MailService.sendEmail` 使用） |
 
-**设计意图**：通用邮件数据传输对象，可同时作为请求对象、响应对象或跨层传递对象。本项目用于 `PlainTextMailSender.sendEmail()` 的参数载体。
+**设计意图**：通用邮件数据传输对象，可同时作为请求对象、响应对象或跨层传递对象。本项目用于 `MailService.sendEmail()` 的参数载体。
 
 ---
 
@@ -650,133 +651,83 @@ Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controlle
 
 ## 3. Controller 层
 
-### 3.1 `HelloController`
+### 3.1 `StatusCheckController`
 
-**文件**：`src/main/java/.../controller/mail/HelloController.java`
+**文件**：`src/main/java/.../controller/statuscheck/StatusCheckController.java`
 
 **类注解**：`@RestController = @Controller + @ResponseBody`
 
-**含义**：所有方法的返回值直接序列化写入 HTTP Response Body（不经过视图解析器渲染模板）。Spring 默认使用 **Jackson**（或 fastjson2，看配置）将返回值对象序列化为 JSON。
+**含义**：所有方法的返回值直接序列化写入 HTTP Response Body（不经过视图解析器渲染模板）。本 Controller 承担**服务状态探活 + 邮件测试**两类非业务功能。
 
 ---
 
-#### 3.1.1 `GET /hello`
+#### 3.1.1 `GET /service-status`
+
+**简述**：Spring 服务存活探活，返回固定字符串。
 
 ```text
-@GetMapping("/hello")
-public String hello() {
-    return helloService.hello();
+@GetMapping("/service-status")
+public String serviceStatus() {
+    return "Service is up and running.";
 }
 ```
 
 | 项目 | 内容 |
 |------|------|
 | HTTP 方法 | GET |
-| 完整 URL | `http://localhost:8079/hello` |
+| 完整 URL | `http://localhost:8080/service-status` |
 | 参数 | 无 |
-| 调用链路 | DispatcherServlet → HandlerMapping 匹配 → `hello()` → `helloService.hello()` |
-| 返回值 | 字符串 `"Hello World!"`，直接写入 response body |
+| 返回值 | 字符串 `"Service is up and running."` |
 
 ---
 
-#### 3.1.2 `GET /access-url`
+#### 3.1.2 `POST /send-email`
 
-```text
-@GetMapping("/access-url")
-public void accessUrl(HttpServletResponse response) throws IOException {
-    helloService.accessUrl(response);
-}
-```
-
-| 项目 | 内容 |
-|------|------|
-| HTTP 方法 | GET |
-| 完整 URL | `http://localhost:8079/access-url` |
-| 参数 | `HttpServletResponse`（由 Spring 自动注入，基于 `HandlerMethodArgumentResolver`） |
-| 调用链路 | `helloService.accessUrl(response)` → `response.sendRedirect(url)` |
-| 返回值 | void（重定向操作直接由 `HttpServletResponse` 完成） |
-
-**技术细节**：`HttpServletResponse` 是 Servlet API 接口，Spring MVC 的 `RequestMappingHandlerAdapter` 内置了对它的支持，自动将 request 级别的对象作为参数传入。
-
----
-
-#### 3.1.3 `POST /fetch-url`
-
-```text
-@PostMapping("/fetch-url")
-public String fetchUrl() {
-    helloService.fetchAfterDelay();   // @Async，触发后立即返回，不等待
-    return helloService.fetchUrl();    // 同步，立即返回配置中的 URL
-}
-```
-
-| 项目 | 内容 |
-|------|------|
-| HTTP 方法 | POST |
-| 完整 URL | `http://localhost:8079/fetch-url` |
-| 参数 | 无 |
-| 第一步调用 | `helloService.fetchAfterDelay()` → `@Async` 异步执行，**不等待**，立即返回 |
-| 第二步调用 | `helloService.fetchUrl()` → 返回 `custom.url` 配置值（`https://baidu.com`） |
-| 返回值 | 字符串 `"https://baidu.com"` |
-
-**关键点**：两次调用是**串行**执行的，但第一步是异步的（`fetchAfterDelay` 立即返回）。由于 `fetchAfterDelay` 只打印日志不返回数据，所以不影响最终返回值。
-
----
-
-### 3.2 `PlainTextMailController`
-
-**文件**：`src/main/java/.../controller/mail/PlainTextMailController.java`
-
-#### `POST /send-email`
+**简述**：发送纯文本邮件（同步）
 
 ```text
 @PostMapping("/send-email")
-public void sendEmail(PlainTextMailRequest request) {
-    plainTextMailSender.sendEmail(request);
+public String sendEmail(@RequestBody PlainTextMailRequest request) {
+    mailService.sendEmail(request);
+    return "Email sent successfully.";
 }
 ```
 
 | 项目 | 内容 |
 |------|------|
 | HTTP 方法 | POST |
-| 完整 URL | `http://localhost:8079/send-email` |
-| 请求参数 | `PlainTextMailRequest`（form-data: `to`/`subject`/`content`） |
-| 调用链路 | `PlainTextMailController.sendEmail(request)` → `PlainTextMailSender.sendEmail(request)` → `JavaMailSender.send(message)` |
-| 返回值 | void |
+| 完整 URL | `http://localhost:8080/send-email` |
+| 请求 Content-Type | `application/json` |
+| 请求体 | `PlainTextMailRequest`（JSON: `to` / `subject` / `content`） |
+| 调用链路 | `StatusCheckController.sendEmail(request)` → `MailService.sendEmail(request)` → `JavaMailSender.send(SimpleMailMessage)` |
+| 返回值 | 字符串 `"Email sent successfully."` |
 
 **Spring 参数绑定流程**：
 
 ```
-HTTP POST form-data
+HTTP POST JSON body
   ↓
-ServletRequestDataBinder（Spring MVC 内部）
+MappingJackson2HttpMessageConverter（Spring MVC 内部）
   ↓
-遍历 PlainTextMailRequest 所有字段，通过 setter 注入
+Jackson 反序列化为 PlainTextMailRequest 对象
   ↓
-例如：plainTextMailRequest.setTo(request.getParameter("to"))
-  ↓
-PlainTextMailRequest 对象完整构建后，传入 Controller 方法
+对象传入 Controller 方法
 ```
 
 ---
 
-### 3.3 `BidWinningMailController`
+#### 3.1.3 `POST /send-notification`
 
-**文件**：`src/main/java/.../controller/mail/BidWinningMailController.java`
-
-#### `POST /send-notification`
+**简述**：发送中标通知书 HTML 邮件（异步，延迟 5 秒）
 
 ```text
 @PostMapping("/send-notification")
 public String sendNotification(@RequestBody BidWinningMailRequest request) {
-    String htmlContent = bidWinningTemplateFiller.processTemplate(request);
+    String htmlContent = templateFiller.processTemplate(request);
 
     AsyncTaskManager.execute(() -> {
-        System.out.println(mailLoggingService.formatMailLog(
-            request.getTo(), request.getSubject(), htmlContent));
-
         try {
-            bidWinningMailSender.sendHtmlEmail(
+            mailService.sendHtmlEmail(
                 request.getTo(),
                 request.getSubject(),
                 htmlContent
@@ -792,21 +743,20 @@ public String sendNotification(@RequestBody BidWinningMailRequest request) {
 | 项目 | 内容 |
 |------|------|
 | HTTP 方法 | POST |
-| 完整 URL | `http://localhost:8079/send-notification` |
-| 请求 Content-Type | `application/json`（`@RequestBody` 注解要求） |
-| 请求参数 | `BidWinningMailRequest`（JSON body） |
+| 完整 URL | `http://localhost:8080/send-notification` |
+| 请求 Content-Type | `application/json` |
+| 请求体 | `BidWinningMailRequest`（JSON: `to` / `subject` / `projectCode` / `handlerName` / `bidWinningList` / `templateName`） |
 | 调用链路 | 见下方详细分解 |
 | 返回值 | 字符串 `"发送成功"`（**立即返回**，不等待邮件实际发送） |
 
-**完整调用链路（模板动态选择 + 异步延迟发送）**：
+**完整调用链路**（模板动态选择 + 异步延迟发送）：
 
 ```
 Step 1. 接收 BidWinningMailRequest（JSON → @RequestBody 自动反序列化）
-        - to / subject / projectCode / handlerName / bidWinningList / templateName
 
-Step 2. bidWinningTemplateFiller.processTemplate(request)
+Step 2. templateFiller.processTemplate(request)
         ├─ 读取 request.getTemplateName() → 例如 "bid-winning-notification2"
-        ├─ staticResourceSearcher.validateTemplateExists(templateName)
+        ├─ resourceSearcher.validateTemplateExists(templateName)
         │   ├─ 扫描 classpath:/templates/*.html
         │   ├─ 精确匹配 "bid-winning-notification2"
         │   └─ 找不到则抛出 IllegalArgumentException，不 fallback
@@ -815,21 +765,15 @@ Step 2. bidWinningTemplateFiller.processTemplate(request)
         ├─ context.setVariable("handlerName", request.getHandlerName())
         ├─ context.setVariable("bidWinningList", request.getBidWinningList())
         └─ templateEngine.process(templateName, context)
-            ├─ TemplateResolver 拼接完整路径：
-            │   classpath:/templates/ + "bid-winning-notification2" + ".html"
-            │   = classpath:/templates/bid-winning-notification2.html
+            ├─ TemplateResolver 拼接完整路径
             ├─ 读取 HTML 文件内容
-            ├─ 扫描 HTML 中的 th:text="${projectCode}" 等 Thymeleaf 表达式
-            ├─ th:each 循环渲染 bidWinningList 每行数据
-            ├─ 用 Context 中的变量值替换表达式，生成最终 HTML 字符串
+            ├─ 扫描 th:text / th:each 表达式
             └─ 返回渲染后的 HTML 字符串
 
 Step 3. 立即返回 "发送成功"（主线程不受异步任务影响）
 
-Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟5秒后执行）：
-        ├─ mailLoggingService.formatMailLog(to, subject, htmlContent)
-        │   → 拼接 MD 格式日志字符串，System.out.println 打印到控制台
-        └─ bidWinningMailSender.sendHtmlEmail(to, subject, htmlContent)
+Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟 5 秒后执行）：
+        └─ mailService.sendHtmlEmail(to, subject, htmlContent)
             ├─ mailSender.createMimeMessage() 创建 MimeMessage
             ├─ new MimeMessageHelper(mimeMessage, true, "UTF-8")
             ├─ helper.setFrom(senderEmail)
@@ -837,37 +781,17 @@ Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟5秒后执行
             ├─ helper.setSubject(subject)
             ├─ helper.setText(htmlContent, true)  ← HTML 格式
             └─ mailSender.send(mimeMessage)
-        └─ finally: System.out.println("邮件发送任务完成: to=...")（兜底日志，无论成功失败）
-```
-
-**Postman 请求示例（选择模板 v2）**：
-
-```json
-POST http://localhost:8079/send-notification
-Content-Type: application/json
-
-{
-    "to": "xxx@outlook.com",
-    "subject": "中标通知书",
-    "projectCode": "WB20260325017",
-    "handlerName": "刘曼曼",
-    "bidWinningList": [
-        { "supplierName": "xxxxxx分公司 合作供应商", "bidWinningAmount": "67,500.00 RMB" },
-        { "supplierName": "xxxxx分公司 合作供应商", "bidWinningAmount": "83,000.00 RMB" }
-    ],
-    "templateName": "bid-winning-notification2"
-}
 ```
 
 **模板搜索行为**：
-- 搜索范围：`classpath:/templates/*.html`（PathMatchingResourcePatternResolver 扫描）
+- 搜索范围：`classpath:/templates/*.html`（`ResourcePatternResolver` 扫描）
 - 匹配方式：**精确匹配**（传入 `"bid-winning-notification2"` 匹配文件名 `"bid-winning-notification2.html"`）
 - 行为安全：**不存在则抛异常**，`IllegalArgumentException: 模板不存在: bid-winning-notification2`，不 fallback 到默认模板
 
 **HTML vs 纯文本邮件的区别**：
 
-| 对比项 | `PlainTextMailSender.sendEmail()`（纯文本） | `BidWinningMailSender.sendHtmlEmail()`（HTML） |
-|--------|---------------------------------------------|------------------------------------------------|
+| 对比项 | `MailService.sendEmail()`（纯文本） | `MailService.sendHtmlEmail()`（HTML） |
+|--------|-------------------------------------|---------------------------------------|
 | Spring Mail 类 | `SimpleMailMessage` | `MimeMessage` + `MimeMessageHelper` |
 | 内容类型 | `text/plain` | `text/html`（第二个参数 `true`） |
 | 模板支持 | 无 | Thymeleaf 渲染后填入 |
@@ -1341,36 +1265,22 @@ JSON Response
 
 ## 4. Service 层
 
-### 4.1 `HelloService`
+> 业务 Service（`BidHandlerInfoService` / `BidWinningNotificationService` / `BidWinningSupplierDetailService`）详见 [`docs/business-controllers.md`](business-controllers.md)。本节聚焦于邮件相关 Service。
 
-**文件**：`src/main/java/.../service/mail/HelloService.java`
+### 4.1 `MailService`
 
-| 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `hello()` | 无 | `"Hello World!"`（String） | 无 | 最简单的业务逻辑演示 |
-| `accessUrl(HttpServletResponse response)` | `HttpServletResponse` | void（通过 response 重定向） | Servlet API（`HttpServletResponse`） | 演示 Service 与 Servlet API 的耦合（不推荐，Service 应返回数据） |
-| `fetchAfterDelay()` | 无 | void（异步执行） | `AsyncTaskManager` | `@Async` 注解 + `AsyncTaskManager.execute()` 双重异步 |
-| `fetchUrl()` | 无 | `custom.url` 配置值（String） | `@Value` 注入配置 | 返回配置值 |
+**文件**：`src/main/java/.../service/mail/MailService.java`
 
-**注入的配置**：
-```text
-@Value("${server.port}")    private int port;       // 8079
-@Value("${custom.url}")    private String url;      // https://baidu.com
-```
-
-**`@Value` 注入原理**：`AutowiredAnnotationBeanPostProcessor`（实现了 `InstantiationAwareBeanPostProcessor` 接口）在 Bean 初始化后，扫描所有带有 `@Value` 的字段，从 Spring `Environment` 中读取对应的 `application.properties` 配置值，通过反射（`Field.setAccessible(true); field.set(this, value)`）注入。
-
----
-
-### 4.2 `PlainTextMailSender`
-
-**文件**：`src/main/java/.../service/mail/PlainTextMailSender.java`
+> **类名说明**：本类名原计划为 `MailSender`，但因 Spring Boot `MailSenderPropertiesConfiguration` 自动注册的 `JavaMailSender` Bean 名为 `mailSender`（类型 `JavaMailSender`），同名会触发 `BeanDefinitionOverrideException`，故改名为 `MailService`。
+>
+> 类内部仍注入 `private JavaMailSender mailSender`（Spring Boot 自动配置的 SMTP 客户端）。
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `sendEmail(PlainTextMailRequest request)` | `PlainTextMailRequest`（包含 to/subject/content） | void（发送纯文本邮件） | `JavaMailSender`、`SimpleMailMessage`、`senderEmail`（配置值） | 纯文本邮件发送，强制使用配置中的发件人 |
+|------|------|------|------------|----------|
+| `sendEmail(PlainTextMailRequest request)` | `PlainTextMailRequest`（to/subject/content） | void（发送纯文本邮件） | `JavaMailSender`、`SimpleMailMessage`、`senderEmail`（配置值） | 纯文本邮件发送，强制使用配置中的发件人 |
+| `sendHtmlEmail(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | void（发送 HTML 邮件） | `JavaMailSender`、`MimeMessage`、`MimeMessageHelper`、`senderEmail` | HTML 邮件发送，使用 MimeMessageHelper 简化构造，强制使用配置发件人 |
 
-**`sendEmail()` 内部流程**：
+**`sendEmail()` 内部流程**（纯文本，`SimpleMailMessage`）：
 
 ```text
 public void sendEmail(PlainTextMailRequest request) {
@@ -1383,6 +1293,20 @@ public void sendEmail(PlainTextMailRequest request) {
 }
 ```
 
+**`sendHtmlEmail()` 内部流程**（HTML，`MimeMessage` + `MimeMessageHelper`）：
+
+```text
+public void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
+    MimeMessage mimeMessage = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+    helper.setFrom(senderEmail);
+    helper.setTo(to);
+    helper.setSubject(subject);
+    helper.setText(htmlContent, true);  // 第二个参数 true = HTML 格式
+    mailSender.send(mimeMessage);
+}
+```
+
 **关键设计决策**：发件人固定使用 `senderEmail`（即 `spring.mail.username`），而非 `request.getFrom()`。原因：
 1. 安全：防止发件人地址被伪造（与 SMTP 服务器授权用户不符会报错）
 2. 统一：所有发出的邮件都从一个发件地址发出
@@ -1392,9 +1316,7 @@ public void sendEmail(PlainTextMailRequest request) {
 ```
 mailSender.send(message)
   ↓
-JavaMailSenderImpl.send(SimpleMailMessage)
-  ↓
-JavaMailSenderImpl.createMimeMessage()  ← 实际上 SimpleMailMessage 内部也创建 MimeMessage
+JavaMailSenderImpl.send(SimpleMailMessage | MimeMessage)
   ↓
 Session.getInstance(props, auth)         ← 使用配置的 SMTP 属性（host/port/username/password）
   ↓
@@ -1404,24 +1326,41 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
      ↓
      AUTH LOGIN                          ← 使用 username/password 认证
      ↓
-     MAIL FROM: <1649681371@qq.com>      ← 必须与认证用户一致
+     MAIL FROM: <senderEmail>            ← 必须与认证用户一致
      ↓
-     RCPT TO: <request.getTo()>          ← 收件人地址
+     RCPT TO: <to>                       ← 收件人地址
      ↓
      DATA                                ← 邮件内容
      ↓
      QUIT
 ```
 
+**为什么需要 `MimeMessage` + `MimeMessageHelper` 而不是 `SimpleMailMessage`？**
+
+| 对比项 | `SimpleMailMessage` | `MimeMessage` + `MimeMessageHelper` |
+|--------|---------------------|-------------------------------------|
+| 内容类型 | 纯文本 | 可文本可HTML（`setText(text, true)`） |
+| 附件支持 | 无 | 支持（multipart） |
+| 内联图片 | 无 | 支持 |
+| 多语言/编码 | 弱 | 强（可设置 charset） |
+| 使用场景 | 简单邮件 | 正式 HTML 邮件（中标通知书含表格样式） |
+
+**调用方**：
+- `StatusCheckController.sendEmail()` → `MailService.sendEmail(request)`
+- `StatusCheckController.sendNotification()` → `MailService.sendHtmlEmail(to, subject, htmlContent)`（异步子线程）
+- `CrudResultEmailAspect`（AOP 切面） → `MailService.sendHtmlEmail(to, subject, htmlContent)`（异步子线程）
+
+**`@Value` 注入原理**：`AutowiredAnnotationBeanPostProcessor`（实现了 `InstantiationAwareBeanPostProcessor` 接口）在 Bean 初始化后，扫描所有带有 `@Value` 的字段，从 Spring `Environment` 中读取对应的 `application.properties` 配置值，通过反射（`Field.setAccessible(true); field.set(this, value)`）注入。
+
 ---
 
-### 4.3 `StaticResourceSearcher`
+### 4.2 `ResourceSearcher`
 
-**文件**：`src/main/java/.../service/mail/StaticResourceSearcher.java`
+**文件**：`src/main/java/.../service/mail/ResourceSearcher.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `validateTemplateExists(String templateName)` | templateName（模板文件名，不含 .html 后缀） | void（验证通过则正常返回，失败则抛 `IllegalArgumentException`） | `ResourcePatternResolver`（Spring Core） | 精确搜索 `classpath:/templates/` 目录验证模板文件是否存在，为 `BidWinningTemplateFiller` 提供模板存在性校验，不存在则抛异常（不 fallback） |
+|------|------|------|------------|----------|
+| `validateTemplateExists(String templateName)` | templateName（模板文件名，不含 .html 后缀） | void（验证通过则正常返回，失败则抛 `IllegalArgumentException`） | `ResourcePatternResolver`（Spring Core） | 精确搜索 `classpath:/templates/` 目录验证模板文件是否存在，为 `TemplateFiller` 提供模板存在性校验，不存在则抛异常（不 fallback） |
 
 **`validateTemplateExists()` 内部流程**：
 
@@ -1431,20 +1370,14 @@ public void validateTemplateExists(String templateName) {
         // 1. 扫描 classpath:/templates/*.html 下的所有模板文件
         Resource[] resources = resourcePatternResolver.getResources("classpath:/templates/*.html");
         //   ↓
-        //   PathMatchingResourcePatternResolver.getResources("classpath:/templates/*.html")
+        //   PathMatchingResourcePatternResolver.getResources(...)
         //     ↓
         //     ClassLoader.getResources("templates/")  ← 遍历 classpath 下所有 templates 目录
-        //     ↓
-        //     对每个 .html 文件创建 ClassPathResource 对象
-        //     ↓
-        //     返回 Resource[] 数组
 
         // 2. 精确匹配
         boolean exists = Arrays.stream(resources)
                 .map(this::extractTemplateName)              // 提取文件名（去 .html 后缀）
                 .anyMatch(name -> name != null && name.equals(templateName));
-                // 精确匹配：传入 "bid-winning-notification2"
-                // → 只匹配文件名完全等于 "bid-winning-notification2" 的文件
 
         // 3. 找不到则抛异常，不 fallback
         if (!exists) {
@@ -1464,12 +1397,9 @@ public void validateTemplateExists(String templateName) {
 private String extractTemplateName(Resource resource) {
     try {
         String path = resource.getURL().getPath();
-        // resource.getURL() 返回 java.net.URL
-        // .getPath() 返回完整系统路径，如 /Users/.../target/classes/templates/bid-winning-notification2.html
         int idx = path.lastIndexOf("/templates/");
         if (idx < 0) return null;
         return path.substring(idx + "/templates/".length()).replace(".html", "");
-        // /templates/bid-winning-notification2.html → "bid-winning-notification2"
     } catch (IOException e) {
         return null;
     }
@@ -1479,63 +1409,17 @@ private String extractTemplateName(Resource resource) {
 **设计意图**：
 - 使用 `ResourcePatternResolver` 而不是直接读取文件系统，确保在打包成 JAR 后仍能正确扫描
 - **精确匹配**：不支持通配符或模糊匹配，必须文件名完全一致
-- **行为安全**：模板不存在时直接抛 `IllegalArgumentException`，不 fallback 到默认模板，保证用户传入的模板码始终受控
+- **行为安全**：模板不存在时直接抛 `IllegalArgumentException`，不 fallback 到默认模板
 
 ---
 
-### 4.4 `BidWinningMailSender`
+### 4.3 `TemplateFiller`
 
-**文件**：`src/main/java/.../service/mail/BidWinningMailSender.java`
-
-| 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `sendHtmlEmail(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | void（发送 HTML 邮件） | `JavaMailSender`、`MimeMessage`、`MimeMessageHelper`、`senderEmail`（配置值） | 支持 HTML 格式的邮件发送，使用 MimeMessageHelper 简化构造，强制使用配置发件人 |
-
-**`sendHtmlEmail()` 内部流程**：
-
-```text
-public void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
-    MimeMessage mimeMessage = mailSender.createMimeMessage();
-    // 1. mailSender（JavaMailSenderImpl）通过 Session 创建 MimeMessage
-    //    MimeMessage 是 jakarta.mail 中表示 MIME 邮件消息的类
-
-    MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-    // 2. MimeMessageHelper 是 Spring 封装的 MIME 邮件构建工具
-    //    参数1：mimeMessage → 关联的 MIME 消息对象
-    //    参数2：true → 启用 multipart（多部分），支持附件
-    //    参数3："UTF-8" → 字符编码
-
-    helper.setFrom(senderEmail);                    // 3. 发件人（强制配置值）
-    helper.setTo(to);                               // 4. 收件人
-    helper.setSubject(subject);                     // 5. 主题
-    helper.setText(htmlContent, true);              // 6. 第二个参数 true = HTML 格式
-    //    helper.setText(text, false) = 纯文本
-    //    helper.setText(text, true)  = HTML（Content-Type: text/html）
-
-    mailSender.send(mimeMessage);                   // 7. 发送 MIME 邮件
-    //    JavaMailSenderImpl.send(MimeMessage) → Transport.send()
-}
-```
-
-**为什么需要 `MimeMessage` + `MimeMessageHelper` 而不是 `SimpleMailMessage`？**
-
-| 对比项 | `SimpleMailMessage` | `MimeMessage` + `MimeMessageHelper` |
-|--------|---------------------|-------------------------------------|
-| 内容类型 | 纯文本 | 可文本可HTML（`setText(text, true)`） |
-| 附件支持 | 无 | 支持（multipart） |
-| 内联图片 | 无 | 支持 |
-| 多语言/编码 | 弱 | 强（可设置 charset） |
-| 使用场景 | 简单邮件 | 正式 HTML 邮件（中标通知书含表格样式） |
-
----
-
-### 4.5 `BidWinningTemplateFiller`
-
-**文件**：`src/main/java/.../service/mail/BidWinningTemplateFiller.java`
+**文件**：`src/main/java/.../service/mail/TemplateFiller.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `processTemplate(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 projectCode + handlerName + bidWinningList + **templateName**） | 渲染后的 HTML 字符串（String） | `SpringTemplateEngine`、`Context`、`StaticResourceSearcher` | 将 Thymeleaf 模板与动态数据结合，根据 `request.templateName` 动态选择模板文件，模板不存在则抛异常（不 fallback） |
+|------|------|------|------------|----------|
+| `processTemplate(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 projectCode + handlerName + bidWinningList + **templateName**） | 渲染后的 HTML 字符串（String） | `SpringTemplateEngine`、`Context`、`ResourceSearcher` | 将 Thymeleaf 模板与动态数据结合，根据 `request.templateName` 动态选择模板文件，模板不存在则抛异常（不 fallback） |
 
 **`processTemplate()` 内部流程**：
 
@@ -1545,29 +1429,20 @@ public String processTemplate(BidWinningMailRequest request) {
     String templateName = request.getTemplateName();  // 例如 "bid-winning-notification2"
 
     // Step 2: 验证模板是否存在（精确匹配 classpath:/templates/*.html）
-    staticResourceSearcher.validateTemplateExists(templateName);
+    resourceSearcher.validateTemplateExists(templateName);
     //    验证通过 → 继续
     //    验证失败 → 抛出 IllegalArgumentException，不 fallback
 
     // Step 3: 创建 Thymeleaf 上下文（数据容器）
     Context context = new Context();
-    //    Context(org.thymeleaf.context) 内部维护一个 Map<String, Object>
-    //    模板引擎渲染时，通过 ${变量名} 从这个 Map 中取值
 
     // Step 4: 放入模板变量
     context.setVariable("projectCode", request.getProjectCode());
     context.setVariable("handlerName", request.getHandlerName());
     context.setVariable("bidWinningList", request.getBidWinningList());
-    //    模板中 ${projectCode} → 从 Map 取到 request.getProjectCode()
-    //    模板中 th:each="item : ${bidWinningList}" → 循环渲染每行中标数据
 
     // Step 5: 渲染模板
     return templateEngine.process(templateName, context);
-    //    process(模板名, Context) 是 SpringTemplateEngine 的核心渲染方法
-    //    模板名直接使用用户传入的 templateName（不含 .html），由 TemplateResolver 拼接完整路径：
-    //    "bid-winning-notification2" → classpath:/templates/bid-winning-notification2.html
-    //    ↓
-    //    读取 HTML 文本 → 解析 Thymeleaf 表达式 → 替换变量 → th:each 循环渲染 → 返回最终 HTML 字符串
 }
 ```
 
@@ -1576,7 +1451,7 @@ public String processTemplate(BidWinningMailRequest request) {
 ```
 用户传入 templateName: "bid-winning-notification2"
         ↓
-StaticResourceSearcher.validateTemplateExists("bid-winning-notification2")
+ResourceSearcher.validateTemplateExists("bid-winning-notification2")
         ↓
 扫描 classpath:/templates/*.html → 精确匹配文件名
         ↓
@@ -1613,30 +1488,7 @@ OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
 
 ---
 
-### 4.6 `MailLoggingService`
-
-**文件**：`src/main/java/.../service/mail/MailLoggingService.java`
-
-| 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
-|------|------|------|-------------|----------|
-| `formatMailLog(String to, String subject, String htmlContent)` | to（收件人）、subject（主题）、htmlContent（HTML内容） | MD 格式字符串（String） | `io.github.furstenheim:copy_down` | 将邮件字段拼接为 Markdown 格式（HTML 经 copy_down 转换后），供异步任务打印到控制台，便于后续扩展（文件/数据库等） |
-
-**`formatMailLog()` 输出格式**（copy_down 将 HTML 表格转换为 Markdown 表格）：
-
-```markdown
-## 邮件发送日志
-**收件人:** xxx@outlook.com
-**主题:** 中标通知书
-| 供应商名称 | 中标价 |
-|---|---|
-| xxx公司 | 67,500.00 RMB |
-```
-
-**用途**：`BidWinningMailController` 在异步任务中调用 `System.out.println()` 打印到控制台。设计为独立方法，方便后续扩展日志输出目标（文件、数据库、消息队列等）。
-
----
-
-### 4.7 MyBatis-Plus 持久化层（Mapper + XML）
+### 4.4 MyBatis-Plus 持久化层（Mapper + XML）
 
 > 详细端到端开发流程（从 DB 到 Controller）见 [`docs/development-flow.md`](development-flow.md)。本节重点说明 Mapper 与 XML 的设计。
 
@@ -1916,7 +1768,7 @@ export SPRING_PROFILES_ACTIVE=prod
 | `spring-boot-starter-thymeleaf` | 由 parent 管理 | spring-boot-starter-thymeleaf + thymeleaf-spring6 | 模板引擎 |
 | `fastjson2` | 2.0.52 | 阿里 JSON 序列化库 | JSON 处理（额外引入，本项目未直接使用） |
 | `lombok` | 由 parent 管理 | 无（编译时注解处理） | 自动生成 getter/setter |
-| `copy_down` | 1.1 | io.github.furstenheim:copy_down | HTML → Markdown 转换（MailLoggingService 使用） |
+| `copy_down` | 1.1 | io.github.furstenheim:copy_down | HTML → Markdown 转换（**已下线**，早期 `MailLoggingService` 使用） |
 
 **依赖传递链**：
 
@@ -2105,7 +1957,7 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 │         ├─ 5.1 模板存在性校验                                │
 │         ├─ 5.2 构造 Thymeleaf Context                         │
 │         ├─ 5.3 SpringTemplateEngine.process() 渲染 HTML        │
-│         ├─ 5.4 BidWinningMailSender.sendHtmlEmail() SMTP 发送 │
+│         ├─ 5.4 MailService.sendHtmlEmail() SMTP 发送 │
 │         ├─ try-catch 兜底（失败仅日志告警）                    │
 │         └─ 子线程生命周期结束                                │
 │                                                              │
@@ -2152,10 +2004,10 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 
 异步任务内部独立 try-catch 兜底：
 
-1. `StaticResourceSearcher.validateTemplateExists()` 模板存在性校验
+1. `ResourceSearcher.validateTemplateExists()` 模板存在性校验
 2. 构造 Thymeleaf Context 注入变量（subject/endpoint/operation/timestamp/result*）
 3. `SpringTemplateEngine.process(templateName, context)` 渲染 HTML
-4. `BidWinningMailSender.sendHtmlEmail(to, subject, html)` SMTP 发送
+4. `MailService.sendHtmlEmail(to, subject, html)` SMTP 发送
 
 ### 7.7 技术栈协同
 
@@ -2166,7 +2018,7 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 | **fastjson2** | 实体转 JSON 字符串（`JSON.toJSONString`）|
 | **Thymeleaf** | 模板引擎渲染 HTML（`SpringTemplateEngine`）|
 | **AsyncTaskManager** | 异步线程池（`AsyncTaskManager.execute`）|
-| **JavaMailSender** | SMTP 协议发邮件（`BidWinningMailSender`）|
+| **JavaMailSender** | SMTP 协议发邮件（`MailService`）|
 
 ### 7.8 关键设计规范（防坑指南）
 
