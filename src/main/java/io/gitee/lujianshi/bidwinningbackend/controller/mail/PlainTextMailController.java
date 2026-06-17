@@ -4,6 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.mail.PlainTextMailRequest;
 import io.gitee.lujianshi.bidwinningbackend.service.mail.PlainTextMailSender;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -25,7 +26,7 @@ public class PlainTextMailController {
      * @param request 邮件请求对象（to/from/subject/content）
      */
     @PostMapping("/send-email")
-    public void sendEmail(PlainTextMailRequest request) {
+    public void sendEmail(@RequestBody PlainTextMailRequest request) {
         plainTextMailSender.sendEmail(request);
     }
 }
