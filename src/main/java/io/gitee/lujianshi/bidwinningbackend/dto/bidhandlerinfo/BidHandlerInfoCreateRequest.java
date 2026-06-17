@@ -75,4 +75,12 @@ public class BidHandlerInfoCreateRequest {
     @NotBlank(message = "所属部门不能为空")
     @Size(max = 100, message = "部门名称长度不能超过100")
     private String departmentName;
+
+    /**
+     * 通知邮件收件人（业务字段，不落库）
+     *
+     * <p>前端调用时可传入指定收件人邮箱，由 {@code BidHandlerInfoService.sendOperationEmail}
+     * 在创建成功后异步发送 HTML 通知邮件；为 null/空时跳过邮件发送。</p>
+     */
+    private String targetEmail;
 }

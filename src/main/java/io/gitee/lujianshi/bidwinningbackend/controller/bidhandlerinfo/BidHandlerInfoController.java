@@ -37,18 +37,21 @@ public class BidHandlerInfoController {
      *   <tr><td>{@code handlerName}</td><td>String</td><td>是</td><td>经办人姓名</td></tr>
      *   <tr><td>{@code companyName}</td><td>String</td><td>是</td><td>所属采购公司</td></tr>
      *   <tr><td>{@code departmentName}</td><td>String</td><td>是</td><td>所属部门</td></tr>
+     *   <tr><td>{@code targetEmail}</td><td>String</td><td>否</td><td>通知邮件收件人（<b>不落库</b>）；null/空=不发邮件</td></tr>
      * </table>
      *
      * <h3>请求示例</h3>
      * <pre>
      * curl -X POST http://localhost:8080/create-bid-handler-info \
      *   -H "Content-Type: application/json" \
-     *   -d '{"handlerName":"张三","companyName":"测试采购公司","departmentName":"采购部"}'
+     *   -d '{"handlerName":"张三","companyName":"测试采购公司","departmentName":"采购部","targetEmail":"alice@example.com"}'
      * </pre>
+     *
+     * 创建成功后由 {@link BidHandlerInfoService# sendOperationEmail} 显式发送 HTML 通知邮件，
+     * 收件人由 {@code targetEmail} 控制（试点方案，仅本端点）。</p>
      *
      * @param request 创建请求 DTO（{@link BidHandlerInfoCreateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-handler-info")
     public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
@@ -56,6 +59,7 @@ public class BidHandlerInfoController {
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
         service.create(entity);
+        service.sendOperationEmail(entity, request.getTargetEmail());
         return Result.success(entity, "创建成功");
     }
 
