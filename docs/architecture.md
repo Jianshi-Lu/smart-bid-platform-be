@@ -315,16 +315,17 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 3 | `MailService` | `JavaMailSender`、`@Value` |
 | 4 | `ResourceSearcher` | `ResourcePatternResolver` |
 | 5 | `TemplateFiller` | `SpringTemplateEngine`、`ResourceSearcher` |
-| 6 | `BidHandlerInfoService` | `BidHandlerInfoMapper` |
-| 7 | `BidWinningNotificationService` | `BidWinningNotificationMapper` |
-| 8 | `BidWinningSupplierDetailService` | `BidWinningSupplierDetailMapper` |
-| 9 | `StatusCheckController` | `MailService`、`TemplateFiller` |
-| 10 | `BidHandlerInfoController` | `BidHandlerInfoService` |
-| 11 | `BidWinningNotificationController` | `BidWinningNotificationService` |
-| 12 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
-| 12 | `BidHandlerInfoMapper` | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
-| 13 | `BidHandlerInfoService` | `BidHandlerInfoMapper`（`@Resource` 注入） |
-| 14 | `BidHandlerInfoController` | `BidHandlerInfoService`（`@Resource` 注入） |
+| 6 | `BaseMapper<T>` | 无（泛型基接口，由具体 Mapper 继承） |
+| 7 | `BidHandlerInfoMapper`（extends `BaseMapper<BidHandlerInfo>`） | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
+| 8 | `BidWinningNotificationMapper`（extends `BaseMapper<BidWinningNotification>`） | 同上 |
+| 9 | `BidWinningSupplierDetailMapper`（extends `BaseMapper<BidWinningSupplierDetail>`） | 同上 |
+| 10 | `BidHandlerInfoService`（extends `BaseService<BidHandlerInfo>`） | `BidHandlerInfoMapper` |
+| 11 | `BidWinningNotificationService`（extends `BaseService<BidWinningNotification>`） | `BidWinningNotificationMapper` |
+| 12 | `BidWinningSupplierDetailService`（extends `BaseService<BidWinningSupplierDetail>`） | `BidWinningSupplierDetailMapper` |
+| 13 | `StatusCheckController` | `MailService`、`TemplateFiller` |
+| 14 | `BidHandlerInfoController` | `BidHandlerInfoService` |
+| 15 | `BidWinningNotificationController` | `BidWinningNotificationService` |
+| 16 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
 
 `@Autowired` 注入发生在 Bean 创建时，Spring 通过 **AutowiredAnnotationBeanPostProcessor**（一个 `InstantiationAwareBeanPostProcessorAdapter`）实现：
 
@@ -622,7 +623,7 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 - data 返回的 X 行**仍然有效**（X 的数据是我们 SELECT 时拿到的）
 - 不会出现"data 返 5 行但实际删 4 行"这种不一致
 
-**不复用 DTO 的理由**：
+**不复用 DTO 的理由**（与通用 `BaseMapper` / `BaseService` 策略不同：DTO 层仍坚持每端点独立，因为 DTO 面向 API 契约，Mapper/Service 面向内部实现）：
 
 | 风险 | 说明 |
 |------|------|
@@ -1265,7 +1266,29 @@ JSON Response
 
 ## 4. Service 层
 
-> 业务 Service（`BidHandlerInfoService` / `BidWinningNotificationService` / `BidWinningSupplierDetailService`）详见 [`docs/business-controllers.md`](business-controllers.md)。本节聚焦于邮件相关 Service。
+> 业务 Service（`BidHandlerInfoService` / `BidWinningNotificationService` / `BidWinningSupplierDetailService`）统一继承 `BaseService<T>`，详见 [`docs/business-controllers.md`](business-controllers.md)。本节聚焦于邮件相关 Service。
+
+### 4.0 `BaseService<T>` 通用 Service 基类
+
+**文件**：`src/main/java/.../service/BaseService.java`
+
+**设计目标**：消除 3 个业务 Service 的重复 CRUD 代码。封装 7 个标准方法，写方法统一加 `@Transactional(rollbackFor = Exception.class)`。
+
+**继承链路**：
+```
+BaseService<T>
+  ↑ extends
+BidHandlerInfoService           — 经办人业务
+BidWinningNotificationService   — 定标通知业务（重写 create 设 createdAt）
+BidWinningSupplierDetailService — 中标明细业务
+```
+
+**调用链路**：
+```
+Controller → Service（BaseService 方法）→ Mapper（BaseMapper<T>）→ Mapper XML → MySQL
+```
+
+**子类职责**：只需实现 `getMapper()` 和 `getIdExtractor()` 两个抽象方法，标准 CRUD 全部继承。
 
 ### 4.1 `MailService`
 

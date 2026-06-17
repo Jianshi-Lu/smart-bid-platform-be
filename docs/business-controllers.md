@@ -29,12 +29,12 @@
 自下而上：
 
 | 层 | 实体 | 说明 |
-|---|---|---|
+|---|---|---|---|
 | ① | DB 表 | MySQL `bid_handler_info` / `bid_winning_notification` / `bid_winning_supplier_detail` |
 | ② | Entity | `@TableName` + `@TableId(type = AUTO)`，字段驼峰 ↔ DB 下划线 |
-| ③ | Mapper 接口 | 手写接口方法签名（**不**继承 `BaseMapper<T>`） |
+| ③ | Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口，7 标准方法） |
 | ④ | Mapper XML | namespace = 接口 FQN，SQL 独立维护 |
-| ⑤ | Service | `@Resource` 注入 Mapper；写方法 `@Transactional(rollbackFor = Exception.class)` |
+| ⑤ | Service | 继承 `BaseService<T>`（项目自建泛型基类，`@Transactional` 写方法）；子类实现 `getMapper()` + `getIdExtractor()` |
 | ⑥ | DTO | `<Entity>CreateRequest`（含 `@NotBlank`/`@NotNull`/`@Size` 校验）<br>`<Entity>UpdateRequest`（仅 `@Size`，PATCH 语义）<br>`<Entity>BatchDeleteRequest`（每端点独立 DTO，含 `@NotEmpty` + `@Size(max=500)`） |
 | ⑦ | Controller | 本目录 3 个类 |
 

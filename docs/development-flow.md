@@ -77,7 +77,7 @@ public class BidHandlerInfo {
 **职责**：**只定义方法签名，无实现**。SQL 实现在 XML。
 
 **关键约定**（坚持 Java 与 SQL 分离）：
-- **不继承** `BaseMapper<T>`（不用 Plus 自动 CRUD）
+- **继承** `BaseMapper<T>`（项目自建泛型基接口，定义 7 个标准 CRUD 方法：insert / updateById / deleteById / selectById / selectAll / deleteByIds / selectByIds）
 - **写** `@Mapper` 注解（显式标注，与启动类 `@MapperScan` 双重保险）
 - 启动类 `@MapperScan("io.gitee.lujianshi.bidwinningbackend.mapper")` 统一扫描注册
 - import 只保留业务需要的类
@@ -85,12 +85,8 @@ public class BidHandlerInfo {
 **本例产物**：
 ```java
 @Mapper
-public interface BidHandlerInfoMapper {
-    int insert(BidHandlerInfo entity);
-    int updateById(BidHandlerInfo entity);
-    int deleteById(Integer handlerId);
-    BidHandlerInfo selectById(Integer handlerId);
-    List<BidHandlerInfo> selectAll();
+public interface BidHandlerInfoMapper extends BaseMapper<BidHandlerInfo> {
+    // 全部继承自 BaseMapper，无需额外方法
 }
 ```
 
@@ -148,28 +144,42 @@ mybatis-plus:
 
 **位置**：`src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java`
 
-**职责**：业务逻辑编排。当前只做 CRUD 转发，未来业务逻辑（分组、聚合、复杂条件查询）放这里。
+**职责**：业务逻辑编排。当前继承 `BaseService<T>` 提供标准 CRUD，未来业务逻辑（分组、聚合、复杂条件查询）在子类中重写或新增方法。
 
-**关键约定**（与 Mapper 风格一致：手写、不继承 Plus）：
-- **不继承** `IService<T>`
-- **不继承** `ServiceImpl<Mapper, T>`
-- 直接 `@Autowired` 注入 Mapper 接口
-- Spring 容器在启动时，根据 `@MapperScan` 扫描到 Mapper 接口，并加载 XML 生成代理实现，注入到 Service
+**关键约定**（与 Mapper 风格一致：继承项目自建基类）：
+- **继承** `BaseService<T>`（项目自建泛型基类，封装 7 个标准方法，写方法统一加 `@Transactional`）
+- 子类只需实现 `getMapper()` 和 `getIdExtractor()` 两个抽象方法
+- 差异化逻辑（如 `BidWinningNotificationService.create()` 需设 `createdAt`）通过 `@Override` 重写
 
 **本例产物**：
 ```java
 @Service
-public class BidHandlerInfoService {
+public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
 
-    @Autowired
+    @Resource
     private BidHandlerInfoMapper mapper;
 
-    public int create(BidHandlerInfo entity) {
-        return mapper.insert(entity);
+    @Override
+    protected BaseMapper<BidHandlerInfo> getMapper() {
+        return mapper;
     }
-    // ... 其他 CRUD 方法 ...
+
+    @Override
+    protected Function<BidHandlerInfo, Integer> getIdExtractor() {
+        return BidHandlerInfo::getHandlerId;
+    }
 }
 ```
+
+**继承的方法**：
+| 方法 | 说明 |
+|------|------|
+| `int create(T entity)` | 创建，`@Transactional` |
+| `int update(T entity)` | 按主键 PATCH 更新，`@Transactional` |
+| `int delete(Integer id)` | 按主键删除，`@Transactional` |
+| `T getById(Integer id)` | 按主键查询 |
+| `List<T> listAll()` | 查询全部（配合 PageHelper 分页） |
+| `List<T> deleteByIds(List<Integer> ids)` | 批量删除，返回实际删除的实体列表，`@Transactional` |
 
 ### ⑥ DTO 层
 
@@ -415,10 +425,8 @@ Postman
 
 ```java
 @Mapper
-public interface XxxMapper {
-    // ... 其他 5 个方法 ...
-    int deleteByIds(@Param("ids") List<Integer> ids);
-    List<Xxx> selectByIds(@Param("ids") List<Integer> ids);
+public interface XxxMapper extends BaseMapper<Xxx> {
+    // deleteByIds / selectByIds 已继承自 BaseMapper，无需额外声明
 }
 ```
 
@@ -443,24 +451,18 @@ public interface XxxMapper {
 </select>
 ```
 
-#### ③ Service（p3 升级版 — 返删掉的实体列表）
+#### ③ Service（p3 升级版 — 返删掉的实体列表，由 `BaseService<T>` 提供）
 
 ```java
-public List<Xxx> deleteByIds(List<Integer> ids) {
-    if (ids == null || ids.isEmpty()) {
-        return List.of();
-    }
-    // 1. SELECT 存在的行（PK 索引，毫秒级）
-    List<Xxx> existing = mapper.selectByIds(ids);
-    // 2. 删掉它们
-    if (!existing.isEmpty()) {
-        List<Integer> existingIds = existing.stream()
-                .map(Xxx::getId)   // 或 getXxxId()
-                .toList();
-        mapper.deleteByIds(existingIds);
-    }
-    // 3. 返回删掉的实体行（前端展示用）
-    return existing;
+// 由 BaseService<T>.deleteByIds() 统一提供，子类无需重写
+// 逻辑：selectByIds → 提取 PK → deleteByIds → 返回删掉的实体列表
+```
+
+子类只需通过 `getIdExtractor()` 提供 PK 提取函数：
+```java
+@Override
+protected Function<Xxx, Integer> getIdExtractor() {
+    return Xxx::getXxxId;
 }
 ```
 

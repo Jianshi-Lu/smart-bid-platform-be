@@ -12,7 +12,6 @@ import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
 import io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification.BidWinningNotificationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -65,7 +64,6 @@ public class BidWinningNotificationController {
      */
     @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-winning-notification")
-    @Transactional(rollbackFor = Exception.class)
     public Result<BidWinningNotification> createBidWinningNotification(
             @RequestBody BidWinningNotificationCreateRequest request) {
         BidWinningNotification entity = new BidWinningNotification();
@@ -131,7 +129,6 @@ public class BidWinningNotificationController {
      */
     @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-winning-notification/{id}")
-    @Transactional(rollbackFor = Exception.class)
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
             @PathVariable Integer id,
             @RequestBody BidWinningNotificationUpdateRequest request) {
@@ -183,7 +180,6 @@ public class BidWinningNotificationController {
      */
     @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-winning-notification/{id}")
-    @Transactional(rollbackFor = Exception.class)
     public Result<Void> deleteBidWinningNotification(@PathVariable Integer id) {
         int rows = service.delete(id);
         return rows > 0
@@ -244,7 +240,6 @@ public class BidWinningNotificationController {
      */
     @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-winning-notification/batch-delete")
-    @Transactional(rollbackFor = Exception.class)
     public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
         List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");

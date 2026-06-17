@@ -58,11 +58,13 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── BidWinningNotification.java         # 定标通知实体（19 字段）
 │   └── BidWinningSupplierDetail.java       # 中标明细实体
 ├── mapper/
-│   ├── BidHandlerInfoMapper.java           # @Mapper 接口（不继承 BaseMapper）
-│   ├── BidWinningNotificationMapper.java   # @Mapper 接口
-│   └── BidWinningSupplierDetailMapper.java # @Mapper 接口
+│   ├── BaseMapper.java                      # 泛型 CRUD 基接口（7 标准方法），由具体 Mapper 继承
+│   ├── BidHandlerInfoMapper.java            # @Mapper 接口（extends BaseMapper<BidHandlerInfo>）
+│   ├── BidWinningNotificationMapper.java    # @Mapper 接口
+│   └── BidWinningSupplierDetailMapper.java  # @Mapper 接口
 ├── service/
-│   ├── bidhandlerinfo/BidHandlerInfoService.java      # @Service
+│   ├── BaseService.java                     # 泛型 CRUD 基类（封装 7 标准方法 + @Transactional）
+│   ├── bidhandlerinfo/BidHandlerInfoService.java      # @Service（extends BaseService<BidHandlerInfo>）
 │   ├── bidwinningnotification/BidWinningNotificationService.java
 │   ├── bidwinningsupplierdetail/BidWinningSupplierDetailService.java
 │   └── mail/
@@ -239,9 +241,9 @@ src/main/resources/
 
 | 维度 | 约定 |
 |------|------|
-| Mapper 接口 | 不继承 `BaseMapper<T>`，手写方法签名 + XML SQL |
-| Service | 不继承 `IService<T>`，不继承 `ServiceImpl`，直接注入 Mapper |
-| 写方法事务 | `@Transactional(rollbackFor = Exception.class)` |
+| Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口，7 标准方法），手写 XML SQL |
+| Service | 继承 `BaseService<T>`（项目自建泛型基类），子类实现 `getMapper()` + `getIdExtractor()` |
+| 写方法事务 | `@Transactional(rollbackFor = Exception.class)`（由 `BaseService` 统一加） |
 | DTO 命名 | `<Entity>CreateRequest` / `<Entity>UpdateRequest`（PATCH 风格，**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest`（独立，不复用） |
 | Controller 响应 | `Result<T>` 包装；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>`（p3 升级版） |
 | 业务状态码 | 200=成功, 400=参数错误, 404=资源不存在 |
