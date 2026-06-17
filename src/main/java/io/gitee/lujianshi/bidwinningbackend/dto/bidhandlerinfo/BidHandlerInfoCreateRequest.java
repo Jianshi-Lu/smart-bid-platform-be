@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo;
 
-import io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo.BidHandlerInfoController;
+import io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;

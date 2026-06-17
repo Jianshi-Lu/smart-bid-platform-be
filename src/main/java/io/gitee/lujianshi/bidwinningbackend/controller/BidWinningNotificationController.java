@@ -1,8 +1,7 @@
-package io.gitee.lujianshi.bidwinningbackend.controller.bidwinningnotification;
+package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationUpdateRequest;
@@ -62,7 +61,6 @@ public class BidWinningNotificationController {
      *
      * @param request 创建请求 DTO（{@link BidWinningNotificationCreateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-winning-notification")
     public Result<BidWinningNotification> createBidWinningNotification(
             @RequestBody BidWinningNotificationCreateRequest request) {
@@ -102,7 +100,6 @@ public class BidWinningNotificationController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-notification/{id}")
     public Result<BidWinningNotification> getByIdBidWinningNotification(@PathVariable Integer id) {
         BidWinningNotification entity = service.getById(id);
@@ -127,7 +124,6 @@ public class BidWinningNotificationController {
      * @param id 主键 ID
      * @param request 更新请求 DTO（{@link BidWinningNotificationUpdateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-winning-notification/{id}")
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
             @PathVariable Integer id,
@@ -178,7 +174,6 @@ public class BidWinningNotificationController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-winning-notification/{id}")
     public Result<Void> deleteBidWinningNotification(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -201,7 +196,6 @@ public class BidWinningNotificationController {
      * <h3>请求示例</h3>
      * <pre>curl "http://localhost:8080/bid-winning-notification?pageNum=1&pageSize=10&sort=notification_id%20desc"</pre>
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-notification")
     public Result<PageInfo<BidWinningNotification>> listBidWinningNotification(
             @RequestParam(defaultValue = "1") int pageNum,
@@ -238,7 +232,6 @@ public class BidWinningNotificationController {
      *
      * @param request 批量删除请求 DTO（{@link BidWinningNotificationBatchDeleteRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-winning-notification/batch-delete")
     public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
         List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());

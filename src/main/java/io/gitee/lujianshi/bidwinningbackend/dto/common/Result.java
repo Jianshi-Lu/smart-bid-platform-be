@@ -1,7 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.common;
 
-import io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo.BidHandlerInfoController;
-import io.gitee.lujianshi.bidwinningbackend.controller.bidwinningnotification.BidWinningNotificationController;
+import io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController;
+import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningNotificationController;
 import lombok.Data;
 
 /**

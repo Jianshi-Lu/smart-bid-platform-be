@@ -1,21 +1,13 @@
 package io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo;
 
-import com.alibaba.fastjson2.JSON;
-import io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo.BidHandlerInfoController;
+import io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.ResourceSearcher;
-import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
-import org.thymeleaf.context.Context;
-import org.thymeleaf.spring6.SpringTemplateEngine;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.function.Function;
 
 /**

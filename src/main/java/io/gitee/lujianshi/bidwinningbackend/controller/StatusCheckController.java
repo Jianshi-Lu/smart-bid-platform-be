@@ -1,8 +1,8 @@
-package io.gitee.lujianshi.bidwinningbackend.controller.statuscheck;
+package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.mail.BidWinningMailRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.mail.PlainTextMailRequest;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.TemplateFiller;
+import io.gitee.lujianshi.bidwinningbackend.utils.TemplateFiller;
 import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
 import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.annotation.Resource;
@@ -51,7 +51,7 @@ public class StatusCheckController {
 
 
     @Resource
-    private TemplateFiller bidWinningTemplateFiller;
+    private TemplateFiller templateFiller;
     /**
      * <h2>中标通知书发送接口<h2/>
      *
@@ -87,7 +87,7 @@ public class StatusCheckController {
      */
     @PostMapping("/send-notification")
     public String sendNotification(@RequestBody BidWinningMailRequest request) {
-        String htmlContent = bidWinningTemplateFiller.processTemplate(request);
+        String htmlContent = templateFiller.processTemplate(request);
 
         AsyncTaskManager.execute(() -> {
             try {

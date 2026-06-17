@@ -1,8 +1,7 @@
-package io.gitee.lujianshi.bidwinningbackend.controller.bidwinningsupplierdetail;
+package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailUpdateRequest;
@@ -51,7 +50,6 @@ public class BidWinningSupplierDetailController {
      *
      * @param request 创建请求 DTO（{@link BidWinningSupplierDetailCreateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/create-bid-winning-supplier-detail")
     public Result<BidWinningSupplierDetail> createBidWinningSupplierDetail(
             @RequestBody BidWinningSupplierDetailCreateRequest request) {
@@ -77,7 +75,6 @@ public class BidWinningSupplierDetailController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-supplier-detail/{id}")
     public Result<BidWinningSupplierDetail> getByIdBidWinningSupplierDetail(@PathVariable Integer id) {
         BidWinningSupplierDetail entity = service.getById(id);
@@ -102,7 +99,6 @@ public class BidWinningSupplierDetailController {
      * @param id 主键 ID
      * @param request 更新请求 DTO（{@link BidWinningSupplierDetailUpdateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-winning-supplier-detail/{id}")
     public Result<Diff<BidWinningSupplierDetail>> patchBidWinningSupplierDetail(
             @PathVariable Integer id,
@@ -137,7 +133,6 @@ public class BidWinningSupplierDetailController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-winning-supplier-detail/{id}")
     public Result<Void> deleteBidWinningSupplierDetail(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -160,7 +155,6 @@ public class BidWinningSupplierDetailController {
      * <h3>请求示例</h3>
      * <pre>curl "http://localhost:8080/bid-winning-supplier-detail?pageNum=1&pageSize=10&sort=detail_id%20desc"</pre>
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-winning-supplier-detail")
     public Result<PageInfo<BidWinningSupplierDetail>> listBidWinningSupplierDetail(
             @RequestParam(defaultValue = "1") int pageNum,
@@ -197,7 +191,6 @@ public class BidWinningSupplierDetailController {
      *
      * @param request 批量删除请求 DTO（{@link BidWinningSupplierDetailBatchDeleteRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-winning-supplier-detail/batch-delete")
     public Result<List<BidWinningSupplierDetail>> batchDeleteBidWinningSupplierDetail(
             @Valid @RequestBody BidWinningSupplierDetailBatchDeleteRequest request) {

@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail;
 
+import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningSupplierDetailController;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -73,7 +74,7 @@ import java.math.BigDecimal;
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
  * @see io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailCreateRequest
  * @see io.gitee.lujianshi.bidwinningbackend.dto.common.Diff
- * @see io.gitee.lujianshi.bidwinningbackend.controller.bidwinningsupplierdetail.BidWinningSupplierDetailController
+ * @see BidWinningSupplierDetailController
  */
 @Data
 public class BidWinningSupplierDetailUpdateRequest {

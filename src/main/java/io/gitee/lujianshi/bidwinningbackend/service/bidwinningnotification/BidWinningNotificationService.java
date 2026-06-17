@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification;
 
-import io.gitee.lujianshi.bidwinningbackend.controller.bidwinningnotification.BidWinningNotificationController;
+import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningNotificationController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper;

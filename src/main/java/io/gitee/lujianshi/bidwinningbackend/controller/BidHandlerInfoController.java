@@ -1,8 +1,7 @@
-package io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo;
+package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.annotation.SendEmailOnSuccess;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoBatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoCreateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoUpdateRequest;
@@ -77,7 +76,6 @@ public class BidHandlerInfoController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @GetMapping("/bid-handler-info/{id}")
     public Result<BidHandlerInfo> getByIdBidHandlerInfo(@PathVariable Integer id) {
         BidHandlerInfo entity = service.getById(id);
@@ -108,7 +106,6 @@ public class BidHandlerInfoController {
      * @param id 主键 ID
      * @param request 更新请求 DTO（{@link BidHandlerInfoUpdateRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PatchMapping("/bid-handler-info/{id}")
     public Result<Diff<BidHandlerInfo>> patchBidHandlerInfo(
             @PathVariable Integer id,
@@ -143,7 +140,6 @@ public class BidHandlerInfoController {
      *
      * @param id 主键 ID
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @DeleteMapping("/bid-handler-info/{id}")
     public Result<Void> deleteBidHandlerInfo(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -166,7 +162,6 @@ public class BidHandlerInfoController {
      * <h3>请求示例</h3>
      * <pre>curl "http://localhost:8080/bid-handler-info?page=1&size=10&sort=handler_id%20desc"</pre>
      */
-    @SendEmailOnSuccess(to = "jianshi.lu@outlook.com")
     @GetMapping("/bid-handler-info")
     public Result<PageInfo<BidHandlerInfo>> getAllBidHandlerInfo(
             @RequestParam(defaultValue = "1") int page,
@@ -202,7 +197,6 @@ public class BidHandlerInfoController {
      *
      * @param request 批量删除请求 DTO（{@link BidHandlerInfoBatchDeleteRequest}）
      */
-    @SendEmailOnSuccess(to = "ops@company.com")
     @PostMapping("/bid-handler-info/batch-delete")
     public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody BidHandlerInfoBatchDeleteRequest request) {
         List<BidHandlerInfo> deleted = service.deleteByIds(request.getIds());

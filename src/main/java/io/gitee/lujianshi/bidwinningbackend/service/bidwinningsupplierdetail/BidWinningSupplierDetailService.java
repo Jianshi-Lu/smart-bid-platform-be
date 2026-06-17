@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.bidwinningsupplierdetail;
 
+import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningSupplierDetailController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningSupplierDetailMapper;
@@ -29,7 +30,7 @@ import java.util.function.Function;
  *   <li>{@code List&lt;BidWinningSupplierDetail&gt; deleteByIds(List&lt;Integer&gt; ids)} — 批量删除，返回实际删除的实体列表</li>
  * </ul>
  *
- * @see io.gitee.lujianshi.bidwinningbackend.controller.bidwinningsupplierdetail.BidWinningSupplierDetailController
+ * @see BidWinningSupplierDetailController
  */
 @Service
 public class BidWinningSupplierDetailService extends BaseService<BidWinningSupplierDetail> {

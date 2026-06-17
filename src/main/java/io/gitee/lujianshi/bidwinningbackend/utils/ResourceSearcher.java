@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.mail;
+package io.gitee.lujianshi.bidwinningbackend.utils;
 
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.stereotype.Service;
