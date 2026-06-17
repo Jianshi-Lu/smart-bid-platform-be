@@ -1,13 +1,21 @@
 package io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo;
 
+import com.alibaba.fastjson2.JSON;
 import io.gitee.lujianshi.bidwinningbackend.controller.bidhandlerinfo.BidHandlerInfoController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
+import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
+import io.gitee.lujianshi.bidwinningbackend.service.mail.ResourceSearcher;
+import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.function.Function;
 
 /**
@@ -27,7 +35,13 @@ import java.util.function.Function;
  *   <li>{@code int delete(Integer id)} — 按主键删除</li>
  *   <li>{@code BidHandlerInfo getById(Integer id)} — 按主键查询</li>
  *   <li>{@code List&lt;BidHandlerInfo&gt; listAll()} — 查询全部（配合 PageHelper 分页）</li>
- *   <li>{@code List&lt;BidHandlerInfo&gt; deleteByIds(List&lt;Integer&gt; ids)} — 批量删除，返回实际删除的实体列表</li>
+ *   <li>{@code List&lt;BidHandlerInfo&gt; deleteByIds(List<Integer> ids)} — 批量删除，返回实际删除的实体列表</li>
+ * </ul>
+ *
+ * <h3>本类新增方法（试点：DTO 传参邮件通知）</h3>
+ * <ul>
+ *   <li>{@link # sendEmail(BidHandlerInfo, String)} — 创建成功后异步发送 HTML 通知邮件，
+ *       收件人由 {@code BidHandlerInfoCreateRequest.targetEmail} 传入，绕开 AOP 体系</li>
  * </ul>
  *
  * @see BidHandlerInfoController
@@ -46,4 +60,9 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
     protected Function<BidHandlerInfo, Integer> getIdExtractor() {
         return BidHandlerInfo::getHandlerId;
     }
+
+    public void sendOperationEmail(BidHandlerInfo entity, String targetEmail) {
+        this.sendEmail(entity, targetEmail, "bid-handler-info/create", "新增");
+    }
+
 }

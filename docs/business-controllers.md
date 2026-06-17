@@ -100,7 +100,46 @@
 
 ## 9. AOP 邮件通知
 
-- 所有 18 个端点（3 Controller × 6 端点）均标注 `@SendEmailOnSuccess(to = "ops@company.com")`
+- 大多数端点（3 Controller × 6 端点 = 18 端点中 17 个）标注 `@SendEmailOnSuccess(to = "ops@company.com")`
 - 由 `CrudResultEmailAspect` 切面拦截，业务代码 0 改动
 - 收件人覆盖：HTTP Header `Target-Email-Address` 优先于注解 `to()`
 - 完整执行链路详见 `docs/aop-execution-chain.md`
+
+## 10. 试点：DTO 传参邮件通知（仅 `BidHandlerInfoController.create`）
+
+> 试点方案，**仅 `BidHandlerInfoController.createBidHandlerInfo` 一个端点**应用此模式。
+> 其他 17 个端点继续走 AOP 邮件通知体系。
+
+### 10.1 试点设计
+
+- **脱离 AOP 体系**：`createBidHandlerInfo` 不再标注 `@SendEmailOnSuccess`
+- **收件人由 DTO 传入**：`BidHandlerInfoCreateRequest.targetEmail` 字段（可选，null/空 = 不发）
+- **Service 层显式调用**：`BidHandlerInfoService.notifyEmail(entity, targetEmail)` 渲染 `crud-result` 模板 + `MailService.sendHtmlEmail`
+- **复用现有组件**：`crud-result` Thymeleaf 模板 + `ResourceSearcher.validateTemplateExists` + `SpringTemplateEngine` + `MailService`，与 AOP 用同一套链路
+
+### 10.2 收件人优先级（试点端点）
+
+```
+targetEmail (DTO JSON body)  >  无 fallback，直接跳过
+```
+
+即试点端点**不读 HTTP Header**，收件人**只能**从 JSON body 传。如不传则不发邮件。
+
+### 10.3 请求示例
+
+```bash
+curl -X POST http://localhost:8080/create-bid-handler-info \
+  -H "Content-Type: application/json" \
+  -d '{
+    "handlerName":"张三",
+    "companyName":"测试采购公司",
+    "departmentName":"采购部",
+    "targetEmail":"alice@example.com"
+  }'
+```
+
+### 10.4 试点价值
+
+- 验证 DTO 传参收件人可行性（替代 Header 方式）
+- 验证 Service 层显式调用邮件链路（替代 AOP 自动触发）
+- 试点结果稳定后可推广到其他 2 个 Controller
