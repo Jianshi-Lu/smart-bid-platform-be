@@ -32,7 +32,7 @@ import lombok.Data;
  *   <li>调用方传哪些字段，就更新哪些字段；未传的字段在 DB 中保持原值</li>
  * </ul>
  *
- * <h3>与 {@code BidHandlerInfoCreateRequest} 的对比</h3>
+ * <h3>与 {@code AddRequest} 的对比</h3>
  * <table border="1">
  *   <tr><th>维度</th><th>CreateRequest</th><th>UpdateRequest（本类）</th></tr>
  *   <tr><td>字段集合</td><td>3 字段</td><td>3 字段（<b>完全相同</b>）</td></tr>
@@ -71,12 +71,12 @@ import lombok.Data;
  * </table>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoCreateRequest
+ * @see AddRequest
  * @see io.gitee.lujianshi.bidwinningbackend.dto.common.Diff
  * @see BidHandlerInfoController
  */
 @Data
-public class BidHandlerInfoUpdateRequest {
+public class UpdateRequest {
 
     @Size(max = 50, message = "经办人姓名长度不能超过50")
     private String handlerName;
@@ -86,4 +86,6 @@ public class BidHandlerInfoUpdateRequest {
 
     @Size(max = 100, message = "部门名称长度不能超过100")
     private String departmentName;
+
+    private String targetEmail;
 }

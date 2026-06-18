@@ -103,4 +103,6 @@ public class BidWinningNotificationCreateRequest {
     private String biddingStatus;
 
     private String notes;
+
+    private String targetEmail;
 }

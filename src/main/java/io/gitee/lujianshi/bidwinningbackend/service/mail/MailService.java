@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.mail;
 
-import io.gitee.lujianshi.bidwinningbackend.dto.mail.PlainTextMailRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.statuscheck.PlainTextMailRequest;
 import jakarta.annotation.Resource;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;

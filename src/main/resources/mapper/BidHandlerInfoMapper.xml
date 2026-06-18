@@ -34,6 +34,7 @@
         <result column="handler_name"    property="handlerName"/>
         <result column="company_name"    property="companyName"/>
         <result column="department_name" property="departmentName"/>
+        <result column="target_email" property="targetEmail"/>
     </resultMap>
 
     <!--
@@ -45,8 +46,8 @@
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
             useGeneratedKeys="true"
             keyProperty="handlerId">
-        INSERT INTO bid_handler_info (handler_name, company_name, department_name)
-        VALUES (#{handlerName}, #{companyName}, #{departmentName})
+        INSERT INTO bid_handler_info (handler_name, company_name, department_name, target_email)
+        VALUES (#{handlerName}, #{companyName}, #{departmentName}, #{targetEmail})
     </insert>
 
     <!--
@@ -55,7 +56,7 @@
       - 使用 <set> + <if> 实现 PATCH 语义：
         * 字段为 null → 不更新（保留 DB 原值）
         * 字段非 null → 更新
-      - 配合 BidHandlerInfoUpdateRequest 使用（PATCH 请求体）
+      - 配合 UpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
@@ -64,6 +65,7 @@
             <if test="handlerName != null">handler_name = #{handlerName},</if>
             <if test="companyName != null">company_name = #{companyName},</if>
             <if test="departmentName != null">department_name = #{departmentName},</if>
+            <if test="targetEmail != null">target_email = #{targetEmail},</if>
         </set>
         WHERE handler_id    = #{handlerId}
     </update>
@@ -80,7 +82,7 @@
       按 ID 查询：resultMap 引用上面定义的 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name
+        SELECT handler_id, handler_name, company_name, department_name, target_email
         FROM bid_handler_info
         WHERE handler_id = #{handlerId}
     </select>
@@ -90,7 +92,7 @@
       数据量小时可直接用，数据量大时建议加分页（后续可加 PageHelper / Plus PaginationInnerInterceptor）
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name
+        SELECT handler_id, handler_name, company_name, department_name, target_email
         FROM bid_handler_info
     </select>
 
@@ -118,7 +120,7 @@
       - 排序：DB 物理顺序（无 ORDER BY），最小实现
     -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name
+        SELECT handler_id, handler_name, company_name, department_name, target_email
         FROM bid_handler_info
         WHERE handler_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">

@@ -98,48 +98,83 @@
 - 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错），当前透传给 PageHelper
 - 统一异常处理（`GlobalExceptionHandler` 尚未实现）
 
-## 9. AOP 邮件通知
+## 9. 业务操作后邮件通知（Service 层显式调用）
 
-- 大多数端点（3 Controller × 6 端点 = 18 端点中 17 个）标注 `@SendEmailOnSuccess(to = "ops@company.com")`
-- 由 `CrudResultEmailAspect` 切面拦截，业务代码 0 改动
-- 收件人覆盖：HTTP Header `Target-Email-Address` 优先于注解 `to()`
-- 完整执行链路详见 `docs/aop-execution-chain.md`
+> **历史方案（已下线）**：早期使用 AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）拦截 Controller 返回值异步发邮件。详见 [docs/aop-execution-chain.md](aop-execution-chain.md)（已标记为 offline，仅供历史参考）。
 
-## 10. 试点：DTO 传参邮件通知（仅 `BidHandlerInfoController.create`）
+### 9.1 当前方案概述
 
-> 试点方案，**仅 `BidHandlerInfoController.createBidHandlerInfo` 一个端点**应用此模式。
-> 其他 17 个端点继续走 AOP 邮件通知体系。
+- **触发方式**：由 `Controller` 业务方法执行完毕后，**显式调用** Service 层提供的邮件发送方法（如 `BidHandlerInfoService.sendOperationEmail(entity)`）
+- **邮件发送**：`BaseService.sendEmail(entity, targetEmail, endpoint, operation)` 内部通过 `AsyncTaskManager.execute(...)` 异步执行（0ms 延迟，`new Thread + .start()`）
+- **模板渲染**：`SpringTemplateEngine.process("crud-email-template", context)`，模板路径 `src/main/resources/templates/crud-email-template.html`
+- **组件链路**：`ResourceSearcher.validateTemplateExists` + `SpringTemplateEngine` + `MailService.sendHtmlEmail`
+- **业务代码 0 改动**：除 `create` 端点外，其他端点**不**触发邮件；如需接入，参考 §9.3
 
-### 10.1 试点设计
+### 9.2 当前已接入端点
 
-- **脱离 AOP 体系**：`createBidHandlerInfo` 不再标注 `@SendEmailOnSuccess`
-- **收件人由 DTO 传入**：`BidHandlerInfoCreateRequest.targetEmail` 字段（可选，null/空 = 不发）
-- **Service 层显式调用**：`BidHandlerInfoService.notifyEmail(entity, targetEmail)` 渲染 `crud-result` 模板 + `MailService.sendHtmlEmail`
-- **复用现有组件**：`crud-result` Thymeleaf 模板 + `ResourceSearcher.validateTemplateExists` + `SpringTemplateEngine` + `MailService`，与 AOP 用同一套链路
+| Controller | 端点 | 触发方法 | 收件人来源 |
+|---|---|---|---|
+| `BidHandlerInfoController` | `POST /create-bid-handler-info` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库，DB 字段 `target_email`） |
+| `BidWinningNotificationController` | 全部 6 端点 | — | —（**不**发送邮件）|
+| `BidWinningSupplierDetailController` | 全部 6 端点 | — | —（**不**发送邮件）|
 
-### 10.2 收件人优先级（试点端点）
+### 9.3 接入新端点的步骤（参考样板）
 
-```
-targetEmail (DTO JSON body)  >  无 fallback，直接跳过
-```
+以 `BidWinningNotificationController.create` 接入邮件通知为例：
 
-即试点端点**不读 HTTP Header**，收件人**只能**从 JSON body 传。如不传则不发邮件。
+#### ① 在 DTO 中添加 `targetEmail` 字段
 
-### 10.3 请求示例
-
-```bash
-curl -X POST http://localhost:8080/create-bid-handler-info \
-  -H "Content-Type: application/json" \
-  -d '{
-    "handlerName":"张三",
-    "companyName":"测试采购公司",
-    "departmentName":"采购部",
-    "targetEmail":"alice@example.com"
-  }'
+```java
+// BidWinningNotificationCreateRequest.java
+private String targetEmail;   // 通知邮件收件人（已落库）
 ```
 
-### 10.4 试点价值
+#### ② 在子 Service 添加便利方法
 
-- 验证 DTO 传参收件人可行性（替代 Header 方式）
-- 验证 Service 层显式调用邮件链路（替代 AOP 自动触发）
-- 试点结果稳定后可推广到其他 2 个 Controller
+```java
+// BidWinningNotificationService.java
+public void sendOperationEmail(BidWinningNotification entity) {
+    this.sendEmail(entity, "bid-winning-notification/create", "新增");
+}
+```
+
+#### ③ 在 Controller 业务方法末尾调用
+
+```java
+// BidWinningNotificationController.java
+service.create(entity);
+service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
+return Result.success(entity, "创建成功");
+```
+
+### 9.4 收件人解析
+
+`targetEmail` 来自 Entity 字段（`entity.targetEmail`），落库后由 `BaseService.sendEmail` 反射读取。
+
+```
+entity.targetEmail（DB 字段 target_email）→ null/空 = 跳过
+```
+
+不再需要 Controller 显式传递 `targetEmail` 参数。
+
+### 9.5 邮件模板变量
+
+模板 `crud-email-template.html` 接收的变量：
+
+| 变量 | 来源 | 示例 |
+|---|---|---|
+| `subject` | `BaseService.sendEmail` 内部构造 | `[数据操作通知] bid-handler-info/create - 2026-06-17 15:02:28` |
+| `formName` | `endpoint` 参数 | `bid-handler-info/create` |
+| `actionName` | `operation` 参数 | `新增` |
+| `operateTime` | `LocalDateTime.now()` | `2026-06-17 15:02:28` |
+| `status` | `operation + " 成功"` | `新增 成功` |
+| `data` | `PropertyDescriptor` 反射遍历 entity 字段（**排除 targetEmail**） | `List<Map.Entry<String, Object>>` |
+
+### 9.6 时序
+
+- Step 1：Controller 业务方法执行完（如 `service.create(entity)` + `service.sendOperationEmail(entity)`）
+- Step 2：`sendOperationEmail` → `BaseService.sendEmail` 同步执行反射 + Thymeleaf 渲染（~微秒级）
+- Step 3：`AsyncTaskManager.execute(...)` 提交异步任务，主线程仅 `new Thread + .start()`，**瞬间**完成
+- Step 4：Controller 包装 `Result.success(...)` 返回
+- Step 5：Spring MVC 序列化 JSON，**HTTP 响应完成**（前端收到 200）
+- Step 6（**与 Step 4-5 并行**）：后台子线程执行 SMTP 邮件发送

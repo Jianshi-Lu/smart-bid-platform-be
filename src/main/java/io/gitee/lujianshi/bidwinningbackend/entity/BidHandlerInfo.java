@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
  *      ↓
  *   ⑤ Service 层（BidHandlerInfoService.java，业务调用）
  *      ↓
- *   ⑥ DTO 层（BidHandlerInfoCreateRequest.java，请求载体）
+ *   ⑥ DTO 层（AddRequest.java，请求载体）
  *      ↓
  *   ⑦ Controller 层（BidHandlerInfoController.java，HTTP 入口）
  * </pre>
@@ -71,4 +71,6 @@ public class BidHandlerInfo {
     private String companyName;
 
     private String departmentName;
+
+    private String targetEmail;
 }

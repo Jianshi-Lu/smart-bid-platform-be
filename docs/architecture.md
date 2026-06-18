@@ -110,7 +110,7 @@ public @interface SpringBootApplication {
 | 类 | 注解 |
 |----|------|
 | `MailService` | `@Service` |
-| `TemplateFiller` | `@Service` |
+| `StatusCheckService` | `@Service` |
 | `ResourceSearcher` | `@Service` |
 | `BidHandlerInfoService` | `@Service` |
 | `BidWinningNotificationService` | `@Service` |
@@ -119,7 +119,6 @@ public @interface SpringBootApplication {
 | `BidHandlerInfoController` | `@RestController`（含 `@Controller`） |
 | `BidWinningNotificationController` | `@RestController`（含 `@Controller`） |
 | `BidWinningSupplierDetailController` | `@RestController`（含 `@Controller`） |
-| `CrudResultEmailAspect` | `@Aspect`（AOP 切面，代理 Controller 调用） |
 | `BidWinningBackendApplication` | `@Configuration`（隐含） |
 
 `AsyncTaskManager` **没有**任何上述注解，它是一个纯静态工具类，不归 Spring 容器管理。
@@ -165,7 +164,7 @@ JavaMailSender mailSender  ← MailService 通过 @Autowired 注入
 
 **关键结果**：
 ```
-SpringTemplateEngine templateEngine  ← TemplateFiller 通过 @Autowired 注入
+SpringTemplateEngine templateEngine  ← StatusCheckService 通过 @Autowired 注入
 ```
 
 #### 1.5.3 `WebMvcAutoConfiguration`
@@ -290,7 +289,7 @@ Spring AOP 代理在调用 `fetchAfterDelay()` 时：
 - 而是将任务提交到 `SimpleAsyncTaskExecutor`（`@EnableAsync` 默认使用的执行器）
 - 主线程立即返回，3 秒后在新线程中打印"获取地址成功"
 
-**注意**：早期 `HelloService.fetchAfterDelay()` 内部调用了 `AsyncTaskManager.execute()` 形成双重异步。该服务已下线（`StatusCheckController` 仅保留 `serviceStatus` / `sendEmail` / `sendNotification` 三个测试端点），不再存在此问题。
+> **历史说明**：早期 `HelloService.fetchAfterDelay()` 内部调用了 `AsyncTaskManager.execute()` 形成双重异步。该服务已下线（`StatusCheckController` 仅保留 `serviceStatus` / `sendEmail` / `sendNotification` 三个测试端点），不再存在此问题。
 
 ---
 
@@ -314,7 +313,7 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 2 | `SpringTemplateEngine` | 无（由 `ThymeleafAutoConfiguration` 创建） |
 | 3 | `MailService` | `JavaMailSender`、`@Value` |
 | 4 | `ResourceSearcher` | `ResourcePatternResolver` |
-| 5 | `TemplateFiller` | `SpringTemplateEngine`、`ResourceSearcher` |
+| 5 | `StatusCheckService` | `SpringTemplateEngine`、`ResourceSearcher`、`MailService` |
 | 6 | `BaseMapper<T>` | 无（泛型基接口，由具体 Mapper 继承） |
 | 7 | `BidHandlerInfoMapper`（extends `BaseMapper<BidHandlerInfo>`） | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
 | 8 | `BidWinningNotificationMapper`（extends `BaseMapper<BidWinningNotification>`） | 同上 |
@@ -322,7 +321,7 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 10 | `BidHandlerInfoService`（extends `BaseService<BidHandlerInfo>`） | `BidHandlerInfoMapper` |
 | 11 | `BidWinningNotificationService`（extends `BaseService<BidWinningNotification>`） | `BidWinningNotificationMapper` |
 | 12 | `BidWinningSupplierDetailService`（extends `BaseService<BidWinningSupplierDetail>`） | `BidWinningSupplierDetailMapper` |
-| 13 | `StatusCheckController` | `MailService`、`TemplateFiller` |
+| 13 | `StatusCheckController` | `MailService`、`StatusCheckService` |
 | 14 | `BidHandlerInfoController` | `BidHandlerInfoService` |
 | 15 | `BidWinningNotificationController` | `BidWinningNotificationService` |
 | 16 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
@@ -724,20 +723,7 @@ Jackson 反序列化为 PlainTextMailRequest 对象
 ```text
 @PostMapping("/send-notification")
 public String sendNotification(@RequestBody BidWinningMailRequest request) {
-    String htmlContent = templateFiller.processTemplate(request);
-
-    AsyncTaskManager.execute(() -> {
-        try {
-            mailService.sendHtmlEmail(
-                request.getTo(),
-                request.getSubject(),
-                htmlContent
-            );
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
-    }, 5000);
-    return "发送成功";
+    return statusCheckService.sendNotification(request);
 }
 ```
 
@@ -747,29 +733,21 @@ public String sendNotification(@RequestBody BidWinningMailRequest request) {
 | 完整 URL | `http://localhost:8080/send-notification` |
 | 请求 Content-Type | `application/json` |
 | 请求体 | `BidWinningMailRequest`（JSON: `to` / `subject` / `projectCode` / `handlerName` / `bidWinningList` / `templateName`） |
-| 调用链路 | 见下方详细分解 |
+| 调用链路 | `StatusCheckController.sendNotification()` → `StatusCheckService.sendNotification()` → `MailService.sendHtmlEmail()`（异步子线程） |
 | 返回值 | 字符串 `"发送成功"`（**立即返回**，不等待邮件实际发送） |
 
-**完整调用链路**（模板动态选择 + 异步延迟发送）：
+**完整调用链路**（StatusCheckService 内部编排，延迟 5 秒异步发送）：
 
 ```
 Step 1. 接收 BidWinningMailRequest（JSON → @RequestBody 自动反序列化）
 
-Step 2. templateFiller.processTemplate(request)
-        ├─ 读取 request.getTemplateName() → 例如 "bid-winning-notification2"
-        ├─ resourceSearcher.validateTemplateExists(templateName)
-        │   ├─ 扫描 classpath:/templates/*.html
-        │   ├─ 精确匹配 "bid-winning-notification2"
-        │   └─ 找不到则抛出 IllegalArgumentException，不 fallback
-        ├─ 创建 new Context()
-        ├─ context.setVariable("projectCode", request.getProjectCode())
-        ├─ context.setVariable("handlerName", request.getHandlerName())
-        ├─ context.setVariable("bidWinningList", request.getBidWinningList())
-        └─ templateEngine.process(templateName, context)
-            ├─ TemplateResolver 拼接完整路径
-            ├─ 读取 HTML 文件内容
-            ├─ 扫描 th:text / th:each 表达式
-            └─ 返回渲染后的 HTML 字符串
+Step 2. StatusCheckService.sendNotification(request) 内部：
+  ├─ resourceSearcher.validateTemplateExists(request.getTemplateName())
+  │   ├─ 扫描 classpath:/templates/*.html
+  │   ├─ 精确匹配模板文件名
+  │   └─ 找不到则抛出 IllegalArgumentException，不 fallback
+  ├─ 创建 Thymeleaf Context，放入 projectCode / handlerName / bidWinningList
+  └─ templateEngine.process(templateName, context) → 返回渲染后的 HTML 字符串
 
 Step 3. 立即返回 "发送成功"（主线程不受异步任务影响）
 
@@ -1370,8 +1348,8 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 **调用方**：
 - `StatusCheckController.sendEmail()` → `MailService.sendEmail(request)`
-- `StatusCheckController.sendNotification()` → `MailService.sendHtmlEmail(to, subject, htmlContent)`（异步子线程）
-- `CrudResultEmailAspect`（AOP 切面） → `MailService.sendHtmlEmail(to, subject, htmlContent)`（异步子线程）
+- `StatusCheckController.sendNotification()` → `StatusCheckService.sendNotification()` → `MailService.sendHtmlEmail()`（异步子线程）
+- `BaseService.sendEmail(entity, targetEmail, endpoint, operation)` → `MailService.sendHtmlEmail(to, subject, htmlContent)`（异步子线程，详见 §7）
 
 **`@Value` 注入原理**：`AutowiredAnnotationBeanPostProcessor`（实现了 `InstantiationAwareBeanPostProcessor` 接口）在 Bean 初始化后，扫描所有带有 `@Value` 的字段，从 Spring `Environment` 中读取对应的 `application.properties` 配置值，通过反射（`Field.setAccessible(true); field.set(this, value)`）注入。
 
@@ -1383,7 +1361,7 @@ Transport.send(message)                  ← 通过 TCP socket 连接 smtp.qq.co
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|------------|----------|
-| `validateTemplateExists(String templateName)` | templateName（模板文件名，不含 .html 后缀） | void（验证通过则正常返回，失败则抛 `IllegalArgumentException`） | `ResourcePatternResolver`（Spring Core） | 精确搜索 `classpath:/templates/` 目录验证模板文件是否存在，为 `TemplateFiller` 提供模板存在性校验，不存在则抛异常（不 fallback） |
+| `validateTemplateExists(String templateName)` | templateName（模板文件名，不含 .html 后缀） | void（验证通过则正常返回，失败则抛 `IllegalArgumentException`） | `ResourcePatternResolver`（Spring Core） | 精确搜索 `classpath:/templates/` 目录验证模板文件是否存在，为 `StatusCheckService` 提供模板存在性校验，不存在则抛异常（不 fallback） |
 
 **`validateTemplateExists()` 内部流程**：
 
@@ -1436,76 +1414,44 @@ private String extractTemplateName(Resource resource) {
 
 ---
 
-### 4.3 `TemplateFiller`
+### 4.3 `StatusCheckService`
 
-**文件**：`src/main/java/.../service/mail/TemplateFiller.java`
+**文件**：`src/main/java/.../service/statuscheck/StatusCheckService.java`
 
 | 方法 | 输入 | 输出 | 第三方依赖 | 设计思路 |
 |------|------|------|------------|----------|
-| `processTemplate(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 projectCode + handlerName + bidWinningList + **templateName**） | 渲染后的 HTML 字符串（String） | `SpringTemplateEngine`、`Context`、`ResourceSearcher` | 将 Thymeleaf 模板与动态数据结合，根据 `request.templateName` 动态选择模板文件，模板不存在则抛异常（不 fallback） |
+| `sendNotification(BidWinningMailRequest request)` | `BidWinningMailRequest`（含 to + subject + projectCode + handlerName + bidWinningList + templateName） | "发送成功"（String，主线程立即返回） | `SpringTemplateEngine`、`Context`、`ResourceSearcher`、`MailService`、`AsyncTaskManager` | 中标通知书 HTML 邮件发送：Thymeleaf 渲染 → 异步 5 秒延迟发送；遵循与其他业务 Service 相同的架构模式 |
 
-**`processTemplate()` 内部流程**：
+**`sendNotification()` 内部流程**：
 
 ```text
-public String processTemplate(BidWinningMailRequest request) {
-    // Step 1: 读取用户传入的模板文件名（不含 .html 后缀）
-    String templateName = request.getTemplateName();  // 例如 "bid-winning-notification2"
+public String sendNotification(BidWinningMailRequest request) {
+    // Step 1: 验证模板存在性（精确匹配 classpath:/templates/*.html）
+    resourceSearcher.validateTemplateExists(request.getTemplateName());
 
-    // Step 2: 验证模板是否存在（精确匹配 classpath:/templates/*.html）
-    resourceSearcher.validateTemplateExists(templateName);
-    //    验证通过 → 继续
-    //    验证失败 → 抛出 IllegalArgumentException，不 fallback
-
-    // Step 3: 创建 Thymeleaf 上下文（数据容器）
+    // Step 2: 构造 Thymeleaf Context，放入模板变量
     Context context = new Context();
-
-    // Step 4: 放入模板变量
     context.setVariable("projectCode", request.getProjectCode());
     context.setVariable("handlerName", request.getHandlerName());
     context.setVariable("bidWinningList", request.getBidWinningList());
 
-    // Step 5: 渲染模板
-    return templateEngine.process(templateName, context);
+    // Step 3: 渲染 HTML
+    String htmlContent = templateEngine.process(request.getTemplateName(), context);
+
+    // Step 4: 异步发送（延迟 5 秒），主线程立即返回
+    AsyncTaskManager.execute(() -> {
+        try {
+            mailService.sendHtmlEmail(request.getTo(), request.getSubject(), htmlContent);
+        } catch (MessagingException e) {
+            System.err.println("[STATUS-CHECK] 邮件发送失败: " + e.getMessage());
+        }
+    }, 5000);
+
+    return "发送成功";
 }
 ```
 
-**模板搜索与选择机制（完整链路）**：
-
-```
-用户传入 templateName: "bid-winning-notification2"
-        ↓
-ResourceSearcher.validateTemplateExists("bid-winning-notification2")
-        ↓
-扫描 classpath:/templates/*.html → 精确匹配文件名
-        ↓
-找到 → TemplateResolver 拼接路径 → classpath:/templates/bid-winning-notification2.html
-        ↓
-读取文件 → Thymeleaf AST 解析 → 渲染
-        ↓
-找不到 → 抛出 IllegalArgumentException（不 fallback，不使用默认模板）
-```
-
-**Thymeleaf 渲染原理（底层）**：
-
-```
-templateEngine.process(templateName, context)
-  ↓
-TemplateResolver.resolveTemplateName(templateName)
-  → 拼接完整路径 classpath:/templates/{templateName}.html
-  ↓
-TemplateParser.parseTemplate()  ← 解析 HTML 为 AST（抽象语法树）
-  → 遍历 AST 节点，遇到 th:text="${projectCode}" 节点
-  → 遍历 AST 节点，遇到 th:each="item : ${bidWinningList}" 节点
-  ↓
-Dialect.execute()  ← 执行 OGNL/SpringEL 表达式从 Context 取值
-  → context.getVariable("projectCode") → "WB20260325017"
-  → bidWinningList 循环渲染每项 supplierName + bidWinningAmount
-  ↓
-OutputWriter.write(result)  ← 将替换后的 HTML 写入 String
-  → 返回完整 HTML 字符串
-```
-
-**设计决策**：模板名由用户传入，实现动态模板选择；验证后不使用默认模板，保证用户传入的 `templateName` 始终受控。
+**架构对齐**：与其他业务 Service（`BidHandlerInfoService` / `BidWinningNotificationService`）遵循相同模式——Controller 注入 Service，Service 内部编排 MailService / Thymeleaf / ResourceSearcher。`TemplateFiller` 已被废弃，其职责并入 `StatusCheckService`。
 
 **`SpringTemplateEngine` 的 Bean 来源**：`ThymeleafAutoConfiguration` 在容器启动时注册，单例模式。
 
@@ -1890,179 +1836,175 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 
 ---
 
-## 7. AOP 切面（业务操作后邮件通知）
+## 7. Service 层邮件通知（BaseService.sendEmail）
 
-### 7.1 为什么需要 AOP（横切关注点 Cross-cutting Concerns）
+> **历史方案（已下线）**：早期使用 AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）拦截 Controller 返回值异步发邮件。详见 [docs/aop-execution-chain.md](aop-execution-chain.md)（已标记为 offline，仅供历史参考）。
 
-邮件通知是典型的**横切关注点**：
-- 18 个业务 Controller 端点都需要"操作成功后发邮件"
-- 如果写在每个 Controller，会重复 18 段
-- AOP 切面统一处理：Controller 业务代码 **0 改动**，只需贴一个 `@SendEmailOnSuccess` 注解
+### 7.1 当前方案
 
-**其他横切场景**（可参考本类扩展）：
-- 操作日志记录（`@Before` + MethodSignature）
-- 接口限流（`@Around` + Redis）
-- 敏感数据脱敏（`@AfterReturning` + 处理 Result.data）
-- 分布式锁（`@Around`）
+业务 Controller 端点执行完毕后，**显式调用** Service 层提供的邮件发送方法（如 `BidHandlerInfoService.sendOperationEmail(entity)`），由 `BaseService.sendEmail` 统一完成邮件渲染与发送。
 
-### 7.2 为什么 `@SendEmailOnSuccess` 注解能自动拦截
+**当前已接入端点**（3 Controller × 6 端点 = 18 端点中仅 1 个）：
 
-**注解本身只是"静态标记"（元数据），没有任何执行能力**。生效靠 **Spring AOP 动态代理机制** + **Bean 生命周期**：
+| Controller | 端点 | 触发方法 |
+|---|---|---|
+| `BidHandlerInfoController` | `POST /create-bid-handler-info` | `service.sendEmail(entity, ...)`（targetEmail 从 entity 反射读取） |
+| 其他 17 个端点 | — | **不**发送邮件 |
 
-1. **收集标记**：Spring Boot 启动扫描所有类
-   - 看到 `@Aspect` → 知道 `CrudResultEmailAspect` 是切面
-   - 看到 `pointcut = "@annotation(anno)"` → 记下规则："谁的方法上贴了 `@SendEmailOnSuccess`，就拦截谁"
-2. **生成代理对象（"秘书"）**：Spring 看到 Controller 方法贴了注解 → 在内存里动态生成 Controller 的代理对象
-3. **偷梁换柱**：HTTP 请求实际打到"秘书"上，不是原始"老板"
-4. **拦截执行**：
-   - "秘书"让"老板"执行核心业务（落库 + 组装 Result）
-   - "老板"返回 Result → "秘书"看到标签 → 触发 `@AfterReturning` 切面逻辑（发邮件）
-   - "秘书"把 Result 返回给前端
+### 7.2 接入新端点的步骤
 
-### 7.3 注解设计要点
+#### ① DTO 添加 `targetEmail` 字段
 
-| 元注解 | 取值 | 原因 |
-|--------|------|------|
-| `@Target(ElementType.METHOD)` | METHOD | 限制只能贴方法（编译期 IDE 拦截误用）|
-| `@Retention(RetentionPolicy.RUNTIME)` | **RUNTIME** | **必须 RUNTIME**，否则 Spring AOP 反射读不到（CLASS/SOURCE 都会丢失）|
+```java
+// BidXxxCreateRequest.java
+private String targetEmail;   // 通知邮件收件人（已落库）
+```
 
-**为什么 RUNTIME 必需**：
-- CLASS：编译进 `.class` 但 JVM 加载时丢弃 → AOP 失效
-- SOURCE：编译器直接丢弃 → AOP 失效
-- 只有 RUNTIME 才能让 Spring 通过 `Method.getAnnotation(...)` 读取到注解实例
+#### ② 子 Service 添加便利方法
 
-### 7.4 完整业务执行生命周期（5 步精确时序 + 主/子线程分离）
+```java
+// BidXxxService.java
+public void sendOperationEmail(BidXxx entity) {
+    this.sendEmail(entity, "xxx/create", "新增");
+}
+```
 
-主线程与异步线程**分离**的完整链路（**核心理解：AOP 切面在主线程中执行，但邮件发送在后台子线程异步执行**）：
+#### ③ Controller 业务方法末尾调用
+
+```java
+service.create(entity);
+service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
+return Result.success(entity, "创建成功");
+```
+
+### 7.3 BaseService.sendEmail 内部实现
+
+```java
+// BaseService.java
+protected void sendEmail(T entity, String targetEmail, String endpoint, String operation) {
+    // targetEmail 来源：entity.targetEmail（已落库），反射读取；null/空则跳过
+
+    // 1. 构造 Thymeleaf Context 变量
+    final String formName = endpoint;
+    final String actionName = operation;
+    final String operateTime = LocalDateTime.now().format(TS_FMT);
+    final String status = operation + " 成功";
+    final String subject = emailSubjectPrefix + " " + endpoint + " - " + operateTime;
+
+    // 2. 反射遍历 entity 字段（排除 targetEmail） → List<Map.Entry<String, Object>>
+    List<Map.Entry<String, Object>> dataList;
+    try {
+        Map<String, Object> dataMap = new LinkedHashMap<>();
+        PropertyDescriptor[] pds = BeanUtils.getPropertyDescriptors(entity.getClass());
+        for (PropertyDescriptor pd : pds) {
+            if (pd.getReadMethod() != null && !"class".equals(pd.getName()) && !"targetEmail".equals(pd.getName())) {
+                dataMap.put(pd.getName(), pd.getReadMethod().invoke(entity));
+            }
+        }
+        dataList = new ArrayList<>(dataMap.entrySet());
+    } catch (Exception e) {
+        dataList = List.of();
+    }
+
+    // 3. 异步执行邮件发送（不阻塞主线程）
+    List<Map.Entry<String, Object>> finalDataList = dataList;
+    AsyncTaskManager.execute(() -> {
+        try {
+            resourceSearcher.validateTemplateExists("crud-email-template");
+            Context context = new Context();
+            context.setVariable("subject", subject);
+            context.setVariable("formName", formName);
+            context.setVariable("actionName", actionName);
+            context.setVariable("operateTime", operateTime);
+            context.setVariable("status", status);
+            context.setVariable("data", finalDataList);
+            String html = templateEngine.process("crud-email-template", context);
+            mailService.sendHtmlEmail(targetEmail, subject, html);
+            System.out.println("[BASE-EMAIL] 发送成功: to=" + targetEmail);
+        } catch (Exception e) {
+            System.err.println("[BASE-EMAIL] 发送失败: to=" + targetEmail + ", error=" + e.getMessage());
+        }
+    }, 0);
+}
+```
+
+### 7.4 主/子线程分离的精确时序
+
+主线程（HTTP 请求处理）：
 
 ```
-┌─ 主线程（HTTP 请求处理）─────────────────────────────────────┐
-│                                                              │
-│ Step 1. Controller 内部业务执行完毕，构造 Result 对象，return │
-│         → service.create(entity) 落库                        │
-│         → 组装 Result<Entity> 对象                            │
-│         → 走到 return（此时 Result 已构造，<b>还没</b>返回前端）│
-│                                                              │
-│ Step 2. 触发 @AfterReturning 切面（主线程<b>未</b>放行）       │
-│         ┌─ 2.1 切面前半段（同步，~微秒级）                     │
-│         │    → Spring AOP 注入 3 个参数：                    │
-│         │       JoinPoint / Object result / SendEmailOnSuccess│
-│         │    → instanceof Result<?> 验证                      │
-│         │    → 反射推断 endpoint/operation                    │
-│         │    → fastjson2 序列化 Result.data                  │
-│         │    → 构造邮件主题 subject                           │
-│         │                                                    │
-│         └─ 2.2 切面后半段：AsyncTaskManager.execute(...) 提交  │
-│              ├─ 主线程：new Thread(runnable).start()         │
-│              │   ├─ 构造 Thread 对象（微秒级）                │
-│              │   └─ 调用 .start()（<b>立即返回</b>，不等待子线程）│
-│              │   → 主线程这行代码"瞬间"完成                    │
-│              │                                                │
-│              └─ 后台子线程<b>已启动</b>（与主线程并行）        │
-│                  └─ 此时主线程继续往下走                       │
-│                                                              │
-│ Step 3. 切面方法全部执行完毕（handleAfterReturning return）     │
-│                                                              │
-│ Step 4. Spring AOP 代理对象放行                              │
-│         → Spring MVC 拿到原始 Result 对象                    │
-│         → Jackson/fastjson 序列化为 JSON                     │
-│         → DispatcherServlet 写入 HTTP Response               │
-│         → TCP 发送回前端                                     │
-│         → <b>此时接口响应完成</b>（前端收到 200 OK + JSON）   │
-│                                                              │
-│ === 主线程生命周期结束（HTTP 请求处理完毕）===                │
-└──────────────────────────────────────────────────────────────┘
+Step 1. Controller 业务执行 → service.create(entity) 落库（targetEmail 同时落地）
+Step 2. Controller 显式调 service.sendEmail(entity, ...)
+        → BaseService.sendEmail 同步执行反射 + 构造 Thymeleaf Context（~微秒级）
+        → AsyncTaskManager.execute(...) 提交异步任务（new Thread + .start()，瞬间完成）
+Step 3. Controller 包装 Result.success(entity, "创建成功") 并 return
+Step 4. Spring MVC 序列化 JSON → DispatcherServlet 写 HTTP Response
+        → 此时接口响应完成（前端收到 200）
+=== 主线程生命周期结束 ===
+```
 
-┌─ 后台子线程（与主线程 Step 3-4 <b>并行</b>）─────────────────┐
-│                                                              │
-│ Step 5. 后台子线程并行执行（sleep(0) + 邮件发送全流程）         │
-│         ├─ 子线程从 Thread.sleep(0) 醒来（几乎立即）          │
-│         ├─ 5.1 模板存在性校验                                │
-│         ├─ 5.2 构造 Thymeleaf Context                         │
-│         ├─ 5.3 SpringTemplateEngine.process() 渲染 HTML        │
-│         ├─ 5.4 MailService.sendHtmlEmail() SMTP 发送 │
-│         ├─ try-catch 兜底（失败仅日志告警）                    │
-│         └─ 子线程生命周期结束                                │
-│                                                              │
-│ 关键：步骤 5 可能在主线程 Step 4 <b>之后</b>才完成              │
-│      → 前端<b>不感知</b>邮件是否发送成功                      │
-│      → 子线程异常被隔离，不影响主线程的 Result 返回           │
-└──────────────────────────────────────────────────────────────┘
+后台子线程（与主线程并行）：
+
+```
+Step 5. ResourceSearcher.validateTemplateExists("crud-email-template")
+Step 6. SpringTemplateEngine.process("crud-email-template", context) 渲染 HTML
+Step 7. MailService.sendHtmlEmail(to, subject, html) SMTP 发送
+Step 8. try-catch 兜底（失败仅日志告警，不影响主业务）
+=== 子线程生命周期结束 ===
 ```
 
 **关键时序要点**：
 
 | 要点 | 说明 |
 |------|------|
-| **Step 2.2 非阻塞** | `new Thread(...).start()` 内部仅构造 Thread 对象（微秒级）+ 调用 .start()（立即返回），主线程这行代码 ≈ 微秒级完成，**不会**等待子线程 |
-| **Step 5 异步并行** | 后台子线程可能还要花 1-3 秒完成 SMTP 发送，此时前端已经收到 200 OK 响应 |
-| **异常隔离** | 子线程异常被 try-catch 捕获 → 仅日志告警 → 不会反向传播到主线程 → 不会导致 HTTP 500 |
-| **用户感知** | 前端调用接口后只看到 `Result.success(...)`，**不感知**邮件是否发送成功，邮件是后台"附带"的副作用 |
+| **AsyncTaskManager 非阻塞** | `new Thread(...).start()` 仅构造 Thread 对象（微秒级）+ .start()（立即返回）|
+| **子线程并行** | 后台 SMTP 发送 1-3 秒期间，前端已收到 200 |
+| **异常隔离** | 子线程 try-catch 兜底，不反向传播主线程 |
+| **targetEmail=null 跳过** | 主线程直接 return，不提交异步任务 |
 
-**对比同步 vs 异步**：
+### 7.5 邮件模板变量
 
-| 模式 | 主线程耗时 | 邮件失败影响 | 接口响应 |
-|------|----------|------------|---------|
-| 同步发送（不用 AsyncTaskManager） | 1-3 秒（被 SMTP 阻塞）| HTTP 500 风险 | 慢 |
-| **异步发送（当前实现）** | **~微秒级** | **仅日志告警** | **快（200 OK）** |
+模板 `crud-email-template.html` 接收的变量（由 `BaseService.sendEmail` 注入）：
 
-### 7.5 5 步传参与验证（同步，主线程）
+| 变量 | 类型 | 来源 | 示例 |
+|------|------|------|------|
+| `subject` | String | 内部构造 | `[数据操作通知] bid-handler-info/create - 2026-06-17 15:02:28` |
+| `formName` | String | `endpoint` 参数 | `bid-handler-info/create` |
+| `actionName` | String | `operation` 参数 | `新增` |
+| `operateTime` | String | `LocalDateTime.now()` | `2026-06-17 15:02:28` |
+| `status` | String | `operation + " 成功"` | `新增 成功` |
+| `data` | `List<Map.Entry<String, Object>>` | 反射遍历 entity 字段（**排除 targetEmail**） | 字段键值对列表 |
 
-代理对象调用 `handleAfterReturning(JoinPoint, Object, SendEmailOnSuccess)` 传入 3 个参数：
-
-| # | 参数 | 来源 | 验证/使用 |
-|---|------|------|-----------|
-| 1 | `JoinPoint joinPoint` | Spring AOP 自动注入 | `MethodSignature` + `Method` 反射推断 endpoint |
-| 2 | `Object result` | `returning = "result"` 绑定 | `instanceof Result<?>` 验证（防御性编程）|
-| 3 | `SendEmailOnSuccess anno` | 反射读取方法注解 | `anno.to()` / `anno.subject()` / `anno.templateName()` |
-
-**5 步同步处理**：
-1. `instanceof Result<?>` 验证（弱化强类型依赖）
-2. 反射提取 method 签名，推断 endpoint/operation
-3. fastjson2 序列化 `Result.data` 为 JSON
-4. 构造 subject（注解覆盖 or 默认格式）
-5. `AsyncTaskManager.execute(...)` 提交异步任务
-
-### 7.6 4 步异步发送（工作线程，0 ms 延迟）
-
-异步任务内部独立 try-catch 兜底：
-
-1. `ResourceSearcher.validateTemplateExists()` 模板存在性校验
-2. 构造 Thymeleaf Context 注入变量（subject/endpoint/operation/timestamp/result*）
-3. `SpringTemplateEngine.process(templateName, context)` 渲染 HTML
-4. `MailService.sendHtmlEmail(to, subject, html)` SMTP 发送
-
-### 7.7 技术栈协同
+### 7.6 技术栈协同
 
 | 技术 | 角色 |
 |------|------|
-| **Spring AOP / AspectJ** | 横向拦截（`@Aspect` + `@AfterReturning`）|
-| **Java 反射** | 动态获取方法元信息（`MethodSignature`）|
-| **fastjson2** | 实体转 JSON 字符串（`JSON.toJSONString`）|
-| **Thymeleaf** | 模板引擎渲染 HTML（`SpringTemplateEngine`）|
-| **AsyncTaskManager** | 异步线程池（`AsyncTaskManager.execute`）|
-| **JavaMailSender** | SMTP 协议发邮件（`MailService`）|
+| **Thymeleaf** | 模板引擎渲染 HTML（`SpringTemplateEngine`） |
+| **PropertyDescriptor** | 反射遍历 entity 字段（`java.beans.PropertyDescriptor`），**排除 targetEmail** |
+| **AsyncTaskManager** | 异步线程池（`new Thread + .start()`，纯 Java 线程，非 Spring `@Async` 代理） |
+| **JavaMailSender** | SMTP 协议发邮件（`MailService.sendHtmlEmail`） |
+| **ResourceSearcher** | classpath 模板文件存在性校验 |
 
-### 7.8 关键设计规范（防坑指南）
+### 7.7 关键设计规范（防坑指南）
 
 | 规范 | 原因 |
 |------|------|
-| **必须 try-catch 兜底** | 切面代码绝对不能因自身报错导致主业务回滚；邮件失败就失败日志告警 |
-| **耗时操作必须异步** | SMTP 网络 I/O 耗时 1-3 秒；同步会拖慢接口响应 |
-| **防代理失效** | 只有 Spring 注入对象调用方法时 AOP 才生效；类内部 A→B 调用 B 上的注解不会触发（跳过了"秘书"）|
-| **弱化强类型依赖** | `instanceof Result<?>` 校验避免 ClassCastException；不要预设拦截方法一定返回某类型 |
-| **参数名绑定** | `@AfterReturning(argNames = "joinPoint, result, anno")` 让编译器字节码保留形参名 |
+| **targetEmail=null 跳过** | 主线程直接 return，不创建 Thymeleaf Context、不开子线程，零开销 |
+| **反射异常隔离** | PropertyDescriptor 遍历用 try-catch 兜底，dataList 失败回退为 `List.of()`，邮件仍可发 |
+| **lambda 闭包** | dataList 须声明为 `finalDataList` 才能在 Runnable lambda 中捕获 |
+| **不要放 Controller 自动发邮件** | 当前方案需 Controller 显式调用，便于单元测试 mock |
 
-### 7.9 完整文件清单
+### 7.8 完整文件清单
 
 | # | 路径 | 角色 |
 |---|------|------|
-| 1 | `annotation/SendEmailOnSuccess.java` | 注解（贴在方法上）|
-| 2 | `aspect/CrudResultEmailAspect.java` | 切面（拦截注解方法）|
-| 3 | `templates/crud-result-notification.html` | 邮件 HTML 模板 |
-| 4 | `BidWinningBackendApplication.java` | 启动类加 `@EnableAspectJAutoProxy` |
-| 5 | 3 业务 Controller × 6 端点 | 贴 `@SendEmailOnSuccess(to = "ops@company.com")` |
-| 6 | `pom.xml` | 加 `org.aspectj:aspectjweaver`（Spring Boot 4 没有 starter-aop）|
+| 1 | `service/BaseService.java` | `sendEmail(T, String, String, String)` 邮件发送主入口（4-param）；`sendEmail(T, String, String)` 重载（2-param，从 entity 读 targetEmail） |
+| 2 | `service/bidhandlerinfo/BidHandlerInfoService.java` | `sendOperationEmail(entity)` 便利方法（1-param，从 entity 读 targetEmail） |
+| 3 | `templates/crud-email-template.html` | 邮件 HTML 模板（已加 `.content` 背景）|
+| 4 | `utils/AsyncTaskManager.java` | 异步执行器（`new Thread + .start()`）|
+| 5 | `utils/ResourceSearcher.java` | 模板存在性校验 |
+| 6 | `service/statuscheck/StatusCheckService.java` | `sendNotification()` 中标通知书 HTML 邮件发送（Thymeleaf 渲染 + 异步延迟）|
+| 7 | `service/mail/MailService.java` | `sendEmail` / `sendHtmlEmail` 邮件发送 |
 
 ---
 

@@ -33,7 +33,7 @@ import lombok.Data;
  *   <li><b>安全隔离</b>：Entity 不直接暴露给前端，避免泄漏敏感字段</li>
  * </ul>
  *
- * <h3>与 {@code BidHandlerInfoUpdateRequest} 的对比</h3>
+ * <h3>与 {@code UpdateRequest} 的对比</h3>
  * <table border="1">
  *   <tr><th>维度</th><th>CreateRequest（本类）</th><th>UpdateRequest</th></tr>
  *   <tr><td>HTTP 方法</td><td>POST</td><td>PATCH</td></tr>
@@ -59,11 +59,11 @@ import lombok.Data;
  * </table>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoUpdateRequest
+ * @see UpdateRequest
  * @see BidHandlerInfoController
  */
 @Data
-public class BidHandlerInfoCreateRequest {
+public class AddRequest {
     @NotBlank(message = "经办人姓名不能为空")
     @Size(max = 50, message = "经办人姓名长度不能超过50")
     private String handlerName;

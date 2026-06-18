@@ -21,7 +21,7 @@ import java.util.List;
  * <ul>
  *   <li>本 DTO <b>专属于</b>未来的 {@code POST /bid-winning-supplier-detail/batch-delete}，不复用于其他端点</li>
  *   <li>理由：避免端点间耦合（改一个端点的 DTO 不应影响其他端点），符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"</li>
- *   <li>与 {@code BidHandlerInfoBatchDeleteRequest} / {@code BidWinningNotificationBatchDeleteRequest} 结构完全相同，但<b>类型独立</b></li>
+ *   <li>与 {@code DeleteRequest} / {@code BidWinningNotificationBatchDeleteRequest} 结构完全相同，但<b>类型独立</b></li>
  * </ul>
  *
  * <h3>字段说明</h3>

@@ -2,7 +2,7 @@
   通用 CRUD 操作结果通知邮件模板（Thymeleaf）
 
   使用方：io.gitee.lujianshi.bidwinningbackend.service.BaseService
-  模板渲染入口：SpringTemplateEngine.process("crud-result-notification", context)
+  模板渲染入口：SpringTemplateEngine.process("crud-email-template", context)
 
   模板变量（由 BaseService.sendEmail 通过 Thymeleaf Context 注入）：
     subject         邮件标题（<title> 标签显示）
@@ -15,6 +15,7 @@
   CSS 样式说明：
     .status-success   绿色文字 → 操作成功
     .status-fail      红色文字 → 操作失败
+    .content          浅灰背景容器，包裹 base-info / data-section / footer
 -->
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
@@ -26,19 +27,20 @@
         .container { max-width: 600px; margin: 0 auto; }
         .header { background: #2c3e50; color: #fff; padding: 16px 20px; border-radius: 4px 4px 0 0; text-align: center; font-size: 18px; font-weight: 600; }
         .main-title { background: #ecf0f1; padding: 12px 20px; font-size: 16px; color: #2c3e50; border-bottom: 1px solid #d0d5d8; }
-        .base-info { padding: 12px 20px; border-bottom: 1px solid #eee; }
+        .content { background: #f8f9fa; padding: 4px 0; }
+        .base-info { padding: 16px 20px; border-bottom: 1px solid #e1e4e8; }
         .base-info .row { display: flex; padding: 6px 0; font-size: 14px; }
         .base-info .label { color: #7f8c8d; width: 80px; flex-shrink: 0; }
         .base-info .value { color: #2c3e50; font-weight: 500; }
         .status-success { color: #27ae60; font-weight: 600; }
         .status-fail { color: #e74c3c; font-weight: 600; }
-        .data-section { padding: 12px 20px; }
+        .data-section { padding: 16px 20px; }
         .data-title { font-size: 14px; color: #7f8c8d; margin-bottom: 8px; }
         .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .data-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
+        .data-table td { padding: 6px 8px; border-bottom: 1px solid #e1e4e8; }
         .data-table .key { color: #7f8c8d; width: 120px; }
         .data-table .value { color: #2c3e50; }
-        .footer { color: #95a5a6; font-size: 12px; text-align: center; padding: 16px; border-top: 1px solid #eee; margin-top: 8px; }
+        .footer { color: #95a5a6; font-size: 12px; text-align: center; padding: 16px; }
     </style>
 </head>
 <body>
@@ -49,33 +51,35 @@
         经办人表单 - 新增提交操作
     </div>
 
-    <div class="base-info">
-        <div class="row">
-            <div class="label">操作时间</div>
-            <div class="value" th:text="${operateTime}">2026-06-17 15:02:28</div>
+    <div class="content">
+        <div class="base-info">
+            <div class="row">
+                <div class="label">操作时间</div>
+                <div class="value" th:text="${operateTime}">2026-06-17 15:02:28</div>
+            </div>
+            <div class="row">
+                <div class="label">执行状态</div>
+                <div class="value"
+                     th:class="${status eq '成功'} ? 'status-success' : (${status.contains('失败')} ? 'status-fail' : '')"
+                     th:text="${status}">新增 成功</div>
+            </div>
         </div>
-        <div class="row">
-            <div class="label">执行状态</div>
-            <div class="value"
-                 th:class="${status eq '成功'} ? 'status-success' : (${status.contains('失败')} ? 'status-fail' : '')"
-                 th:text="${status}">新增 成功</div>
+
+        <div class="data-section">
+            <div class="data-title">返回数据</div>
+            <table class="data-table">
+                <tbody>
+                <tr th:each="entry : ${data}">
+                    <td class="key" th:text="${entry.key}">companyName</td>
+                    <td class="value" th:text="${entry.value}">北京科技有限公司</td>
+                </tr>
+                </tbody>
+            </table>
         </div>
-    </div>
 
-    <div class="data-section">
-        <div class="data-title">返回数据</div>
-        <table class="data-table">
-            <tbody>
-            <tr th:each="entry : ${data}">
-                <td class="key" th:text="${entry.key}">companyName</td>
-                <td class="value" th:text="${entry.value}">北京科技有限公司</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="footer">
-        本邮件由系统自动发送，请勿直接回复。
+        <div class="footer">
+            本邮件由 bid-winning-backend 系统自动发送，请勿直接回复。
+        </div>
     </div>
 </div>
 </body>

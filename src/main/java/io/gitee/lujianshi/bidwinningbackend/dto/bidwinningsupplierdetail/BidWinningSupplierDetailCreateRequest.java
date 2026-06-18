@@ -73,4 +73,6 @@ public class BidWinningSupplierDetailCreateRequest {
 
     @NotNull(message = "中标价不能为空")
     private BigDecimal amount;
+
+    private String targetEmail;
 }

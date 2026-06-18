@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * 定标通知 Controller — 6 端点标准 CRUD
  *
- * <p>端点列表 / PATCH 语义 / 分页机制 / 批量删除 / AOP 邮件通知 / 7 层链路
+ * <p>端点列表 / PATCH 语义 / 分页机制 / 批量删除 / Service 层邮件通知 / 7 层链路
  * 详见 {@code docs/business-controllers.md}。</p>
  */
 @RestController
@@ -59,6 +59,10 @@ public class BidWinningNotificationController {
      *   -d '{"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001"}'
      * </pre>
      *
+     * <p>本端点当前不发送邮件通知。如需接入，参考
+     * {@link io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService#sendOperationEmail}
+     * 的实现模式（Service 层显式调用，由 BaseService.sendEmail 实现邮件发送）。</p>
+     *
      * @param request 创建请求 DTO（{@link BidWinningNotificationCreateRequest}）
      */
     @PostMapping("/create-bid-winning-notification")
@@ -82,6 +86,7 @@ public class BidWinningNotificationController {
         entity.setBusinessBidDeadline(request.getBusinessBidDeadline());
         entity.setBiddingStatus(request.getBiddingStatus());
         entity.setNotes(request.getNotes());
+        entity.setTargetEmail(request.getTargetEmail());
         service.create(entity);
         return Result.success(entity, "创建成功");
     }
@@ -151,6 +156,7 @@ public class BidWinningNotificationController {
         after.setBusinessBidDeadline(request.getBusinessBidDeadline());
         after.setBiddingStatus(request.getBiddingStatus());
         after.setNotes(request.getNotes());
+        after.setTargetEmail(request.getTargetEmail());
         int rows = service.update(after);
         if (rows == 0) {
             return Result.error(404, "记录不存在");

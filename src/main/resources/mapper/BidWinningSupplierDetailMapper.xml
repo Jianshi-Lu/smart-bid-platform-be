@@ -37,6 +37,7 @@
         <result column="notification_id" property="notificationId"/>
         <result column="supplier_name"   property="supplierName"/>
         <result column="amount"          property="amount"/>
+        <result column="target_email"   property="targetEmail"/>
     </resultMap>
 
     <!--
@@ -49,9 +50,9 @@
             useGeneratedKeys="true"
             keyProperty="detailId">
         INSERT INTO bid_winning_supplier_detail
-            (notification_id, supplier_name, amount)
+            (notification_id, supplier_name, amount, target_email)
         VALUES
-            (#{notificationId}, #{supplierName}, #{amount})
+            (#{notificationId}, #{supplierName}, #{amount}, #{targetEmail})
     </insert>
 
     <!--
@@ -68,6 +69,7 @@
             <if test="notificationId != null">notification_id = #{notificationId},</if>
             <if test="supplierName != null">supplier_name = #{supplierName},</if>
             <if test="amount != null">amount = #{amount},</if>
+            <if test="targetEmail != null">target_email = #{targetEmail},</if>
         </set>
         WHERE detail_id = #{detailId}
     </update>
@@ -84,7 +86,7 @@
       按 ID 查询：resultMap 复用 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount
+        SELECT detail_id, notification_id, supplier_name, amount, target_email
         FROM bid_winning_supplier_detail
         WHERE detail_id = #{detailId}
     </select>
@@ -94,7 +96,7 @@
       数据量小时可直接用，数据量大时建议后续加分页
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount
+        SELECT detail_id, notification_id, supplier_name, amount, target_email
         FROM bid_winning_supplier_detail
     </select>
 
@@ -107,7 +109,7 @@
     </delete>
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount
+        SELECT detail_id, notification_id, supplier_name, amount, target_email
         FROM bid_winning_supplier_detail
         WHERE detail_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">

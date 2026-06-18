@@ -15,7 +15,7 @@ import java.util.List;
  *   <li>本 DTO <b>专属于</b> {@code POST /bid-winning-notification/batch-delete}，不复用于其他端点</li>
  *   <li>理由：避免端点间耦合（改一个端点的 DTO 不应影响其他端点），符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"</li>
  *   <li>命名规范：{@code <EntityName>BatchDeleteRequest}，实体名 + "BatchDelete" + "Request"</li>
- *   <li>与 {@code BidHandlerInfoBatchDeleteRequest} 等结构完全相同，但<b>类型独立</b></li>
+ *   <li>与 {@code DeleteRequest} 等结构完全相同，但<b>类型独立</b></li>
  * </ul>
  *
  * <h3>字段说明</h3>

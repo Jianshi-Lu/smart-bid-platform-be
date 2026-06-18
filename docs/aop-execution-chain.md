@@ -1,9 +1,10 @@
-# AOP 邮件通知切面执行链路
+# AOP 邮件通知切面执行链路（已下线，仅供历史参考）
 
-> 源代码：`aspect/CrudResultEmailAspect.java`
-> 注解：`annotation/SendEmailOnSuccess.java`
-> 模板：`templates/crud-result-notification.html`（默认 AOP 通知模板）
-> 收件人优先级：`Target-Email-Address` HTTP Header > 注解 `to()` > 配置默认
+> ⚠️ **本文档已下线**，仅供参考，不反映当前代码状态。
+>
+> **当前邮件通知方案**：Service 层显式调用 `BaseService.sendEmail`，详见 [docs/architecture.md §7](architecture.md#7-service-层邮件通知baseservicesendemail)。
+>
+> **源代码已删除**：`aspect/CrudResultEmailAspect.java` + `annotation/SendEmailOnSuccess.java` 已从代码库移除。
 
 ---
 

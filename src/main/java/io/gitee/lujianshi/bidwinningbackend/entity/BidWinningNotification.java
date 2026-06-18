@@ -41,4 +41,6 @@ public class BidWinningNotification {
     private String biddingStatus;
     private String notes;
     private LocalDateTime createdAt;
+
+    private String targetEmail;
 }

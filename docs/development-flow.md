@@ -568,7 +568,7 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 ## 7. 后续待办
 
 - [x] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller，6 端点含批量删除 p3 升级版）
-- [x] AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect` + crud-result 模板）— 详见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)
+- [x] Service 层邮件通知（`BaseService.sendEmail` + `crud-email-template` 模板）— 详见 [docs/architecture.md §7](architecture.md#7-service-层邮件通知baseservicesendemail)
 - [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
 - [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 上 `@NotBlank` / `@Size` 校验失效）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）
@@ -577,146 +577,56 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 
 ---
 
-## 8. AOP 切面开发模式（4 步标准开发）
+## 8. 接入新端点邮件通知的步骤（3 步标准开发）
 
-> 适用范围：所有需要**横切关注点**（Cross-cutting Concerns）的功能，包括：
-> - 操作日志记录、邮件通知、短信通知
-> - 接口限流、敏感数据脱敏、分布式锁
-> - 接口耗时统计、统一异常处理
+> **历史方案（已下线）**：早期使用 AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）拦截 Controller 返回值异步发邮件。详见 [docs/aop-execution-chain.md](aop-execution-chain.md)（已标记为 offline，仅供历史参考）。
 
-### 8.1 何时用 AOP（适用场景判断）
+### 8.1 何时需要在端点接入邮件通知
 
-当你发现某段逻辑（如日志、鉴权、缓存、通知）**散落在多个 Controller 或 Service** 中，且代码**高度重复**时，就该用切面。
+当某端点需要在业务操作成功后向指定邮箱发送 HTML 通知时，在该端点接入。
 
-**反例**（不要用 AOP）：
-- 核心业务逻辑（算钱、扣库存）→ 写在 Service
-- 一次性逻辑（仅 1 个端点用到）→ 写在 Controller
+**当前已接入端点**（仅 1 个）：
+- `POST /create-bid-handler-info` — `BidHandlerInfoService.sendOperationEmail`
 
-### 8.2 标准 4 步开发流程
+### 8.2 标准 3 步开发流程
 
-#### Step 1：定义注解（打标签）
+#### Step 1：DTO 添加 `targetEmail` 字段
 
 ```java
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)   // 必须 RUNTIME
-public @interface SendEmailOnSuccess {
-    String to();
-    String subject() default "";
-    String templateName() default "crud-result";
+// BidXxxCreateRequest.java
+private String targetEmail;   // 通知邮件收件人（已落库）
+```
+
+#### Step 2：子 Service 添加便利方法
+
+```java
+// BidXxxService.java
+public void sendOperationEmail(BidXxx entity) {
+    this.sendEmail(entity, "xxx/create", "新增");
 }
 ```
 
-**关键**：`@Retention(RetentionPolicy.RUNTIME)` 必填，否则 Spring AOP 反射读不到。
-
-#### Step 2：定义切面类（写逻辑）
+#### Step 3：Controller 业务方法末尾显式调用
 
 ```java
-@Aspect
-@Component
-public class CrudResultEmailAspect {
-    @AfterReturning(
-        pointcut = "@annotation(anno)",     // 拦截带注解的方法
-        returning = "result",                 // 绑定返回值
-        argNames = "joinPoint, result, anno"  // 形参名（编译期保留）
-    )
-    public void handleAfterReturning(JoinPoint joinPoint, Object result,
-                                     SendEmailOnSuccess anno) {
-        // 切面逻辑
-    }
-}
+// BidXxxController.java
+service.create(entity);
+service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
+return Result.success(entity, "创建成功");
 ```
 
-#### Step 3：确定增强时机（Advice）
+### 8.3 收件人说明
 
-| Advice | 时机 | 典型场景 |
-|--------|------|---------|
-| `@Before` | 方法执行前 | 鉴权、参数校验 |
-| `@AfterReturning` | 方法正常返回后 | 邮件通知、成功日志 |
-| `@AfterThrowing` | 方法抛异常后 | 异常告警收集 |
-| `@Around` | 环绕（最强）| 耗时统计、分布式锁、限流 |
+- `targetEmail` 来自 Entity 字段（`entity.targetEmail`），已落库（`target_email` 列）
+- `BaseService.sendEmail` 反射读取 `entity.targetEmail`，无需 Controller 显式传参
+- `targetEmail` 为 `null` 或空字符串时跳过发邮件
 
-**本项目用 `@AfterReturning`**，因为邮件通知仅在成功时发。
-
-#### Step 4：启动类开启 AOP
-
-```java
-@SpringBootApplication
-@EnableAsync
-@EnableAspectJAutoProxy   // ← 新增
-@MapperScan("...")
-public class BidWinningBackendApplication { }
-```
-
-### 8.3 5 步传参与验证流程（以 CrudResultEmailAspect 为例）
-
-代理对象调用 `handleAfterReturning(JoinPoint, Object, SendEmailOnSuccess)` 传入 3 个参数：
-
-| # | 参数 | 验证/使用 |
-|---|------|----------|
-| 1 | `JoinPoint joinPoint` | `MethodSignature` + `Method` 反射推断 endpoint |
-| 2 | `Object result` | `instanceof Result<?>` 验证（防御性编程）|
-| 3 | `SendEmailOnSuccess anno` | `anno.to()` / `anno.subject()` / `anno.templateName()` |
-
-### 8.4 主线程 / 后台子线程分离的精确时序（以 CrudResultEmailAspect 为例）
-
-**核心理解**：AOP 切面方法在主线程中执行（~微秒级），但实际的副作用（邮件发送）在后台子线程中执行（1-3 秒）。
-
-```
-┌─ 主线程（HTTP 请求处理）──────────────────────────────────┐
-│ Step 1. Controller 业务执行完毕，return Result             │
-│ Step 2. 触发 @AfterReturning 切面（主线程<b>未</b>放行）    │
-│   ├─ 2.1 切面前半段（~微秒级）                              │
-│   │   → instanceof 验证 + 反射推断 + JSON 序列化 + 构造主题 │
-│   └─ 2.2 AsyncTaskManager.execute(...)                     │
-│       → 主线程仅 new Thread + .start()，<b>瞬间</b>完成     │
-│ Step 3. 切面方法全部执行完毕（return）                      │
-│ Step 4. Spring 代理对象放行                                │
-│   → Spring MVC 序列化 Result 为 JSON                       │
-│   → TCP 发送回前端 → <b>此时接口响应完成</b>                │
-└──────────────────────────────────────────────────────────┘
-
-┌─ 后台子线程（与主线程 Step 3-4 <b>并行</b>）────────────┐
-│ Step 5. sleep(0) + 邮件发送全流程                          │
-│   → 可能在主线程 Step 4 <b>之后</b>才完成                 │
-│   → 前端<b>不感知</b>邮件是否发送成功                      │
-└──────────────────────────────────────────────────────────┘
-```
-
-**为什么这样设计**：
-
-| 模式 | 主线程耗时 | 接口响应 |
-|------|----------|---------|
-| 同步发送 | 1-3 秒（SMTP 阻塞主线程）| 慢 |
-| **异步发送（当前实现）** | **~微秒级**（仅 new Thread）| **快（200 OK）** |
-
-**关键：Step 2.2 的 `AsyncTaskManager.execute(...)` 是非阻塞调用**
-- 内部执行 `new Thread(runnable).start()`
-- 构造 Thread 对象（微秒级）+ 调用 .start()（**立即返回**，不等待子线程）
-- 主线程这行代码 ≈ 微秒级完成 → 继续往下走
-
----
-
-### 8.5 防坑指南（核心设计规范）
-
-| 规范 | 原因 |
-|------|------|
-| **try-catch 兜底** | 切面代码**绝对不能**因自身报错导致主业务回滚 |
-| **耗时操作异步化** | SMTP / HTTP / DB 等网络 I/O 必须丢线程池 |
-| **防代理失效** | 类内部 A→B 调用，B 上的注解**不会**触发切面（跳过了"秘书"）|
-| **弱化强类型** | `instanceof` 校验避免 ClassCastException |
-| **argNames 绑定** | 编译期字节码保留形参名，让 Spring 能正确注入 |
-
-### 8.6 完整文件清单（参考实现）
+### 8.4 完整文件清单
 
 | # | 路径 | 角色 |
 |---|------|------|
-| 1 | `annotation/SendEmailOnSuccess.java` | 注解 |
-| 2 | `aspect/CrudResultEmailAspect.java` | 切面 |
-| 3 | `templates/crud-result-notification.html` | 邮件模板 |
-| 4 | `BidWinningBackendApplication.java` | 加 `@EnableAspectJAutoProxy` |
-| 5 | 3 业务 Controller × 6 端点 | 贴 `@SendEmailOnSuccess` |
-| 6 | `pom.xml` | 加 `org.aspectj:aspectjweaver` |
-
-**Spring Boot 4 注意**：`spring-boot-starter-aop` starter 在 SB4 已**不存在**，需直接引 `aspectjweaver`（parent BOM 4.0.6 管理版本）。
-
-详细执行链路 / 5 步传参 / 技术栈协同：见 [docs/architecture.md §7](architecture.md#7-aop-切面业务操作后邮件通知)
+| 1 | `service/BaseService.java` | `sendEmail(T, String, String, String)` + `sendEmail(T, String, String)` 重载 |
+| 2 | `service/.../XxxService.java` | `sendOperationEmail(entity)` 便利方法（1-param，从 entity 读 targetEmail）|
+| 3 | `templates/crud-email-template.html` | 邮件 HTML 模板 |
+| 4 | `utils/AsyncTaskManager.java` | 异步执行器（`new Thread + .start()`）|
+| 5 | `service/mail/MailService.java` | SMTP 发送 |

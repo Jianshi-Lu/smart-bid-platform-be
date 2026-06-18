@@ -16,7 +16,8 @@
 │  ├─ handler_id PK        │
 │  ├─ handler_name         │
 │  ├─ company_name         │
-│  └─ department_name      │
+│  ├─ department_name      │
+│  └─ target_email        │
 └──────────────────────────┘
            │ 1:N
            ▼
@@ -27,7 +28,8 @@
 │  ├─ project_no / purchase_task_no     │
 │  ├─ 招标规则（流程/方式/采购方式等）  │
 │  ├─ 时间线（报名/技术/商务截止）      │
-│  └─ bidding_status / notes / created_at│
+│  ├─ bidding_status / notes / created_at│
+│  └─ target_email                  │
 └──────────────────────────────────────┘
            │ 1:N
            ▼
@@ -36,7 +38,8 @@
 │  ├─ detail_id PK                      │
 │  ├─ notification_id FK                │
 │  ├─ supplier_name                     │
-│  └─ amount (DECIMAL 15,2)             │
+│  ├─ amount (DECIMAL 15,2)             │
+│  └─ target_email                    │
 └──────────────────────────────────────┘
 ```
 
@@ -57,6 +60,7 @@
 | `handler_name` | VARCHAR(50) | ✅ | 经办人姓名 |
 | `company_name` | VARCHAR(100) | ✅ | 所属采购公司（V2+） |
 | `department_name` | VARCHAR(100) | ✅ | 所属采购部门（V2+） |
+| `target_email` | VARCHAR(255) | ❌ | 邮件通知收件人（已落库，V6+） |
 
 **索引**：PK（handler_id）
 
@@ -87,6 +91,7 @@
 | `bidding_status` | VARCHAR(20) | ❌ | 状态（默认 "已完成"） |
 | `notes` | TEXT | ❌ | 备注 |
 | `created_at` | DATETIME | ✅ | 创建时间（默认 CURRENT_TIMESTAMP） |
+| `target_email` | VARCHAR(255) | ❌ | 邮件通知收件人（已落库，V6+） |
 
 **索引**：
 - PK（notification_id）
@@ -105,6 +110,7 @@
 | `notification_id` | INT | ✅ | 外键，反向关联主表 |
 | `supplier_name` | VARCHAR(100) | ✅ | 中标供应商名称 |
 | `amount` | DECIMAL(15,2) | ✅ | 中标价（元） |
+| `target_email` | VARCHAR(255) | ❌ | 邮件通知收件人（已落库，V6+） |
 
 **索引**：
 - PK（detail_id）
@@ -125,8 +131,9 @@
 | V3 | `V3__update_handler_info_to_bid_handler_info.sql` | 重命名为 `bid_handler_info` |
 | V4 | `V4__create_bid_winning_notification.sql` | 创建 `bid_winning_notification` 表 |
 | V5 | `V5__create_bid_winning_supplier_detail.sql` | 创建 `bid_winning_supplier_detail` 表 |
+| V6 | `V6__add_target_email.sql` | 三个业务表各加 `target_email` 字段 |
 
-**执行顺序**：V1 → V2 → V3 → V4 → V5
+**执行顺序**：V1 → V2 → V3 → V4 → V5 → V6
 
 ---
 

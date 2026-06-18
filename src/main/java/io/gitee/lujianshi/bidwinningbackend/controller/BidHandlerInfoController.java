@@ -2,9 +2,9 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoBatchDeleteRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoCreateRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BidHandlerInfoUpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.DeleteRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
@@ -49,16 +49,17 @@ public class BidHandlerInfoController {
      * 创建成功后由 {@link BidHandlerInfoService# sendOperationEmail} 显式发送 HTML 通知邮件，
      * 收件人由 {@code targetEmail} 控制（试点方案，仅本端点）。</p>
      *
-     * @param request 创建请求 DTO（{@link BidHandlerInfoCreateRequest}）
+     * @param request 创建请求 DTO（{@link AddRequest}）
      */
     @PostMapping("/create-bid-handler-info")
-    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
+    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody AddRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
         entity.setHandlerName(request.getHandlerName());
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
+        entity.setTargetEmail(request.getTargetEmail());
         service.create(entity);
-        service.sendOperationEmail(entity, request.getTargetEmail());
+        service.sendOperationEmail(entity);
         return Result.success(entity, "创建成功");
     }
 
@@ -104,12 +105,12 @@ public class BidHandlerInfoController {
      * </pre>
      *
      * @param id 主键 ID
-     * @param request 更新请求 DTO（{@link BidHandlerInfoUpdateRequest}）
+     * @param request 更新请求 DTO（{@link UpdateRequest}）
      */
     @PatchMapping("/bid-handler-info/{id}")
     public Result<Diff<BidHandlerInfo>> patchBidHandlerInfo(
             @PathVariable Integer id,
-            @RequestBody BidHandlerInfoUpdateRequest request) {
+            @RequestBody UpdateRequest request) {
         BidHandlerInfo before = service.getById(id);
         if (before == null) {
             return Result.error(404, "记录不存在");
@@ -119,6 +120,7 @@ public class BidHandlerInfoController {
         after.setHandlerName(request.getHandlerName());
         after.setCompanyName(request.getCompanyName());
         after.setDepartmentName(request.getDepartmentName());
+        after.setTargetEmail(request.getTargetEmail());
         int rows = service.update(after);
         if (rows == 0) {
             return Result.error(404, "记录不存在");
@@ -195,10 +197,10 @@ public class BidHandlerInfoController {
      *   -d '{"ids":[1,2,3]}'
      * </pre>
      *
-     * @param request 批量删除请求 DTO（{@link BidHandlerInfoBatchDeleteRequest}）
+     * @param request 批量删除请求 DTO（{@link DeleteRequest}）
      */
     @PostMapping("/bid-handler-info/batch-delete")
-    public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody BidHandlerInfoBatchDeleteRequest request) {
+    public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody DeleteRequest request) {
         List<BidHandlerInfo> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
     }

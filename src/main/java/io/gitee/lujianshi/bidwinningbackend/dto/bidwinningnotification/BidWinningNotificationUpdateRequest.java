@@ -110,4 +110,6 @@ public class BidWinningNotificationUpdateRequest {
     private String biddingStatus;
 
     private String notes;
+
+    private String targetEmail;
 }

@@ -30,10 +30,12 @@ import java.util.function.Function;
  *   <li>{@code List&lt;BidHandlerInfo&gt; deleteByIds(List<Integer> ids)} — 批量删除，返回实际删除的实体列表</li>
  * </ul>
  *
- * <h3>本类新增方法（试点：DTO 传参邮件通知）</h3>
+ * <h3>本类新增方法（邮件通知，DTO 传参模式）</h3>
  * <ul>
- *   <li>{@link # sendEmail(BidHandlerInfo, String)} — 创建成功后异步发送 HTML 通知邮件，
- *       收件人由 {@code BidHandlerInfoCreateRequest.targetEmail} 传入，绕开 AOP 体系</li>
+ *   <li>{@link # sendOperationEmail(BidHandlerInfo, String)} — 创建经办人后由 Controller 显式调用，
+ *       渲染 {@code crud-email-template} 模板异步发送 HTML 通知邮件。收件人由
+ *       {@code AddRequest.targetEmail}（JSON body 字段，<b>不落库</b>）传入，
+ *       null/空字符串 = 跳过发邮件。端点描述硬编码为 {@code "bid-handler-info/create"}，操作类型为 {@code "新增"}。</li>
  * </ul>
  *
  * @see BidHandlerInfoController
@@ -48,13 +50,22 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
     protected BaseMapper<BidHandlerInfo> getMapper() {
         return mapper;
     }
+
     @Override
     protected Function<BidHandlerInfo, Integer> getIdExtractor() {
         return BidHandlerInfo::getHandlerId;
     }
 
-    public void sendOperationEmail(BidHandlerInfo entity, String targetEmail) {
-        this.sendEmail(entity, targetEmail, "bid-handler-info/create", "新增");
+    /**
+     * 创建经办人后异步发送 HTML 通知邮件。
+     *
+     * <p>端点描述和操作类型当前硬编码为 {@code "bid-handler-info/create"} / {@code "新增"}。
+     * 后续若其他业务方法（如 update / delete）也接入邮件通知，需重构为
+     * {@link BaseService#sendEmail} 直接调用并显式传入 endpoint 和 operation 参数。</p>
+     *
+     * @param entity 创建后的实体（邮件 {@code data} 字段来源，targetEmail 从 entity.targetEmail 反射读取）
+     */
+    public void sendOperationEmail(BidHandlerInfo entity) {
+        this.sendEmail(entity, "bid-handler-info/create", "新增");
     }
-
 }

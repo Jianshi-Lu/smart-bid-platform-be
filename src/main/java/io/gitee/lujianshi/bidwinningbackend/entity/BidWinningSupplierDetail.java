@@ -20,4 +20,6 @@ public class BidWinningSupplierDetail {
     private Integer notificationId;
     private String supplierName;
     private BigDecimal amount;
+
+    private String targetEmail;
 }

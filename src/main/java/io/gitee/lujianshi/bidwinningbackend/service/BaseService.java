@@ -86,7 +86,7 @@ public abstract class BaseService<T> {
             Map<String, Object> dataMap = new LinkedHashMap<>();
             PropertyDescriptor[] pds = BeanUtils.getPropertyDescriptors(entity.getClass());
             for (PropertyDescriptor pd : pds) {
-                if (pd.getReadMethod() != null && !"class".equals(pd.getName())) {
+                if (pd.getReadMethod() != null && !"class".equals(pd.getName()) && !"targetEmail".equals(pd.getName())) {
                     dataMap.put(pd.getName(), pd.getReadMethod().invoke(entity));
                 }
             }
@@ -113,6 +113,22 @@ public abstract class BaseService<T> {
                 System.err.println("[BASE-EMAIL] 发送失败: to=" + targetEmail + ", error=" + e.getMessage());
             }
         }, 0);
+    }
+
+    /**
+     * sendEmail 重载——targetEmail 从 entity.targetEmail 字段反射读取。
+     * entity 需携带 targetEmail 字段（已落库），否则跳过发邮件。
+     */
+    protected void sendEmail(T entity, String endpoint, String operation) {
+        String targetEmail = null;
+        try {
+            PropertyDescriptor pd = new PropertyDescriptor("targetEmail", entity.getClass());
+            Object val = pd.getReadMethod().invoke(entity);
+            targetEmail = (val != null) ? val.toString() : null;
+        } catch (Exception e) {
+            // targetEmail 字段不存在 → 跳过
+        }
+        this.sendEmail(entity, targetEmail, endpoint, operation);
     }
 
     @Transactional(rollbackFor = Exception.class)

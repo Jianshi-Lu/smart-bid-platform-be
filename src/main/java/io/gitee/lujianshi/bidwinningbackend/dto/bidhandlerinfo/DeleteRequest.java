@@ -52,7 +52,7 @@ import java.util.List;
  *
  * <h3>链路位置</h3>
  * <pre>
- *   ① Controller 接收 BidHandlerInfoBatchDeleteRequest（@Valid 触发 @NotEmpty 校验）
+ *   ① Controller 接收 DeleteRequest（@Valid 触发 @NotEmpty 校验）
  *      ↓
  *   ② 字段拷贝：ids → service.deleteByIds(ids)
  *      ↓
@@ -65,7 +65,7 @@ import java.util.List;
  * @see io.gitee.lujianshi.bidwinningbackend.dto.common.Result
  */
 @Data
-public class BidHandlerInfoBatchDeleteRequest {
+public class DeleteRequest {
 
     @NotEmpty(message = "ids 不能为空")
     @Size(max = 500, message = "单次批量删除不能超过 500 条")

@@ -132,55 +132,33 @@
 | 金额（DECIMAL） | JSON 数字（BigDecimal 序列化） | `67500.00` |
 | 布尔（TINYINT(1)） | JSON 布尔 | `true` / `false` |
 
-### 1.7 业务操作后邮件通知（AOP 切面）
+### 1.7 业务操作后邮件通知（Service 层显式调用）
 
-业务 Controller 端点标注 `@SendEmailOnSuccess(to = "...")` 后，AOP 切面（`CrudResultEmailAspect`）会在方法正常返回后**异步**发送邮件通知。
+> **历史方案（已下线）**：早期使用 AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）拦截 Controller 返回值异步发邮件。详见 [docs/aop-execution-chain.md](aop-execution-chain.md)（已标记为 offline，仅供历史参考）。
+
+**当前方案**：由 Service 层方法显式调用 `BaseService.sendEmail(entity, targetEmail, endpoint, operation)` 发送。
 
 **触发条件**：
-- 方法正常返回（异常不触发）
-- 返回值必须是 `Result<T>` 类型（通过 `instanceof` 校验）
+- 端点业务方法正常完成（异常不触发）
+- `targetEmail` 来自 `entity.target_email`（已落库），由 `BaseService.sendEmail` 反射读取
+- `targetEmail` 为 null 或空字符串时跳过发邮件
 
-**邮件内容**（HTML 模板 `crud-result-notification.html`）：
-- 操作类型徽章（CREATE / UPDATE / DELETE / BATCH_DELETE，颜色区分）
-- 业务码（`Result.code`） + 消息（`Result.message`）
-- 返回数据 JSON（`Result.data` 经 fastjson2 序列化）
-- 接口路径（HTTP method + 类名#方法名）
-- 时间戳
+**邮件内容**（HTML 模板 `crud-email-template.html`）：
+- 操作时间（yyyy-MM-dd HH:mm:ss）
+- 执行状态（"操作类型 成功"，如 "新增 成功"）
+- 实体字段键值对（`List<Map.Entry<String, Object>>`，动态遍历）
 
-**注解参数**：
-- `to`（必填）：收件人邮箱
-- `subject`（可选）：自定义邮件主题，默认 `[业务操作通知] {endpoint} {operation} - {timestamp}`
-- `templateName`（可选）：Thymeleaf 模板名，默认 `crud-result`
+**当前已接入端点**（3 Controller 中仅 1 个）：
+- `POST /create-bid-handler-info` — 创建经办人时发送（DTO 字段 `BidHandlerInfoCreateRequest.targetEmail`）
+- 其他 17 个端点**未**接入邮件通知
 
-**时序**：
-- Step 1：Controller 业务代码执行，return Result
-- Step 2：触发 @AfterReturning 切面（主线程未放行）
-  - Step 2.1：切面前半段（~微秒级，instanceof 验证 + 反射 + JSON 序列化 + 主题）
-  - Step 2.2：`AsyncTaskManager.execute(...)` 提交异步任务，主线程仅 `new Thread + .start()`，**瞬间**完成
-- Step 3：切面方法全部执行完毕（return）
-- Step 4：Spring 代理对象放行，Spring MVC 序列化 Result 为 JSON，**HTTP 响应完成**
-- Step 5（**与 Step 3-4 并行**）：后台子线程执行 sleep(0) + 邮件发送全流程
+**收件人邮箱来源**：
 
-完整执行链路：见 [docs/architecture.md §7.4](architecture.md#74-完整业务执行生命周期5-步精确时序--主子线程分离)
-AOP 切面开发模式：见 [docs/development-flow.md §8](development-flow.md#8-aop-切面开发模式4-步标准开发)
-
-**收件人邮箱来源（优先级）**：
-
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1（最高） | HTTP Header `Target-Email-Address` | 调用方可在请求头中指定通知邮箱 |
-| 2 | 注解 `to` 参数 | `@SendEmailOnSuccess(to = "ops@company.com")` |
-| 3（最低） | 配置默认值 | 当前为 `ops@company.com`（占位符） |
-
-**示例**（通过 header 指定通知邮箱）：
-```bash
-curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
-  -H "Content-Type: application/json" \
-  -H "Target-Email-Address: admin@company.com" \
-  -d '{"handlerName":"张三","companyName":"测试","departmentName":"采购部"}'
+```
+targetEmail (entity.target_email 字段，已落库) → null/空 = 跳过
 ```
 
-不传 `Target-Email-Address` header 时，使用注解 `to` 参数（`ops@company.com`）。
+`BaseService.sendEmail` 从 Entity 字段反射读取 `targetEmail`，无需 Controller 显式传参。
 
 ---
 
@@ -298,7 +276,7 @@ curl -X POST http://192.168.76.177:8080/send-notification \
 > 主键：`handler_id`（自增 INT）
 > Controller：`BidHandlerInfoController`
 
-> **本章所有端点均支持可选 Header `Target-Email-Address`**    **重要**：`Target-Email-Address` 是 **HTTP Header**（Postman 的 **Headers** 标签页），**不是 JSON body 字段**。用于覆盖通知邮件收件人。优先级：Header > 注解默认值 `ops@company.com`。详见 §1.7。
+> **本章端点邮件通知说明**：`POST /create-bid-handler-info` 端点支持 JSON body 字段 `targetEmail` 传入通知邮件收件人；其他 5 个端点**不**发送邮件通知。详见 §1.7。
 
 ### 4.1 `POST /create-bid-handler-info`
 
@@ -312,10 +290,10 @@ curl -X POST http://192.168.76.177:8080/send-notification \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `handlerName` | Body | String | 是 | @NotBlank, @Size(max=50) | 经办人姓名 |
 | `companyName` | Body | String | 是 | @NotBlank, @Size(max=100) | 所属采购公司 |
 | `departmentName` | Body | String | 是 | @NotBlank, @Size(max=100) | 所属部门 |
+| `targetEmail` | Body | String | 否 | — | 通知邮件收件人（**已落库**）；null/空字符串 = 不发邮件 |
 
 > **注意**：`@Valid` 校验当前**未启用**（待 `GlobalExceptionHandler` 补全），字段缺失不会触发 400。
 
@@ -357,7 +335,6 @@ curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 经办人主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
@@ -382,7 +359,6 @@ curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `handlerName` | Body | String | 否 | @Size(max=50) | 省略/为 null = 不修改 |
 | `companyName` | Body | String | 否 | @Size(max=100) | 同上 |
 | `departmentName` | Body | String | 否 | @Size(max=100) | 同上 |
@@ -425,7 +401,6 @@ curl -X PATCH http://192.168.76.177:8080/bid-handler-info/1 \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 经办人主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL DELETE
@@ -448,7 +423,6 @@ curl -X PATCH http://192.168.76.177:8080/bid-handler-info/1 \
 
 | 参数 | 位置 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `page` | Query | Integer | 1 | 页码（1-based） |
 | `size` | Query | Integer | 3 | 每页条数 |
 | `sort` | Query | String | `handler_id desc` | 排序（PageHelper 原生格式，空格分隔） |
@@ -497,7 +471,6 @@ curl "http://192.168.76.177:8080/bid-handler-info?page=1&size=3&sort=handler_id%
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除主键 ID 列表（1-500 条） |
 
 **调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表
@@ -533,7 +506,7 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 > 主键：`notification_id`（自增 INT）
 > Controller：`BidWinningNotificationController`
 
-> **本章所有端点均支持可选 Header `Target-Email-Address`**    **重要**：`Target-Email-Address` 是 **HTTP Header**（Postman 的 **Headers** 标签页），**不是 JSON body 字段**。用于覆盖通知邮件收件人。优先级：Header > 注解默认值 `ops@company.com`。详见 §1.7。
+> **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
 
 ### 5.1 `POST /create-bid-winning-notification`
 
@@ -549,7 +522,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `handlerId` | Body | Integer | 是 | @NotNull | 经办人 ID（关联 `bid_handler_info.handler_id`） |
 | `projectNo` | Body | String | 是 | @NotBlank, @Size(max=50) | 项目编号 |
 | `purchaseTaskNo` | Body | String | 是 | @NotBlank, @Size(max=50) | 采购任务编号 |
@@ -558,7 +530,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 校验 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `platformCategory` | Body | String | @Size(max=50) | 平台采购类别 |
 | `biddingProcess` | Body | String | @Size(max=50) | 招标流程 |
 | `biddingMethod` | Body | String | @Size(max=50) | 招标方式 |
@@ -594,7 +565,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 定标通知主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
@@ -641,7 +611,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 定标通知主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL DELETE
@@ -664,7 +633,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `pageNum` | Query | Integer | 1 | 页码 |
 | `pageSize` | Query | Integer | 10 | 每页条数 |
 | `sort` | Query | String | `notification_id desc` | 排序 |
@@ -691,7 +659,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除 `notification_id` 列表 |
 
 **调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表
@@ -711,7 +678,7 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 > 主键：`detail_id`（自增 INT）
 > Controller：`BidWinningSupplierDetailController`
 
-> **本章所有端点均支持可选 Header `Target-Email-Address`**    **重要**：`Target-Email-Address` 是 **HTTP Header**（Postman 的 **Headers** 标签页），**不是 JSON body 字段**。用于覆盖通知邮件收件人。优先级：Header > 注解默认值 `ops@company.com`。详见 §1.7。
+> **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
 
 ### 6.1 `POST /create-bid-winning-supplier-detail`
 
@@ -725,7 +692,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `notificationId` | Body | Integer | 是 | @NotNull | 定标通知 ID（关联 `bid_winning_notification.notification_id`） |
 | `supplierName` | Body | String | 是 | @NotBlank, @Size(max=100) | 中标供应商名称 |
 | `amount` | Body | BigDecimal | 是 | @NotNull | 中标价（元） |
@@ -748,7 +714,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 明细主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
@@ -773,7 +738,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `notificationId` | Body | Integer | 否 | — | 省略/为 null = 不修改 |
 | `supplierName` | Body | String | 否 | @Size(max=100) | 同上 |
 | `amount` | Body | BigDecimal | 否 | — | 同上 |
@@ -798,7 +762,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `id` | Path | Integer | 是 | 明细主键 ID |
 
 **调用链路**：Controller → Service → Mapper → MySQL DELETE
@@ -821,7 +784,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`）|
 | `pageNum` | Query | Integer | 1 | 页码 |
 | `pageSize` | Query | Integer | 10 | 每页条数 |
 | `sort` | Query | String | `detail_id desc` | 排序 |
@@ -848,7 +810,6 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |
-| `Target-Email-Address` | **HTTP Header**   | String | 否 | — |   **Header 字段**（非 JSON body）— 通知邮件收件人（覆盖默认 `ops@company.com`），不传则用注解 to |
 | `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除 `detail_id` 列表 |
 
 **调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表

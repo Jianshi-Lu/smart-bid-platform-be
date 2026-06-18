@@ -51,6 +51,7 @@
         <result column="bidding_status"         property="biddingStatus"/>
         <result column="notes"                  property="notes"/>
         <result column="created_at"             property="createdAt"/>
+        <result column="target_email"         property="targetEmail"/>
     </resultMap>
 
     <!--
@@ -68,13 +69,13 @@
              bidding_process, bidding_method, purchase_method, is_fixed_price,
              target_cost, document_fee, deposit, credit_report_required,
              registration_deadline, tech_bid_deadline, business_bid_deadline,
-             notes)
+             notes, target_email)
         VALUES
             (#{handlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
              #{biddingProcess}, #{biddingMethod}, #{purchaseMethod}, #{isFixedPrice},
              #{targetCost}, #{documentFee}, #{deposit}, #{creditReportRequired},
              #{registrationDeadline}, #{techBidDeadline}, #{businessBidDeadline},
-             #{notes})
+             #{notes}, #{targetEmail})
     </insert>
 
     <!--
@@ -107,6 +108,7 @@
             <if test="businessBidDeadline != null">business_bid_deadline = #{businessBidDeadline},</if>
             <if test="biddingStatus != null">bidding_status = #{biddingStatus},</if>
             <if test="notes != null">notes = #{notes},</if>
+            <if test="targetEmail != null">target_email = #{targetEmail},</if>
         </set>
         WHERE notification_id = #{notificationId}
     </update>
@@ -126,7 +128,7 @@
         SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
         FROM bid_winning_notification
         WHERE notification_id = #{notificationId}
     </select>
@@ -139,7 +141,7 @@
         SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
         FROM bid_winning_notification
     </select>
 
@@ -173,7 +175,7 @@
         SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at
+               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
         FROM bid_winning_notification
         WHERE notification_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">

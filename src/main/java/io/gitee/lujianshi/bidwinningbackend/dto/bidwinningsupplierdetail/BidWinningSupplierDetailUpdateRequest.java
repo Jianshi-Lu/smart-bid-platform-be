@@ -85,4 +85,6 @@ public class BidWinningSupplierDetailUpdateRequest {
     private String supplierName;
 
     private BigDecimal amount;
+
+    private String targetEmail;
 }
