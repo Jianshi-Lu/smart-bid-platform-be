@@ -43,18 +43,14 @@ public class BidWinningSupplierDetailController {
      *
      * <h3>请求示例</h3>
      * <pre>
-     * curl -X POST http://localhost:8080/create-bid-winning-supplier-detail \
+     * curl -X POST http://localhost:8080/add-bid-winning-supplier-detail \
      *   -H "Content-Type: application/json" \
      *   -d '{"notificationId":1,"supplierName":"ABC公司","amount":1234567.89}'
      * </pre>
      *
-     * <p>本端点当前不发送邮件通知。如需接入，参考
-     * {@link io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService#sendOperationEmail}
-     * 的实现模式（Service 层显式调用，由 BaseService.sendEmail 实现邮件发送）。</p>
-     *
      * @param request 创建请求 DTO（{@link AddRequest}）
      */
-    @PostMapping("/create-bid-winning-supplier-detail")
+    @PostMapping("/add-bid-winning-supplier-detail")
     public Result<BidWinningSupplierDetail> createBidWinningSupplierDetail(
             @Valid @RequestBody AddRequest request) {
         BidWinningSupplierDetail entity = new BidWinningSupplierDetail();

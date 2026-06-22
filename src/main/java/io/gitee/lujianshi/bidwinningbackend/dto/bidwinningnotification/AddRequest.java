@@ -48,7 +48,7 @@ import java.time.LocalDateTime;
  * </ul>
  *
  * <h3>校验触发</h3>
- * Controller 方法参数加 {@code @Valid} 后生效；当前 {@code createBidWinningNotification} 未加（待 GlobalExceptionHandler 一起补全）。
+ * Controller 方法参数加 {@code @Valid} 注解（已补全 GlobalExceptionHandler）。
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification
  * @see UpdateRequest

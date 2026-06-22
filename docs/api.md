@@ -149,7 +149,7 @@
 - 实体字段键值对（`List<Map.Entry<String, Object>>`，动态遍历）
 
 **当前已接入端点**（3 Controller 中仅 1 个）：
-- `POST /create-bid-handler-info` — 创建经办人时发送（DTO 字段 `BidHandlerInfoCreateRequest.targetEmail`）
+- `POST /bid-handler-info/add` — 创建经办人时发送（DTO 字段 `AddRequest.targetEmail`）
 - 其他 17 个端点**未**接入邮件通知
 
 **收件人邮箱来源**：
@@ -276,11 +276,11 @@ curl -X POST http://192.168.76.177:8080/send-notification \
 > 主键：`handler_id`（自增 INT）
 > Controller：`BidHandlerInfoController`
 
-> **本章端点邮件通知说明**：`POST /create-bid-handler-info` 端点支持 JSON body 字段 `targetEmail` 传入通知邮件收件人；其他 5 个端点**不**发送邮件通知。详见 §1.7。
+> **本章端点邮件通知说明**：`POST /bid-handler-info/add` 端点支持 JSON body 字段 `targetEmail` 传入通知邮件收件人；其他 5 个端点**不**发送邮件通知。详见 §1.7。
 
-### 4.1 `POST /create-bid-handler-info`
+### 4.1 `POST /bid-handler-info/add`
 
-**完整请求路径**：`http://192.168.76.177:8080/create-bid-handler-info`
+**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/add`
 
 **请求方式**：`POST`
 
@@ -305,7 +305,7 @@ curl -X POST http://192.168.76.177:8080/send-notification \
 
 **示例**：
 ```bash
-curl -X POST http://192.168.76.177:8080/create-bid-handler-info \
+curl -X POST http://192.168.76.177:8080/bid-handler-info/add \
   -H "Content-Type: application/json" \
   -d '{"handlerName":"张三","companyName":"测试公司","departmentName":"采购部"}'
 ```
@@ -508,15 +508,15 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 > **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
 
-### 5.1 `POST /create-bid-winning-notification`
+### 5.1 `POST /bid-winning-notification/add`
 
-**完整请求路径**：`http://192.168.76.177:8080/create-bid-winning-notification`
+**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/add`
 
 **请求方式**：`POST`
 
 **请求体**：JSON（raw）
 
-**请求参数**（`BidWinningNotificationCreateRequest`，17 字段）：
+**请求参数**（`AddRequest`，17 字段）：
 
 **必填字段（3 个）**：
 
@@ -680,15 +680,15 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 
 > **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
 
-### 6.1 `POST /create-bid-winning-supplier-detail`
+### 6.1 `POST /add-bid-winning-supplier-detail`
 
-**完整请求路径**：`http://192.168.76.177:8080/create-bid-winning-supplier-detail`
+**完整请求路径**：`http://192.168.76.177:8080/add-bid-winning-supplier-detail`
 
 **请求方式**：`POST`
 
 **请求体**：JSON（raw）
 
-**请求参数**（`BidWinningSupplierDetailCreateRequest`，3 字段）：
+**请求参数**（`AddRequest`，3 字段）：
 
 | 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
 | --- | --- | --- | --- | --- | --- |

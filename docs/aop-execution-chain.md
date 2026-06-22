@@ -26,7 +26,7 @@
 
 | Step | 动作 | 耗时 |
 |---|---|---|
-| 1 | Controller 业务执行完毕，`service.create(entity)` 落库，组装 `Result<Entity>` | 业务耗时 |
+| 1 | Controller 业务执行完毕，`service.add(entity)` 落库，组装 `Result<Entity>` | 业务耗时 |
 | 2 | 触发 `@AfterReturning` 切面（主线程**未**放行）<br>2.1 反射推断 endpoint/operation + fastjson2 序列化 Result.data + 构造 subject<br>2.2 `AsyncTaskManager.execute(runnable, 3000)` 提交异步任务 | 2.1 同步 ~微秒级<br>2.2 立即返回（new Thread + .start） |
 | 3 | 切面方法 return | — |
 | 4 | Spring AOP 代理对象放行 → Spring MVC 序列化 JSON → DispatcherServlet 写 HTTP Response | 序列化 + 网络 |

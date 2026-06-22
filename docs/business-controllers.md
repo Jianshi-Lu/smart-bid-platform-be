@@ -114,7 +114,7 @@
 
 | Controller | 端点 | 触发方法 | 收件人来源 |
 |---|---|---|---|
-| `BidHandlerInfoController` | `POST /create-bid-handler-info` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库，DB 字段 `target_email`） |
+| `BidHandlerInfoController` | `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库，DB 字段 `target_email`） |
 | `BidWinningNotificationController` | 全部 6 端点 | — | —（**不**发送邮件）|
 | `BidWinningSupplierDetailController` | 全部 6 端点 | — | —（**不**发送邮件）|
 
@@ -125,7 +125,7 @@
 #### ① 在 DTO 中添加 `targetEmail` 字段
 
 ```java
-// BidWinningNotificationCreateRequest.java
+// AddRequest.java
 private String targetEmail;   // 通知邮件收件人（已落库）
 ```
 
@@ -142,7 +142,7 @@ public void sendOperationEmail(BidWinningNotification entity) {
 
 ```java
 // BidWinningNotificationController.java
-service.create(entity);
+service.add(entity);
 service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
 return Result.success(entity, "创建成功");
 ```
@@ -172,7 +172,7 @@ entity.targetEmail（DB 字段 target_email）→ null/空 = 跳过
 
 ### 9.6 时序
 
-- Step 1：Controller 业务方法执行完（如 `service.create(entity)` + `service.sendOperationEmail(entity)`）
+- Step 1：Controller 业务方法执行完（如 `service.add(entity)` + `service.sendOperationEmail(entity)`）
 - Step 2：`sendOperationEmail` → `BaseService.sendEmail` 同步执行反射 + Thymeleaf 渲染（~微秒级）
 - Step 3：`AsyncTaskManager.execute(...)` 提交异步任务，主线程仅 `new Thread + .start()`，**瞬间**完成
 - Step 4：Controller 包装 `Result.success(...)` 返回

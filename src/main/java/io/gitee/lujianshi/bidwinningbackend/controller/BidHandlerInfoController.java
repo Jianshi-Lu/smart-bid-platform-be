@@ -37,7 +37,7 @@ public class BidHandlerInfoController {
      *   <tr><td>{@code handlerName}</td><td>String</td><td>是</td><td>经办人姓名</td></tr>
      *   <tr><td>{@code companyName}</td><td>String</td><td>是</td><td>所属采购公司</td></tr>
      *   <tr><td>{@code departmentName}</td><td>String</td><td>是</td><td>所属部门</td></tr>
-     *   <tr><td>{@code targetEmail}</td><td>String</td><td>否</td><td>通知邮件收件人（<b>不落库</b>）；null/空=不发邮件</td></tr>
+     *   <tr><td>{@code targetEmail}</td><td>String</td><td>是</td><td>通知邮件收件人（<b>已落库</b>）；空=返回400校验失败</td></tr>
      * </table>
      *
      * <h3>请求示例</h3>

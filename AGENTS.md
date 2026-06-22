@@ -180,7 +180,7 @@ src/main/resources/
 
 | Method | Path | Content-Type | Response data |
 |-------|------|-------------|---------------|
-| POST | `/create-bid-handler-info` | `application/json` | `BidHandlerInfo` |
+| POST | `/bid-handler-info/add` | `application/json` | `BidHandlerInfo` |
 | GET | `/bid-handler-info/{id}` | - | `BidHandlerInfo`（404→null） |
 | PATCH | `/bid-handler-info/{id}` | `application/json` | `Diff<BidHandlerInfo>` |
 | DELETE | `/bid-handler-info/{id}` | - | `null` |
@@ -191,7 +191,7 @@ src/main/resources/
 
 | Method | Path | Content-Type | Response data |
 |-------|------|-------------|---------------|
-| POST | `/create-bid-winning-notification` | `application/json` | `BidWinningNotification` |
+| POST | `/bid-winning-notification/add` | `application/json` | `BidWinningNotification` |
 | GET | `/bid-winning-notification/{id}` | - | `BidWinningNotification` |
 | PATCH | `/bid-winning-notification/{id}` | `application/json` | `Diff<BidWinningNotification>` |
 | DELETE | `/bid-winning-notification/{id}` | - | `null` |
@@ -202,7 +202,7 @@ src/main/resources/
 
 | Method | Path | Content-Type | Response data |
 |-------|------|-------------|---------------|
-| POST | `/create-bid-winning-supplier-detail` | `application/json` | `BidWinningSupplierDetail` |
+| POST | `/add-bid-winning-supplier-detail` | `application/json` | `BidWinningSupplierDetail` |
 | GET | `/bid-winning-supplier-detail/{id}` | - | `BidWinningSupplierDetail` |
 | PATCH | `/bid-winning-supplier-detail/{id}` | `application/json` | `Diff<BidWinningSupplierDetail>` |
 | DELETE | `/bid-winning-supplier-detail/{id}` | - | `null` |
@@ -224,7 +224,7 @@ src/main/resources/
 
 **关键点**：
 - 异步执行：主线程不阻塞（微秒级）；子线程用 `AsyncTaskManager`（纯 Java `new Thread().start()`，非 Spring `@Async` 代理）
-- 主题格式：`[{op}] {endpoint 摘要}`（如 `[CREATE] /create-bid-handler-info`）
+- 主题格式：`[{op}] {endpoint 摘要}`（如 `[CREATE] /bid-handler-info/add`）
 - 响应 `data` 通过 fastjson2 序列化为 JSON 嵌入邮件
 
 ## Async Task（`AsyncTaskManager`）

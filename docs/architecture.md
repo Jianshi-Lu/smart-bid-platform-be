@@ -546,9 +546,9 @@ Service（业务结果）→ Controller（包装为 Result）→ Jackson（序�
 ### 2.6 批量删除 DTO 模式（每端点独立 DTO + data 返实体列表）
 
 **文件**：
-- `src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoBatchDeleteRequest.java`
-- `src/main/java/.../dto/bidwinningnotification/BidWinningNotificationBatchDeleteRequest.java`
-- `src/main/java/.../dto/bidwinningsupplierdetail/BidWinningSupplierDetailBatchDeleteRequest.java`（**预留**，等 SupplierDetail Controller 启用）
+- `src/main/java/.../dto/bidhandlerinfo/DeleteRequest.java`
+- `src/main/java/.../dto/bidwinningnotification/BatchDeleteRequest.java`
+- `src/main/java/.../dto/bidwinningsupplierdetail/BatchDeleteRequest.java`（**预留**，等 SupplierDetail Controller 启用）
 
 **设计目标**：每端点独立 DTO，符合阿里《Java 开发手册》"推荐每 API 入口对应独立 DTO"。
 
@@ -644,8 +644,8 @@ Service（SELECT 存在行 → DELETE 它们 → 返实体列表）→ Controlle
 
 **当前使用范围**：
 - `BidHandlerInfoController.batchDeleteBidHandlerInfo` ← 用 `BidHandlerInfoBatchDeleteRequest`
-- `BidWinningNotificationController.batchDeleteBidWinningNotification` ← 用 `BidWinningNotificationBatchDeleteRequest`
-- `BidWinningSupplierDetailController.batchDeleteBidWinningSupplierDetail` ← 用 `BidWinningSupplierDetailBatchDeleteRequest`（**已启用**）
+- `BidWinningNotificationController.batchDeleteBidWinningNotification` ← 用 `BatchDeleteRequest`
+- `BidWinningSupplierDetailController.batchDeleteBidWinningSupplierDetail` ← 用 `BatchDeleteRequest`（**已启用**）
 
 ---
 
@@ -801,7 +801,7 @@ Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟 5 秒后执�
 
 | Method | Path | 用途 | 返回类型 | 状态 |
 |--------|------|------|----------|------|
-| POST | `/create-bid-handler-info` | 创建经办人 | `Result<BidHandlerInfo>` | ✅ |
+| POST | `/bid-handler-info/add` | 创建经办人 | `Result<BidHandlerInfo>` | ✅ |
 | GET | `/bid-handler-info/{id}` | 按主键查询 | `Result<BidHandlerInfo>` | ✅ |
 | **PATCH** | `/bid-handler-info/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidHandlerInfo>>` | ✅ |
 | DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` | ✅ |
@@ -815,14 +815,14 @@ Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟 5 秒后执�
 
 ---
 
-#### `POST /create-bid-handler-info`
+#### `POST /bid-handler-info/add`
 
 | 项目 | 内容 |
 |------|------|
 | HTTP 方法 | POST |
-| 完整 URL | `http://localhost:8080/create-bid-handler-info` |
+| 完整 URL | `http://localhost:8080/bid-handler-info/add` |
 | Content-Type | `application/json`（`@RequestBody` 要求） |
-| 请求参数 | `BidHandlerInfoCreateRequest`（JSON body，3 字段含 `@NotBlank` / `@Size` 校验注解，**当前未加 @Valid**） |
+| 请求参数 | `AddRequest`（JSON body，3 字段含 `@NotBlank` / `@Size` 校验注解，已加 @Valid） |
 | 返回值 | `Result<BidHandlerInfo>`（code=200，data=Entity） |
 
 **调用链路**：
@@ -830,10 +830,10 @@ Step 4. 异步任务（AsyncTaskManager.execute(..., 5000)，延迟 5 秒后执�
 ```
 JSON (handlerName/companyName/departmentName)
   ↓ Jackson 反序列化
-BidHandlerInfoCreateRequest
+AddRequest
   ↓ 字段拷贝
 BidHandlerInfo Entity
-  ↓ service.create(entity) → mapper.insert() → XML <insert> → MySQL INSERT + 自增回填
+  ↓ service.add(entity) → mapper.insert() → XML <insert> → MySQL INSERT + 自增回填
   ↓ 包装为 Result.success(entity, "创建成功")
 JSON Response
 ```
@@ -1099,7 +1099,7 @@ JSON Response
 
 | Method | Path | 用途 | 返回类型 | 状态 |
 |--------|------|------|----------|------|
-| POST | `/create-bid-winning-notification` | 创建定标通知 | `Result<BidWinningNotification>` | ✅ |
+| POST | `/bid-winning-notification/add` | 创建定标通知 | `Result<BidWinningNotification>` | ✅ |
 | GET | `/bid-winning-notification/{id}` | 按主键查询 | `Result<BidWinningNotification>` | ✅ |
 | **PATCH** | `/bid-winning-notification/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidWinningNotification>>` | ✅ |
 | DELETE | `/bid-winning-notification/{id}` | 按主键删除 | `Result<Void>` | ✅ |
@@ -1108,12 +1108,12 @@ JSON Response
 
 #### 端点详解
 
-**POST /create-bid-winning-notification**
+**POST /bid-winning-notification/add**
 
 | 项目 | 内容 |
 |------|------|
-| 请求 DTO | `BidWinningNotificationCreateRequest`（17 字段：3 必填 + 14 可选）|
-| 调用链 | JSON → DTO → Entity（17 字段拷贝）→ service.create() → mapper.insert() → MySQL INSERT + 自增回填 `notificationId` → Result.success(entity, "创建成功") |
+| 请求 DTO | `AddRequest`（17 字段：3 必填 + 14 可选）|
+| 调用链 | JSON → DTO → Entity（17 字段拷贝）→ service.add() → mapper.insert() → MySQL INSERT + 自增回填 `notificationId` → Result.success(entity, "创建成功") |
 | 响应 | `Result<BidWinningNotification>`（code=200）|
 
 **GET /bid-winning-notification/{id}**
@@ -1165,7 +1165,7 @@ JSON Response
 | HTTP 方法 | POST |
 | 完整 URL | `http://localhost:8080/bid-winning-notification/batch-delete` |
 | Content-Type | `application/json`（`@RequestBody` + `@Valid` 触发校验） |
-| 请求参数 | `BidWinningNotificationBatchDeleteRequest`（`{ "ids": [1, 2, 3] }`，`@NotEmpty` + `@Size(max=500)`） |
+| 请求参数 | `BatchDeleteRequest`（`{ "ids": [1, 2, 3] }`，`@NotEmpty` + `@Size(max=500)`） |
 | 返回值 | `Result<List<BidWinningNotification>>`（code=200，data=实际删除的实体列表） |
 
 **调用链路**：
@@ -1219,7 +1219,7 @@ JSON Response
 
 | Method | Path | 用途 | 返回类型 | 状态 |
 |--------|------|------|----------|------|
-| POST | `/create-bid-winning-supplier-detail` | 创建中标结果明细 | `Result<BidWinningSupplierDetail>` | ✅ |
+| POST | `/add-bid-winning-supplier-detail` | 创建中标结果明细 | `Result<BidWinningSupplierDetail>` | ✅ |
 | GET | `/bid-winning-supplier-detail/{id}` | 按主键查询 | `Result<BidWinningSupplierDetail>` | ✅ |
 | **PATCH** | `/bid-winning-supplier-detail/{id}` | 按主键**部分更新**（返回 diff） | `Result<Diff<BidWinningSupplierDetail>>` | ✅ |
 | DELETE | `/bid-winning-supplier-detail/{id}` | 按主键删除 | `Result<Void>` | ✅ |
@@ -1512,12 +1512,12 @@ Controller（@Valid 触发校验）
 | XML 位置 | `resources/mapper/*.xml` | Maven 编译范围外，是资源文件 |
 | `namespace` | = Mapper 接口全限定名 | 关键约束，错一位全废 |
 
-**完整链路实例（POST /create-bid-handler-info）**：
+**完整链路实例（POST /bid-handler-info/add）**：
 
 1. Postman POST `{handlerName, companyName, departmentName}`
 2. Spring MVC 路由 → `BidHandlerInfoController.createBidHandlerInfo()`
 3. ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（待 `GlobalExceptionHandler` 一起补全）
-4. Jackson 反序列化 → `BidHandlerInfoCreateRequest`
+4. Jackson 反序列化 → `AddRequest`
 5. 字段拷贝：DTO → Entity
 6. `BidHandlerInfoService.create(entity)`
 7. `BidHandlerInfoMapper.insert(entity)`（**Spring 注入的代理实现**）
@@ -1848,7 +1848,7 @@ Spring 解析 `${XXX}` 占位符时按以下顺序查找：
 
 | Controller | 端点 | 触发方法 |
 |---|---|---|
-| `BidHandlerInfoController` | `POST /create-bid-handler-info` | `service.sendEmail(entity, ...)`（targetEmail 从 entity 反射读取） |
+| `BidHandlerInfoController` | `POST /bid-handler-info/add` | `service.sendEmail(entity, ...)`（targetEmail 从 entity 反射读取） |
 | 其他 17 个端点 | — | **不**发送邮件 |
 
 ### 7.2 接入新端点的步骤
@@ -1872,7 +1872,7 @@ public void sendOperationEmail(BidXxx entity) {
 #### ③ Controller 业务方法末尾调用
 
 ```java
-service.create(entity);
+service.add(entity);
 service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
 return Result.success(entity, "创建成功");
 ```
@@ -1933,7 +1933,7 @@ protected void sendEmail(T entity, String targetEmail, String endpoint, String o
 主线程（HTTP 请求处理）：
 
 ```
-Step 1. Controller 业务执行 → service.create(entity) 落库（targetEmail 同时落地）
+Step 1. Controller 业务执行 → service.add(entity) 落库（targetEmail 同时落地）
 Step 2. Controller 显式调 service.sendEmail(entity, ...)
         → BaseService.sendEmail 同步执行反射 + 构造 Thymeleaf Context（~微秒级）
         → AsyncTaskManager.execute(...) 提交异步任务（new Thread + .start()，瞬间完成）

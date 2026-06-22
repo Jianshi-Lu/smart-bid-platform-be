@@ -46,7 +46,7 @@ import lombok.Data;
  * <ul>
  *   <li>{@link NotBlank}：字符串非 null 且去除首尾空格后长度 &gt; 0</li>
  *   <li>{@link Size}：字符串最大长度限制</li>
- *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解（当前未加，待 GlobalExceptionHandler 一起补全）</li>
+ *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解（已补全 GlobalExceptionHandler）</li>
  *   <li>校验失败：抛 {@code MethodArgumentNotValidException}（由 {@code GlobalExceptionHandler} 统一处理）</li>
  * </ul>
  *

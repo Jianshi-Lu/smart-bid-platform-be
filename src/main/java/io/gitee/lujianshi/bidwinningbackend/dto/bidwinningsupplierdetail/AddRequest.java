@@ -38,7 +38,7 @@ import java.math.BigDecimal;
  * </ul>
  *
  * <h3>校验触发</h3>
- * Controller 方法参数加 {@code @Valid} 后生效；当前 {@code createBidWinningSupplierDetail} 未加（待 GlobalExceptionHandler 一起补全）。
+ * Controller 方法参数加 {@code @Valid} 注解（已补全 GlobalExceptionHandler）。
  *
  * <h3>与 {@code UpdateRequest} 的对比</h3>
  * <table border="1">

@@ -48,7 +48,7 @@ import java.math.BigDecimal;
  *   <li><b>无</b> {@code @NotBlank} / {@code @NotNull}：PATCH 语义下 null 是合法值（表示"不修改"）</li>
  *   <li>保留 {@code @Size(max=100)} 限制（确保即使是 PATCH，提供值时也不超长）</li>
  *   <li>DB 层的 NOT NULL 约束是最后防线（即使 DTO 漏校验，DB 也会拒）</li>
- *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解（当前未加，待 GlobalExceptionHandler 一起补全）</li>
+ *   <li>校验触发：Controller 方法参数加 {@code @Valid} 注解（已补全 GlobalExceptionHandler）</li>
  * </ul>
  *
  * <h3>XML 配合（动态 SQL）</h3>

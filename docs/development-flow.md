@@ -183,7 +183,7 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
 
 ### ⑥ DTO 层
 
-**位置**：`src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoCreateRequest.java`
+**位置**：`src/main/java/.../dto/bidhandlerinfo/AddRequest.java`
 
 **职责**：HTTP 请求/响应的载体，与 Entity 分离。
 
@@ -199,7 +199,7 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
 **本例产物**：
 ```java
 @Data
-public class BidHandlerInfoCreateRequest {
+public class AddRequest {
 
     @NotBlank(message = "经办人姓名不能为空")
     @Size(max = 50, message = "经办人姓名长度不能超过50")
@@ -224,7 +224,7 @@ public class BidHandlerInfoCreateRequest {
 
 | Method | Path | 作用 | 状态 |
 |--------|------|------|------|
-| POST | `/create-bid-handler-info` | 创建 | ✅ 已实现 |
+| POST | `/bid-handler-info/add` | 创建 | ✅ 已实现 |
 | GET | `/bid-handler-info/{id}` | 按 ID 查询 | ✅ 已实现 |
 | **PATCH** | `/bid-handler-info/{id}` | 按 ID **部分更新**（带 diff） | ✅ 已实现 |
 | DELETE | `/bid-handler-info/{id}` | 按 ID 删除 | ✅ 已实现 |
@@ -243,13 +243,13 @@ public class BidHandlerInfoController {
     private BidHandlerInfoService service;
 
     // 创建
-    @PostMapping("/create-bid-handler-info")
-    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody BidHandlerInfoCreateRequest request) {
+    @PostMapping("/bid-handler-info/add")
+    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody AddRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
         entity.setHandlerName(request.getHandlerName());
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
-        service.create(entity);
+        service.add(entity);
         return Result.success(entity, "创建成功");
     }
 
@@ -316,16 +316,16 @@ public class BidHandlerInfoController {
 
 ---
 
-## 3. 完整调用链（以 POST /create-bid-handler-info 为例）
+## 3. 完整调用链（以 POST /bid-handler-info/add 为例）
 
 ```
 Postman
-  ↓ POST /create-bid-handler-info {handlerName, companyName, departmentName}
+  ↓ POST /bid-handler-info/add {handlerName, companyName, departmentName}
 Spring DispatcherServlet
   ↓ 路由匹配 → BidHandlerInfoController.createBidHandlerInfo()
   ↓ ⚠️ 当前未加 @Valid，DTO 上的 @NotBlank/@Size 暂未生效
 Jackson
-  ↓ 反序列化 JSON → BidHandlerInfoCreateRequest
+  ↓ 反序列化 JSON → AddRequest
 Controller
   ↓ 字段拷贝：DTO → Entity（手动 setXxx）
   ↓ BidHandlerInfoService.create(entity)
@@ -367,7 +367,7 @@ Postman
 | ③ Mapper 接口 | `src/main/java/.../mapper/BidHandlerInfoMapper.java` | 方法签名 |
 | ④ Mapper XML | `src/main/resources/mapper/BidHandlerInfoMapper.xml` | SQL 实现 |
 | ⑤ Service | `src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java` | 业务编排 |
-| ⑥ DTO | `src/main/java/.../dto/bidhandlerinfo/BidHandlerInfoCreateRequest.java` | 请求载体 |
+| ⑥ DTO | `src/main/java/.../dto/bidhandlerinfo/AddRequest.java` | 请求载体 |
 | ⑦ Controller | `src/main/java/.../controller/bidhandlerinfo/BidHandlerInfoController.java` | HTTP 入口 |
 
 ---
@@ -385,7 +385,7 @@ Postman
 | ③ Mapper 接口 | 复制 `BidHandlerInfoMapper.java` 改名 | ✅（含 @Mapper 注解）|
 | ④ Mapper XML | 复制 `BidHandlerInfoMapper.xml` 改名 + 改 SQL | ✅（含 PATCH 动态 SQL `<set> + <if>`）|
 | ⑤ Service | 复制 `BidHandlerInfoService.java` 改名 | ✅ |
-| ⑥ DTO | 复制 `BidHandlerInfoCreateRequest.java` 改名 + 17 字段 | ✅（CreateRequest + UpdateRequest）|
+| ⑥ DTO | 复制 `AddRequest.java` 改名 + 17 字段 | ✅（CreateRequest + UpdateRequest）|
 | ⑦ Controller | 复制 `BidHandlerInfoController.java` 改名 + 5 端点 | ✅ |
 
 **BidWinningNotification vs BidHandlerInfo 差异**：
@@ -410,7 +410,7 @@ Postman
 | ③ Mapper 接口 | 复制 `BidWinningNotificationMapper.java` 改名 | ✅（含 `deleteByIds` + `selectByIds`，共 7 方法）|
 | ④ Mapper XML | 复制 `BidWinningNotificationMapper.xml` 改名 + 改 SQL | ✅（含 PATCH 动态 SQL `<set> + <if>`）|
 | ⑤ Service | 复制 `BidWinningNotificationService.java` 改名 | ✅（6 方法：create/update/delete/getById/listAll/deleteByIds）|
-| ⑥ DTO | 复制 `BidWinningNotificationCreateRequest.java` 改名 + 3 字段 | ✅（CreateRequest + UpdateRequest + BatchDeleteRequest）|
+| ⑥ DTO | 复制 `AddRequest.java` 改名 + 3 字段 | ✅（CreateRequest + UpdateRequest + BatchDeleteRequest）|
 | ⑦ Controller | 复制 `BidWinningNotificationController.java` 改名 | ✅（6 端点）|
 
 ---
@@ -586,7 +586,7 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 当某端点需要在业务操作成功后向指定邮箱发送 HTML 通知时，在该端点接入。
 
 **当前已接入端点**（仅 1 个）：
-- `POST /create-bid-handler-info` — `BidHandlerInfoService.sendOperationEmail`
+- `POST /bid-handler-info/add` — `BidHandlerInfoService.sendOperationEmail`
 
 ### 8.2 标准 3 步开发流程
 
@@ -610,7 +610,7 @@ public void sendOperationEmail(BidXxx entity) {
 
 ```java
 // BidXxxController.java
-service.create(entity);
+service.add(entity);
 service.sendOperationEmail(entity);   // targetEmail=null/空则 BaseService.sendEmail 跳过
 return Result.success(entity, "创建成功");
 ```
