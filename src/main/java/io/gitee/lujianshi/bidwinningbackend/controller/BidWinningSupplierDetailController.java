@@ -2,9 +2,9 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailBatchDeleteRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailCreateRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailUpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BatchDeleteRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail;
@@ -52,17 +52,17 @@ public class BidWinningSupplierDetailController {
      * {@link io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService#sendOperationEmail}
      * 的实现模式（Service 层显式调用，由 BaseService.sendEmail 实现邮件发送）。</p>
      *
-     * @param request 创建请求 DTO（{@link BidWinningSupplierDetailCreateRequest}）
+     * @param request 创建请求 DTO（{@link AddRequest}）
      */
     @PostMapping("/create-bid-winning-supplier-detail")
     public Result<BidWinningSupplierDetail> createBidWinningSupplierDetail(
-            @RequestBody BidWinningSupplierDetailCreateRequest request) {
+            @Valid @RequestBody AddRequest request) {
         BidWinningSupplierDetail entity = new BidWinningSupplierDetail();
         entity.setNotificationId(request.getNotificationId());
         entity.setSupplierName(request.getSupplierName());
         entity.setAmount(request.getAmount());
         entity.setTargetEmail(request.getTargetEmail());
-        service.create(entity);
+        service.add(entity);
         return Result.success(entity, "创建成功");
     }
 
@@ -102,12 +102,12 @@ public class BidWinningSupplierDetailController {
      * </pre>
      *
      * @param id 主键 ID
-     * @param request 更新请求 DTO（{@link BidWinningSupplierDetailUpdateRequest}）
+     * @param request 更新请求 DTO（{@link UpdateRequest}）
      */
     @PatchMapping("/bid-winning-supplier-detail/{id}")
     public Result<Diff<BidWinningSupplierDetail>> patchBidWinningSupplierDetail(
             @PathVariable Integer id,
-            @RequestBody BidWinningSupplierDetailUpdateRequest request) {
+            @Valid @RequestBody UpdateRequest request) {
         BidWinningSupplierDetail before = service.getById(id);
         if (before == null) {
             return Result.error(404, "记录不存在");
@@ -153,22 +153,22 @@ public class BidWinningSupplierDetailController {
      * <h3>输入参数（URL query）</h3>
      * <table border="1">
      *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code pageNum}</td><td>int</td><td>否</td><td>页码（默认 1）</td></tr>
+     *   <tr><td>{@code page}</td><td>int</td><td>否</td><td>页码（默认 1）</td></tr>
      *   <tr><td>{@code pageSize}</td><td>int</td><td>否</td><td>每页条数（默认 10）</td></tr>
      *   <tr><td>{@code sort}</td><td>String</td><td>否</td><td>PageHelper 原生格式（空格分隔），默认 {@code "detail_id desc"}</td></tr>
      * </table>
      *
      * <h3>请求示例</h3>
-     * <pre>curl "http://localhost:8080/bid-winning-supplier-detail?pageNum=1&pageSize=10&sort=detail_id%20desc"</pre>
+     * <pre>curl "http://localhost:8080/bid-winning-supplier-detail?page=1&pageSize=10&sort=detail_id%20desc"</pre>
      */
     @GetMapping("/bid-winning-supplier-detail")
     public Result<PageInfo<BidWinningSupplierDetail>> listBidWinningSupplierDetail(
-            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(defaultValue = "detail_id desc") String sort) {
         try {
             //noinspection try
-            PageHelper.startPage(pageNum, pageSize, sort);
+            PageHelper.startPage(page, pageSize, sort);
             List<BidWinningSupplierDetail> list = service.listAll();
             PageInfo<BidWinningSupplierDetail> pageInfo = new PageInfo<>(list);
             return Result.success(pageInfo, "查询成功");
@@ -195,11 +195,11 @@ public class BidWinningSupplierDetailController {
      *   -d '{"ids":[1,2,3]}'
      * </pre>
      *
-     * @param request 批量删除请求 DTO（{@link BidWinningSupplierDetailBatchDeleteRequest}）
+     * @param request 批量删除请求 DTO（{@link BatchDeleteRequest}）
      */
     @PostMapping("/bid-winning-supplier-detail/batch-delete")
     public Result<List<BidWinningSupplierDetail>> batchDeleteBidWinningSupplierDetail(
-            @Valid @RequestBody BidWinningSupplierDetailBatchDeleteRequest request) {
+            @Valid @RequestBody BatchDeleteRequest request) {
         List<BidWinningSupplierDetail> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
     }

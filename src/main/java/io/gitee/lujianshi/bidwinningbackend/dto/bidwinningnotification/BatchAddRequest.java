@@ -1,0 +1,44 @@
+package io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+import java.util.List;
+
+/**
+ * 批量新增定标通知 — 请求 DTO。
+ *
+ * <p>外层 {@code targetEmail} 指定汇总邮件收件人（非空时所有记录汇总到 1 封邮件）；
+ * 为空/blank 时不发送汇总邮件。内层 {@code items} 复用 {@link AddRequest}，
+ * 每条记录的 targetEmail 各自落库，不参与邮件路由。</p>
+ *
+ * <h3>请求示例</h3>
+ * <pre>
+ * POST /bid-winning-notification/batch-add
+ * Content-Type: application/json
+ *
+ * {
+ *   "targetEmail": "manager@company.com",
+ *   "items": [
+ *     {"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001","targetEmail":"alice@example.com"},
+ *     {"handlerId":2,"projectNo":"PRJ-2024-002","purchaseTaskNo":"PT-2024-002","targetEmail":"bob@example.com"}
+ *   ]
+ * }
+ * </pre>
+ */
+@Data
+public class BatchAddRequest {
+
+    /**
+     * 汇总邮件收件人（可选）。
+     * <p>非空时，所有新增记录汇总到 1 封邮件发送至此地址；
+     * 为空/blank 时不发送汇总邮件。</p>
+     */
+    private String targetEmail;
+
+    @NotEmpty(message = "items 不能为空")
+    @Size(max = 100, message = "单次批量新增不能超过 100 条")
+    private List<@Valid AddRequest> items;
+}

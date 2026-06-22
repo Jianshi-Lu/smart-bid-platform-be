@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.BatchAddRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.DeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
@@ -41,26 +42,58 @@ public class BidHandlerInfoController {
      *
      * <h3>请求示例</h3>
      * <pre>
-     * curl -X POST http://localhost:8080/create-bid-handler-info \
+     * curl -X POST http://localhost:8080/add-bid-handler-info \
      *   -H "Content-Type: application/json" \
      *   -d '{"handlerName":"张三","companyName":"测试采购公司","departmentName":"采购部","targetEmail":"alice@example.com"}'
      * </pre>
      *
-     * 创建成功后由 {@link BidHandlerInfoService# sendOperationEmail} 显式发送 HTML 通知邮件，
-     * 收件人由 {@code targetEmail} 控制（试点方案，仅本端点）。</p>
+     * 创建成功后由 {@link BidHandlerInfoService#sendOperationEmail} 显式发送 HTML 通知邮件，
+     * 收件人由 {@code targetEmail} 控制。</p>
      *
      * @param request 创建请求 DTO（{@link AddRequest}）
      */
-    @PostMapping("/create-bid-handler-info")
-    public Result<BidHandlerInfo> createBidHandlerInfo(@RequestBody AddRequest request) {
+    @PostMapping("/bid-handler-info/add")
+    public Result<BidHandlerInfo> addBidHandlerInfo(@Valid @RequestBody AddRequest request) {
         BidHandlerInfo entity = new BidHandlerInfo();
         entity.setHandlerName(request.getHandlerName());
         entity.setCompanyName(request.getCompanyName());
         entity.setDepartmentName(request.getDepartmentName());
         entity.setTargetEmail(request.getTargetEmail());
-        service.create(entity);
+        service.add(entity);
         service.sendOperationEmail(entity);
         return Result.success(entity, "创建成功");
+    }
+
+    /**
+     * <h2>批量新增经办人</h2>
+     *
+     * <h3>输入参数（JSON body）</h3>
+     * <table border="1">
+     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+     *   <tr><td>{@code targetEmail}</td><td>String</td><td>否</td><td>汇总邮件收件人；为空/blank 时不发送汇总邮件</td></tr>
+     *   <tr><td>{@code items}</td><td>List&lt;AddRequest&gt;</td><td>是</td><td>经办人列表（1-100 条）</td></tr>
+     * </table>
+     *
+     * <h3>请求示例</h3>
+     * <pre>
+     * curl -X POST http://localhost:8080/bid-handler-info/batch-add \
+     *   -H "Content-Type: application/json" \
+     *   -d '{
+     *     "targetEmail": "manager@company.com",
+     *     "items": [
+     *       {"handlerName":"张三","companyName":"北京科技","departmentName":"采购部","targetEmail":"zhang@x.com"},
+     *       {"handlerName":"李四","companyName":"上海信息","departmentName":"招标部","targetEmail":"li@x.com"}
+     *     ]
+     *   }'
+     * </pre>
+     *
+     * @param request 批量新增请求 DTO（{@link BatchAddRequest}）
+     */
+    @PostMapping("/bid-handler-info/batch-add")
+    public Result<List<BidHandlerInfo>> batchAddBidHandlerInfo(@Valid @RequestBody BatchAddRequest request) {
+        List<BidHandlerInfo> created = service.batchAdd(request.getItems());
+        service.sendBatchAddEmail(created, request.getTargetEmail());
+        return Result.success(created, "批量新增成功");
     }
 
     /**
@@ -110,7 +143,7 @@ public class BidHandlerInfoController {
     @PatchMapping("/bid-handler-info/{id}")
     public Result<Diff<BidHandlerInfo>> patchBidHandlerInfo(
             @PathVariable Integer id,
-            @RequestBody UpdateRequest request) {
+            @Valid @RequestBody UpdateRequest request) {
         BidHandlerInfo before = service.getById(id);
         if (before == null) {
             return Result.error(404, "记录不存在");
@@ -157,21 +190,21 @@ public class BidHandlerInfoController {
      * <table border="1">
      *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
      *   <tr><td>{@code page}</td><td>int</td><td>否</td><td>页码（默认 1，1-based）</td></tr>
-     *   <tr><td>{@code size}</td><td>int</td><td>否</td><td>每页条数（默认 3）</td></tr>
+     *   <tr><td>{@code pageSize}</td><td>int</td><td>否</td><td>每页条数（默认 3）</td></tr>
      *   <tr><td>{@code sort}</td><td>String</td><td>否</td><td>PageHelper 原生格式（空格分隔），默认 {@code "handler_id desc"}</td></tr>
      * </table>
      *
      * <h3>请求示例</h3>
-     * <pre>curl "http://localhost:8080/bid-handler-info?page=1&size=10&sort=handler_id%20desc"</pre>
+     * <pre>curl "http://localhost:8080/bid-handler-info?page=1&pageSize=10&sort=handler_id%20desc"</pre>
      */
     @GetMapping("/bid-handler-info")
     public Result<PageInfo<BidHandlerInfo>> getAllBidHandlerInfo(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "3") int size,
+            @RequestParam(defaultValue = "3") int pageSize,
             @RequestParam(defaultValue = "handler_id desc") String sort) {
         try {
             //noinspection try
-            PageHelper.startPage(page, size, sort);
+            PageHelper.startPage(page, pageSize, sort);
             List<BidHandlerInfo> list = service.listAll();
             return Result.success(new PageInfo<>(list), "查询成功");
         } catch (Exception e) {

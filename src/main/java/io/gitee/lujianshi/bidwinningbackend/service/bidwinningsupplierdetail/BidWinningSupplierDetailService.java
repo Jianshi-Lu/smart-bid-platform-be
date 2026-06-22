@@ -22,7 +22,7 @@ import java.util.function.Function;
  *
  * <h3>继承的方法</h3>
  * <ul>
- *   <li>{@code int create(BidWinningSupplierDetail entity)} — 创建中标明细</li>
+ *   <li>{@code int add(BidWinningSupplierDetail entity)} — 新增中标明细</li>
  *   <li>{@code int update(BidWinningSupplierDetail entity)} — 按主键 PATCH 更新</li>
  *   <li>{@code int delete(Integer id)} — 按主键删除</li>
  *   <li>{@code BidWinningSupplierDetail getById(Integer id)} — 按主键查询</li>

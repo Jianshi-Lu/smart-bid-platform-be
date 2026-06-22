@@ -2,9 +2,10 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationBatchDeleteRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationCreateRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationUpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BatchAddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BatchDeleteRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
@@ -18,8 +19,8 @@ import java.util.List;
 /**
  * 定标通知 Controller — 6 端点标准 CRUD
  *
- * <p>端点列表 / PATCH 语义 / 分页机制 / 批量删除 / Service 层邮件通知 / 7 层链路
- * 详见 {@code docs/business-controllers.md}。</p>
+     * <p>端点列表 / PATCH 语义 / 分页机制 / 批量新增 / 批量删除 / Service 层邮件通知 / 7 层链路
+     * 详见 {@code docs/business-controllers.md}。</p>
  */
 @RestController
 public class BidWinningNotificationController {
@@ -54,20 +55,16 @@ public class BidWinningNotificationController {
      *
      * <h3>请求示例</h3>
      * <pre>
-     * curl -X POST http://localhost:8080/create-bid-winning-notification \
+     * curl -X POST http://localhost:8080/bid-winning-notification/add \
      *   -H "Content-Type: application/json" \
      *   -d '{"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001"}'
      * </pre>
      *
-     * <p>本端点当前不发送邮件通知。如需接入，参考
-     * {@link io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService#sendOperationEmail}
-     * 的实现模式（Service 层显式调用，由 BaseService.sendEmail 实现邮件发送）。</p>
-     *
-     * @param request 创建请求 DTO（{@link BidWinningNotificationCreateRequest}）
+     * @param request 创建请求 DTO（{@link AddRequest}）
      */
-    @PostMapping("/create-bid-winning-notification")
+    @PostMapping("/bid-winning-notification/add")
     public Result<BidWinningNotification> createBidWinningNotification(
-            @RequestBody BidWinningNotificationCreateRequest request) {
+            @Valid @RequestBody AddRequest request) {
         BidWinningNotification entity = new BidWinningNotification();
         entity.setHandlerId(request.getHandlerId());
         entity.setProjectNo(request.getProjectNo());
@@ -87,8 +84,42 @@ public class BidWinningNotificationController {
         entity.setBiddingStatus(request.getBiddingStatus());
         entity.setNotes(request.getNotes());
         entity.setTargetEmail(request.getTargetEmail());
-        service.create(entity);
+        service.add(entity);
+        service.sendOperationEmail(entity);
         return Result.success(entity, "创建成功");
+    }
+
+    /**
+     * <h2>批量新增定标通知</h2>
+     *
+     * <h3>输入参数（JSON body）</h3>
+     * <table border="1">
+     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+     *   <tr><td>{@code targetEmail}</td><td>String</td><td>否</td><td>汇总邮件收件人；为空/blank 时不发送汇总邮件</td></tr>
+     *   <tr><td>{@code items}</td><td>List&lt;AddRequest&gt;</td><td>是</td><td>定标通知列表（1-100 条）</td></tr>
+     * </table>
+     *
+     * <h3>请求示例</h3>
+     * <pre>
+     * curl -X POST http://localhost:8080/bid-winning-notification/batch-add \
+     *   -H "Content-Type: application/json" \
+     *   -d '{
+     *     "targetEmail": "manager@company.com",
+     *     "items": [
+     *       {"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001"},
+     *       {"handlerId":2,"projectNo":"PRJ-2024-002","purchaseTaskNo":"PT-2024-002"}
+     *     ]
+     *   }'
+     * </pre>
+     *
+     * @param request 批量新增请求 DTO（{@link BatchAddRequest}）
+     */
+    @PostMapping("/bid-winning-notification/batch-add")
+    public Result<List<BidWinningNotification>> batchAddBidWinningNotification(
+            @Valid @RequestBody BatchAddRequest request) {
+        List<BidWinningNotification> created = service.batchAdd(request.getItems());
+        service.sendBatchAddEmail(created, request.getTargetEmail());
+        return Result.success(created, "批量新增成功");
     }
 
     /**
@@ -127,12 +158,12 @@ public class BidWinningNotificationController {
      * </pre>
      *
      * @param id 主键 ID
-     * @param request 更新请求 DTO（{@link BidWinningNotificationUpdateRequest}）
+     * @param request 更新请求 DTO（{@link UpdateRequest}）
      */
     @PatchMapping("/bid-winning-notification/{id}")
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
             @PathVariable Integer id,
-            @RequestBody BidWinningNotificationUpdateRequest request) {
+            @Valid @RequestBody UpdateRequest request) {
         BidWinningNotification before = service.getById(id);
         if (before == null) {
             return Result.error(404, "记录不存在");
@@ -194,22 +225,22 @@ public class BidWinningNotificationController {
      * <h3>输入参数（URL query）</h3>
      * <table border="1">
      *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code pageNum}</td><td>int</td><td>否</td><td>页码（默认 1）</td></tr>
+     *   <tr><td>{@code page}</td><td>int</td><td>否</td><td>页码（默认 1）</td></tr>
      *   <tr><td>{@code pageSize}</td><td>int</td><td>否</td><td>每页条数（默认 10）</td></tr>
      *   <tr><td>{@code sort}</td><td>String</td><td>否</td><td>PageHelper 原生格式（空格分隔），默认 {@code "notification_id desc"}</td></tr>
      * </table>
      *
      * <h3>请求示例</h3>
-     * <pre>curl "http://localhost:8080/bid-winning-notification?pageNum=1&pageSize=10&sort=notification_id%20desc"</pre>
+     * <pre>curl "http://localhost:8080/bid-winning-notification?page=1&pageSize=10&sort=notification_id%20desc"</pre>
      */
     @GetMapping("/bid-winning-notification")
     public Result<PageInfo<BidWinningNotification>> listBidWinningNotification(
-            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(defaultValue = "notification_id desc") String sort) {
         try {
             //noinspection try
-            PageHelper.startPage(pageNum, pageSize, sort);
+            PageHelper.startPage(page, pageSize, sort);
             List<BidWinningNotification> list = service.listAll();
             PageInfo<BidWinningNotification> pageInfo = new PageInfo<>(list);
             return Result.success(pageInfo, "查询成功");
@@ -236,10 +267,10 @@ public class BidWinningNotificationController {
      *   -d '{"ids":[1,2,3]}'
      * </pre>
      *
-     * @param request 批量删除请求 DTO（{@link BidWinningNotificationBatchDeleteRequest}）
+     * @param request 批量删除请求 DTO（{@link BatchDeleteRequest}）
      */
     @PostMapping("/bid-winning-notification/batch-delete")
-    public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BidWinningNotificationBatchDeleteRequest request) {
+    public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BatchDeleteRequest request) {
         List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
     }

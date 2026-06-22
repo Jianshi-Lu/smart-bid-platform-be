@@ -85,7 +85,7 @@
       - 使用 <set> + <if> 实现 PATCH 语义：
         * 字段为 null → 不更新（保留 DB 原值）
         * 字段非 null → 更新
-      - 配合 BidWinningNotificationUpdateRequest 使用（PATCH 请求体）
+      - 配合 UpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">

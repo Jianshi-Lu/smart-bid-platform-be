@@ -4,13 +4,15 @@
   使用方：io.gitee.lujianshi.bidwinningbackend.service.BaseService
   模板渲染入口：SpringTemplateEngine.process("crud-email-template", context)
 
-  模板变量（由 BaseService.sendEmail 通过 Thymeleaf Context 注入）：
-    subject         邮件标题（<title> 标签显示）
-    formName        表单名称（替代旧 endpoint）
-    actionName      操作名称（替代旧 operation）
-    operateTime     操作时间（yyyy-MM-dd HH:mm:ss）
-    status          执行状态（格式："操作类型 成功"，如 "新增 成功"）
-    data            List<Map.Entry<String, Object>>，动态遍历键值对
+   模板变量（由 BaseService.sendEmail / sendBatchEmail 通过 Thymeleaf Context 注入）：
+     subject         邮件标题（<title> 标签显示）
+     formName        表单名称（替代旧 endpoint）
+     actionName      操作名称（替代旧 operation）
+     operateTime     操作时间（yyyy-MM-dd HH:mm:ss）
+     status          执行状态（格式："操作类型 成功"，如 "新增 成功"）
+     data            List<Map.Entry<String, Object>>，动态遍历键值对（单条模式）
+     isBatch         布尔值，true=批量模式，false/null=单条模式
+     batchData       List<List<Map.Entry<String, Object>>>，批量模式下的多条数据
 
   CSS 样式说明：
     .status-success   绿色文字 → 操作成功
@@ -67,14 +69,36 @@
 
         <div class="data-section">
             <div class="data-title">返回数据</div>
-            <table class="data-table">
-                <tbody>
-                <tr th:each="entry : ${data}">
-                    <td class="key" th:text="${entry.key}">companyName</td>
-                    <td class="value" th:text="${entry.value}">北京科技有限公司</td>
-                </tr>
-                </tbody>
-            </table>
+
+            <!-- 单条模式 -->
+            <div th:unless="${isBatch}">
+                <table class="data-table">
+                    <tbody>
+                    <tr th:each="entry : ${data}">
+                        <td class="key" th:text="${entry.key}">companyName</td>
+                        <td class="value" th:text="${entry.value}">北京科技有限公司</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 批量模式 -->
+            <div th:if="${isBatch}">
+                <div th:each="record, stat : ${batchData}">
+                    <div style="font-size:13px; color:#2c3e50; font-weight:600; padding:8px 0 4px;">
+                        记录 #<span th:text="${stat.count}">1</span>
+                    </div>
+                    <table class="data-table">
+                        <tbody>
+                        <tr th:each="entry : ${record}">
+                            <td class="key" th:text="${entry.key}">handlerName</td>
+                            <td class="value" th:text="${entry.value}">张三</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <hr th:if="${!stat.last}" style="border:none; border-top:1px dashed #d0d5d8; margin:6px 0;"/>
+                </div>
+            </div>
         </div>
 
         <div class="footer">
