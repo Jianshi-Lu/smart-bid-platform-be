@@ -131,8 +131,65 @@ public abstract class BaseService<T> {
         this.sendEmail(entity, targetEmail, endpoint, operation);
     }
 
+    /**
+     * 发送批量操作汇总邮件。
+     * <p>仅当 {@code outerTargetEmail} 非空时发送 1 封汇总邮件至此地址；
+     * 为空/blank 时跳过，不发邮件。</p>
+     *
+     * @param entities         操作后的实体列表
+     * @param outerTargetEmail 外层指定的汇总收件人（可选，为空则不发送）
+     * @param endpoint         端点描述
+     * @param operation        操作类型
+     */
+    protected void sendBatchEmail(List<T> entities, String outerTargetEmail, String endpoint, String operation) {
+        if (outerTargetEmail == null || outerTargetEmail.isBlank()) return;
+        if (entities == null || entities.isEmpty()) return;
+
+        final String formName = endpoint;
+        final String actionName = operation;
+        final String operateTime = LocalDateTime.now().format(TS_FMT);
+        final String status = operation + " 成功";
+        final String subject = emailSubjectPrefix + " " + endpoint + " - " + operateTime;
+
+        List<List<Map.Entry<String, Object>>> batchDataList = new ArrayList<>();
+        for (T entity : entities) {
+            try {
+                Map<String, Object> dataMap = new LinkedHashMap<>();
+                PropertyDescriptor[] pds = BeanUtils.getPropertyDescriptors(entity.getClass());
+                for (PropertyDescriptor pd : pds) {
+                    if (pd.getReadMethod() != null && !"class".equals(pd.getName()) && !"targetEmail".equals(pd.getName())) {
+                        dataMap.put(pd.getName(), pd.getReadMethod().invoke(entity));
+                    }
+                }
+                batchDataList.add(new ArrayList<>(dataMap.entrySet()));
+            } catch (Exception e) {
+                batchDataList.add(List.of());
+            }
+        }
+
+        List<List<Map.Entry<String, Object>>> finalBatchData = batchDataList;
+        AsyncTaskManager.execute(() -> {
+            try {
+                resourceSearcher.validateTemplateExists("crud-email-template");
+                Context context = new Context();
+                context.setVariable("subject", subject);
+                context.setVariable("formName", formName);
+                context.setVariable("actionName", actionName);
+                context.setVariable("operateTime", operateTime);
+                context.setVariable("status", status);
+                context.setVariable("isBatch", true);
+                context.setVariable("batchData", finalBatchData);
+                String html = templateEngine.process("crud-email-template", context);
+                mailService.sendHtmlEmail(outerTargetEmail, subject, html);
+                System.out.println("[BASE-EMAIL] 批量发送成功: to=" + outerTargetEmail + ", count=" + entities.size());
+            } catch (Exception e) {
+                System.err.println("[BASE-EMAIL] 批量发送失败: to=" + outerTargetEmail + ", error=" + e.getMessage());
+            }
+        }, 0);
+    }
+
     @Transactional(rollbackFor = Exception.class)
-    public int create(T entity) {
+    public int add(T entity) {
         return getMapper().insert(entity);
     }
 

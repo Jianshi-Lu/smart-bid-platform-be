@@ -77,10 +77,12 @@ public class AddRequest {
     private String departmentName;
 
     /**
-     * 通知邮件收件人（业务字段，不落库）
+     * 通知邮件收件人。
      *
-     * <p>前端调用时可传入指定收件人邮箱，由 {@code BidHandlerInfoService.sendOperationEmail}
-     * 在创建成功后异步发送 HTML 通知邮件；为 null/空时跳过邮件发送。</p>
+     * <p>必填。创建成功后由 {@code BidHandlerInfoService.sendOperationEmail}
+     * 异步发送 HTML 通知邮件至本地址。</p>
      */
+    @NotBlank(message = "通知邮件收件人不能为空")
+    @Size(max = 255, message = "通知邮件收件人长度不能超过255")
     private String targetEmail;
 }
