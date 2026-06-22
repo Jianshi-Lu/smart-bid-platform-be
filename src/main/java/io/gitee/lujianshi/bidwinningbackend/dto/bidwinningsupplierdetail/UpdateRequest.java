@@ -34,7 +34,7 @@ import java.math.BigDecimal;
  *   <li>调用方传哪些字段，就更新哪些字段；未传的字段在 DB 中保持原值</li>
  * </ul>
  *
- * <h3>与 {@code BidWinningSupplierDetailCreateRequest} 的对比</h3>
+ * <h3>与 {@code AddRequest} 的对比</h3>
  * <table border="1">
  *   <tr><th>维度</th><th>CreateRequest</th><th>UpdateRequest（本类）</th></tr>
  *   <tr><td>字段集合</td><td>3 字段</td><td>3 字段（<b>完全相同</b>）</td></tr>
@@ -72,12 +72,12 @@ import java.math.BigDecimal;
  * </table>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailCreateRequest
+ * @see AddRequest
  * @see io.gitee.lujianshi.bidwinningbackend.dto.common.Diff
  * @see BidWinningSupplierDetailController
  */
 @Data
-public class BidWinningSupplierDetailUpdateRequest {
+public class UpdateRequest {
 
     private Integer notificationId;
 

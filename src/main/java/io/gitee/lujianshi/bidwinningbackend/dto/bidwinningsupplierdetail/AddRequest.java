@@ -40,7 +40,7 @@ import java.math.BigDecimal;
  * <h3>校验触发</h3>
  * Controller 方法参数加 {@code @Valid} 后生效；当前 {@code createBidWinningSupplierDetail} 未加（待 GlobalExceptionHandler 一起补全）。
  *
- * <h3>与 {@code BidWinningSupplierDetailUpdateRequest} 的对比</h3>
+ * <h3>与 {@code UpdateRequest} 的对比</h3>
  * <table border="1">
  *   <tr><th>维度</th><th>CreateRequest（本类）</th><th>UpdateRequest</th></tr>
  *   <tr><td>HTTP 方法</td><td>POST</td><td>PATCH</td></tr>
@@ -58,11 +58,11 @@ import java.math.BigDecimal;
  * </table>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidwinningsupplierdetail.BidWinningSupplierDetailUpdateRequest
+ * @see UpdateRequest
  * @see BidWinningSupplierDetailController
  */
 @Data
-public class BidWinningSupplierDetailCreateRequest {
+public class AddRequest {
 
     @NotNull(message = "定标通知ID不能为空")
     private Integer notificationId;
@@ -74,5 +74,7 @@ public class BidWinningSupplierDetailCreateRequest {
     @NotNull(message = "中标价不能为空")
     private BigDecimal amount;
 
+    @NotBlank(message = "通知邮件收件人不能为空")
+    @Size(max = 255, message = "通知邮件收件人长度不能超过255")
     private String targetEmail;
 }

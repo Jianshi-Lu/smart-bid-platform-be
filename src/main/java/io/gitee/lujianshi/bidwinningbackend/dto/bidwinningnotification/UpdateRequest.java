@@ -61,10 +61,10 @@ import java.time.LocalDateTime;
  * </pre>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationCreateRequest
+ * @see AddRequest
  */
 @Data
-public class BidWinningNotificationUpdateRequest {
+public class UpdateRequest {
 
     // ========== 3 个 NOT NULL 字段（PATCH 可选，更新时建议提供非空值） ==========
 

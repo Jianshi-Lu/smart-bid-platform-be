@@ -51,10 +51,10 @@ import java.time.LocalDateTime;
  * Controller 方法参数加 {@code @Valid} 后生效；当前 {@code createBidWinningNotification} 未加（待 GlobalExceptionHandler 一起补全）。
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification
- * @see io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.BidWinningNotificationUpdateRequest
+ * @see UpdateRequest
  */
 @Data
-public class BidWinningNotificationCreateRequest {
+public class AddRequest {
 
     // ========== 必填字段（DB NOT NULL） ==========
 
@@ -104,5 +104,7 @@ public class BidWinningNotificationCreateRequest {
 
     private String notes;
 
+    @NotBlank(message = "通知邮件收件人不能为空")
+    @Size(max = 255, message = "通知邮件收件人长度不能超过255")
     private String targetEmail;
 }
