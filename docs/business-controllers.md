@@ -93,10 +93,10 @@
 
 ## 8. 待办
 
-- 当前 `create` / `patch` 端点未加 `@Valid` 校验，DTO 上 `@NotBlank` / `@NotNull` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- 当前 `create` / `patch` 端点未加 `@Valid` 校验，DTO 上 `@NotBlank` / `@NotNull` / `@Size` 暂未生效（`GlobalExceptionHandler` 已补全）
 - 批量删除 DTO 已加 `@Valid`
 - 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错），当前透传给 PageHelper
-- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+- 统一异常处理（`GlobalExceptionHandler` 已实现）
 
 ## 9. 业务操作后邮件通知（Service 层显式调用）
 

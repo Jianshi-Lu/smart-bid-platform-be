@@ -9,7 +9,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
-import io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo.BidHandlerInfoService;
+import io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;

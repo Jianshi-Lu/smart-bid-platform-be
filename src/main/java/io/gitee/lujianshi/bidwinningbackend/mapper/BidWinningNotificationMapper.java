@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
+import io.gitee.lujianshi.bidwinningbackend.service.BidWinningNotificationService;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -21,7 +22,7 @@ import org.apache.ibatis.annotations.Mapper;
  * </ul>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification
- * @see io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification.BidWinningNotificationService
+ * @see BidWinningNotificationService
  */
 @Mapper
 public interface BidWinningNotificationMapper extends BaseMapper<BidWinningNotification> {

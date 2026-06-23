@@ -9,7 +9,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.UpdateReq
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
-import io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification.BidWinningNotificationService;
+import io.gitee.lujianshi.bidwinningbackend.service.BidWinningNotificationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;

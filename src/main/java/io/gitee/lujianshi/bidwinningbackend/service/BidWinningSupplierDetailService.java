@@ -1,10 +1,9 @@
-package io.gitee.lujianshi.bidwinningbackend.service.bidwinningsupplierdetail;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningSupplierDetailController;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningSupplierDetailMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 

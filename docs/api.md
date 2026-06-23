@@ -67,7 +67,7 @@
 | 200 | 成功 | 业务正常完成 |
 | 400 | 参数错误 | 分页参数错误、`@NotBlank`/`@Size` 校验失败等 |
 | 404 | 资源不存在 | 按主键查询/更新/删除时记录不存在 |
-| 500 | 服务器内部错误 | 异常未捕获（待 `GlobalExceptionHandler` 统一处理） |
+| 500 | 服务器内部错误 | 异常未捕获（`GlobalExceptionHandler` 已统一处理） |
 
 > 邮件端点（`/send-email`、`/send-notification`）**不**返回 `Result<T>`，直接返回字符串或 void（详见各端点章节）。
 
@@ -295,7 +295,7 @@ curl -X POST http://192.168.76.177:8080/send-notification \
 | `departmentName` | Body | String | 是 | @NotBlank, @Size(max=100) | 所属部门 |
 | `targetEmail` | Body | String | 否 | — | 通知邮件收件人（**已落库**）；null/空字符串 = 不发邮件 |
 
-> **注意**：`@Valid` 校验当前**未启用**（待 `GlobalExceptionHandler` 补全），字段缺失不会触发 400。
+> **注意**：`@Valid` 校验当前**未启用**（`GlobalExceptionHandler` 已补全），字段缺失不会触发 400。
 
 **调用链路**：Controller → Service → Mapper → MySQL INSERT（自增回填 handlerId）
 
@@ -479,7 +479,7 @@ curl "http://192.168.76.177:8080/bid-handler-info?page=1&size=3&sort=handler_id%
 
 **响应**：
 - 200：`Result<List<BidHandlerInfo>>`，data = 实际删除的实体列表（DB 物理顺序）
-- 400：@Valid 校验失败（待 GlobalExceptionHandler 启用）
+- 400：@Valid 校验失败（GlobalExceptionHandler 已启用）
 
 **示例**：
 ```bash

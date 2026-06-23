@@ -1,6 +1,6 @@
 CREATE TABLE bid_winning_notification (
     notification_id INT NOT NULL AUTO_INCREMENT COMMENT '定标通知ID（主键）',
-    handler_id INT NOT NULL COMMENT '经办人ID（外键，关联招标人员表）',
+    handler_id INT NOT NULL COMMENT '经办人ID（逻辑外键，关联 bid_handler_info.handler_id）',
     
     -- 页面上部的项目信息
     project_no VARCHAR(50) NOT NULL COMMENT '项目编号',

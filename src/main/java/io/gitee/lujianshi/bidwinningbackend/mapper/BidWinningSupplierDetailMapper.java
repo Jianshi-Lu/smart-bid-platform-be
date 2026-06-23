@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail;
+import io.gitee.lujianshi.bidwinningbackend.service.BidWinningSupplierDetailService;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
@@ -21,7 +22,7 @@ import org.apache.ibatis.annotations.Mapper;
  * </ul>
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail
- * @see io.gitee.lujianshi.bidwinningbackend.service.bidwinningsupplierdetail.BidWinningSupplierDetailService
+ * @see BidWinningSupplierDetailService
  */
 @Mapper
 public interface BidWinningSupplierDetailMapper extends BaseMapper<BidWinningSupplierDetail> {

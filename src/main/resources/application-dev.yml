@@ -2,14 +2,15 @@ server:
   address: 0.0.0.0
   port: 8080
 
-custom:
-  url: https://baidu.com
-
 spring:
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${MYSQL_USERNAME}
     password: ${MYSQL_PASSWORD}
+
+  ai:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY}
 
   mail:
     host: smtp.qq.com

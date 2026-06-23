@@ -142,7 +142,7 @@ mybatis-plus:
 
 ### ⑤ Service 层
 
-**位置**：`src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java`
+**位置**：`src/main/java/.../service/BidHandlerInfoService.java`
 
 **职责**：业务逻辑编排。当前继承 `BaseService<T>` 提供标准 CRUD，未来业务逻辑（分组、聚合、复杂条件查询）在子类中重写或新增方法。
 
@@ -310,7 +310,7 @@ public class BidHandlerInfoController {
 }
 ```
 
-**`@Valid` 触发校验**（**当前未启用，待补全**）：DTO 字段上的 `@NotBlank` / `@Size` 需要在 Controller 方法参数上加 `@Valid` 才生效。当前 `createBidHandlerInfo` / `updateBidHandlerInfo` **未加 `@Valid`**，校验注解暂未生效（待 `GlobalExceptionHandler` 一起补全）。校验失败时预期抛 `MethodArgumentNotValidException`，由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息。
+**`@Valid` 触发校验**（**当前未启用，待补全**）：DTO 字段上的 `@NotBlank` / `@Size` 需要在 Controller 方法参数上加 `@Valid` 才生效。当前 `createBidHandlerInfo` / `updateBidHandlerInfo` **未加 `@Valid`**，校验注解暂未生效（`GlobalExceptionHandler` 已补全）。校验失败时预期抛 `MethodArgumentNotValidException`，由 `GlobalExceptionHandler` 统一处理返回 400 + 错误信息。
 
 **注入风格**：使用 `jakarta.annotation.Resource` 字段注入（Spring 6+ 推荐），非 `org.springframework.beans.factory.annotation.Autowired`。
 
@@ -366,7 +366,7 @@ Postman
 | ② Entity | `src/main/java/.../entity/BidHandlerInfo.java` | Java ↔ DB 映射 |
 | ③ Mapper 接口 | `src/main/java/.../mapper/BidHandlerInfoMapper.java` | 方法签名 |
 | ④ Mapper XML | `src/main/resources/mapper/BidHandlerInfoMapper.xml` | SQL 实现 |
-| ⑤ Service | `src/main/java/.../service/bidhandlerinfo/BidHandlerInfoService.java` | 业务编排 |
+| ⑤ Service | `src/main/java/.../service/BidHandlerInfoService.java` | 业务编排 |
 | ⑥ DTO | `src/main/java/.../dto/bidhandlerinfo/AddRequest.java` | 请求载体 |
 | ⑦ Controller | `src/main/java/.../controller/bidhandlerinfo/BidHandlerInfoController.java` | HTTP 入口 |
 
@@ -569,7 +569,7 @@ const missing = requested.filter(id => !deletedIds.includes(id));  // [1]
 
 - [x] 复制模式实现 `BidWinningSupplierDetail` 完整链路（Service / DTO / Controller，6 端点含批量删除 p3 升级版）
 - [x] Service 层邮件通知（`BaseService.sendEmail` + `crud-email-template` 模板）— 详见 [docs/architecture.md §7](architecture.md#7-service-层邮件通知baseservicesendemail)
-- [ ] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
+- [x] 新增 `GlobalExceptionHandler` 统一处理 `MethodArgumentNotValidException`（含 `@Valid` 校验失败的 400 响应）
 - [ ] 给所有 Controller 端点加 `@Valid` 注解（当前未启用，DTO 上 `@NotBlank` / `@Size` 校验失效）
 - [ ] 新增 `MybatisPlusConfig`（分页插件 + 自动填充处理器）
 - [ ] 单元测试（Mapper / Service / Controller）

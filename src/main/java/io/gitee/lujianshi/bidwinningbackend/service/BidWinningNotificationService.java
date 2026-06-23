@@ -1,11 +1,10 @@
-package io.gitee.lujianshi.bidwinningbackend.service.bidwinningnotification;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.controller.BidWinningNotificationController;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

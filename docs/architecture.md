@@ -318,13 +318,14 @@ Spring 容器在 refresh 阶段按照一定顺序创建 Bean：
 | 7 | `BidHandlerInfoMapper`（extends `BaseMapper<BidHandlerInfo>`） | 无（由 `@MapperScan` 扫描 + XML 代理生成） |
 | 8 | `BidWinningNotificationMapper`（extends `BaseMapper<BidWinningNotification>`） | 同上 |
 | 9 | `BidWinningSupplierDetailMapper`（extends `BaseMapper<BidWinningSupplierDetail>`） | 同上 |
-| 10 | `BidHandlerInfoService`（extends `BaseService<BidHandlerInfo>`） | `BidHandlerInfoMapper` |
-| 11 | `BidWinningNotificationService`（extends `BaseService<BidWinningNotification>`） | `BidWinningNotificationMapper` |
-| 12 | `BidWinningSupplierDetailService`（extends `BaseService<BidWinningSupplierDetail>`） | `BidWinningSupplierDetailMapper` |
-| 13 | `StatusCheckController` | `MailService`、`StatusCheckService` |
-| 14 | `BidHandlerInfoController` | `BidHandlerInfoService` |
-| 15 | `BidWinningNotificationController` | `BidWinningNotificationService` |
-| 16 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
+| 10 | `BidWinningRiskAnalysisMapper`（extends `BaseMapper<BidWinningRiskAnalysis>`） | 同上 |
+| 11 | `BidHandlerInfoService`（extends `BaseService<BidHandlerInfo>`） | `BidHandlerInfoMapper` |
+| 12 | `BidWinningNotificationService`（extends `BaseService<BidWinningNotification>`） | `BidWinningNotificationMapper` |
+| 13 | `BidWinningSupplierDetailService`（extends `BaseService<BidWinningSupplierDetail>`） | `BidWinningSupplierDetailMapper` |
+| 14 | `StatusCheckController` | `MailService`、`StatusCheckService` |
+| 15 | `BidHandlerInfoController` | `BidHandlerInfoService` |
+| 16 | `BidWinningNotificationController` | `BidWinningNotificationService` |
+| 17 | `BidWinningSupplierDetailController` | `BidWinningSupplierDetailService` |
 
 `@Autowired` 注入发生在 Bean 创建时，Spring 通过 **AutowiredAnnotationBeanPostProcessor**（一个 `InstantiationAwareBeanPostProcessorAdapter`）实现：
 
@@ -569,7 +570,7 @@ Service（业务结果）→ Controller（包装为 Result）→ Jackson（序�
 | 场景 | code | message | data |
 |------|------|---------|------|
 | 成功（含删除的实体） | 200 | "批量删除完成" | `List<Entity>`（实际删除的实体列表，DB 物理顺序） |
-| ids 为空（@NotEmpty 失败） | — | — | `MethodArgumentNotValidException` → 由 `GlobalExceptionHandler` 返 400（待实现） |
+| ids 为空（@NotEmpty 失败） | — | — | `MethodArgumentNotValidException` → 由 `GlobalExceptionHandler` 返 400（已实现） |
 | ids 超 500（@Size 失败） | — | — | 同上 |
 | ids 部分/全部不存在 | 200 | "批量删除完成" | `List<Entity>` 只含**实际存在并被删的**实体 |
 
@@ -1081,8 +1082,8 @@ JSON Response
 ---
 
 **待办**：
-- ⚠️ `createBidHandlerInfo` / `patchBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
-- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+- ⚠️ `createBidHandlerInfo` / `patchBidHandlerInfo` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效（`GlobalExceptionHandler` 已补全）
+- 统一异常处理（`GlobalExceptionHandler` 已实现）
 - 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错），当前透传给 PageHelper（依赖其解析）
 
 ---
@@ -1205,7 +1206,7 @@ JSON Response
 
 **待办**：
 - ⚠️ `createBidWinningNotification` / `patchBidWinningNotification` 未加 `@Valid`，DTO 上 `@NotBlank` / `@Size` 暂未生效
-- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+- 统一异常处理（`GlobalExceptionHandler` 已实现）
 
 ---
 
@@ -1236,9 +1237,9 @@ JSON Response
 | Mapper 复杂度 | 单表 4 字段 | 19 字段 + 动态 SQL | **4 字段 + PATCH 动态 SQL** |
 
 **待办**：
-- ⚠️ 当前未加 `@Valid`，DTO 上 `@NotNull` / `@NotBlank` / `@Size` 暂未生效（待 `GlobalExceptionHandler` 一起补全）
+- ⚠️ 当前未加 `@Valid`，DTO 上 `@NotNull` / `@NotBlank` / `@Size` 暂未生效（`GlobalExceptionHandler` 已补全）
 - 分页 sort 参数未来可加白名单（防 SQL 注入 / 防字段拼错）
-- 统一异常处理（`GlobalExceptionHandler` 尚未实现）
+- 统一异常处理（`GlobalExceptionHandler` 已实现）
 
 ---
 
@@ -1469,9 +1470,10 @@ src/main/
 │   ├── entity/                          ← Java 实体（Plus 注解）
 │   │   ├── BidHandlerInfo.java
 │   │   ├── BidWinningNotification.java
-│   │   └── BidWinningSupplierDetail.java
+│   │   ├── BidWinningSupplierDetail.java
+│   │   └── BidWinningRiskAnalysis.java
 │   ├── mapper/                          ← Mapper 接口（手写签名）
-│   │   └── BidHandlerInfoMapper.java
+│   │   ├── BidHandlerInfoMapper.java
 │   └── service/                          ← 业务层
 │       └── BidHandlerInfoService.java
 └── resources/
@@ -1516,7 +1518,7 @@ Controller（@Valid 触发校验）
 
 1. Postman POST `{handlerName, companyName, departmentName}`
 2. Spring MVC 路由 → `BidHandlerInfoController.createBidHandlerInfo()`
-3. ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（待 `GlobalExceptionHandler` 一起补全）
+3. ⚠️ **当前未加 `@Valid`**，DTO 上的 `@NotBlank` / `@Size` 校验暂未生效（`GlobalExceptionHandler` 已补全）
 4. Jackson 反序列化 → `AddRequest`
 5. 字段拷贝：DTO → Entity
 6. `BidHandlerInfoService.create(entity)`
@@ -1999,7 +2001,7 @@ Step 8. try-catch 兜底（失败仅日志告警，不影响主业务）
 | # | 路径 | 角色 |
 |---|------|------|
 | 1 | `service/BaseService.java` | `sendEmail(T, String, String, String)` 邮件发送主入口（4-param）；`sendEmail(T, String, String)` 重载（2-param，从 entity 读 targetEmail） |
-| 2 | `service/bidhandlerinfo/BidHandlerInfoService.java` | `sendOperationEmail(entity)` 便利方法（1-param，从 entity 读 targetEmail） |
+| 2 | `service/BidHandlerInfoService.java` | `sendOperationEmail(entity)` 便利方法（1-param，从 entity 读 targetEmail） |
 | 3 | `templates/crud-email-template.html` | 邮件 HTML 模板（已加 `.content` 背景）|
 | 4 | `utils/AsyncTaskManager.java` | 异步执行器（`new Thread + .start()`）|
 | 5 | `utils/ResourceSearcher.java` | 模板存在性校验 |

@@ -1,11 +1,10 @@
-package io.gitee.lujianshi.bidwinningbackend.service.bidhandlerinfo;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.controller.BidHandlerInfoController;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +35,7 @@ import java.util.function.Function;
  *
  * <h3>本类新增方法</h3>
  * <ul>
- *   <li>{@link #batchAdd(List, String)} — 批量新增经办人，返回已落库的实体列表</li>
+ *   <li>{@link #batchAdd(List)} — 批量新增经办人，返回已落库的实体列表</li>
  *   <li>{@link #sendOperationEmail(BidHandlerInfo)} — 单条新增后异步发通知邮件</li>
  *   <li>{@link #sendBatchAddEmail(List, String)} — 批量新增后异步发汇总邮件</li>
  * </ul>

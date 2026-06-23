@@ -56,29 +56,33 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── entity/
 │   ├── BidHandlerInfo.java                 # 经办人实体
 │   ├── BidWinningNotification.java         # 定标通知实体（19 字段）
-│   └── BidWinningSupplierDetail.java       # 中标明细实体
+│   ├── BidWinningSupplierDetail.java       # 中标明细实体
+│   └── BidWinningRiskAnalysis.java         # 风险分析结果实体
 ├── mapper/
 │   ├── BaseMapper.java                      # 泛型 CRUD 基接口（7 标准方法），由具体 Mapper 继承
 │   ├── BidHandlerInfoMapper.java            # @Mapper 接口（extends BaseMapper<BidHandlerInfo>）
 │   ├── BidWinningNotificationMapper.java    # @Mapper 接口
-│   └── BidWinningSupplierDetailMapper.java  # @Mapper 接口
+│   ├── BidWinningSupplierDetailMapper.java  # @Mapper 接口
+│   └── BidWinningRiskAnalysisMapper.java    # @Mapper 接口（+ selectByDetailId）
 ├── service/
 │   ├── BaseService.java                     # 泛型 CRUD 基类（封装 7 标准方法 + @Transactional）
-│   ├── bidhandlerinfo/BidHandlerInfoService.java      # @Service（extends BaseService<BidHandlerInfo>）
-│   ├── bidwinningnotification/BidWinningNotificationService.java
-│   ├── bidwinningsupplierdetail/BidWinningSupplierDetailService.java
-│   └── mail/
-│       ├── MailService.java                # 邮件发送（sendEmail 纯文本 + sendHtmlEmail HTML）
-│       ├── TemplateFiller.java             # Thymeleaf 模板渲染
-│       └── ResourceSearcher.java           # classpath 模板文件存在性校验
+│   ├── BidHandlerInfoService.java           # @Service（extends BaseService<BidHandlerInfo>）
+│   ├── BidWinningNotificationService.java   # @Service
+│   ├── BidWinningSupplierDetailService.java # @Service
+│   ├── mail/
+│   │   └── MailService.java                # 邮件发送（sendEmail 纯文本 + sendHtmlEmail HTML）
+│   └── statuscheck/
+│       └── StatusCheckService.java         # 中标通知书邮件发送（Thymeleaf 渲染 + 异步）
 └── utils/
-    └── AsyncTaskManager.java               # 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
+    ├── AsyncTaskManager.java               # 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
+    └── ResourceSearcher.java               # classpath 模板文件存在性校验
 
 src/main/resources/
 ├── mapper/                                 # MyBatis XML（namespace = Mapper 接口 FQN）
 │   ├── BidHandlerInfoMapper.xml
 │   ├── BidWinningNotificationMapper.xml
-│   └── BidWinningSupplierDetailMapper.xml
+│   ├── BidWinningSupplierDetailMapper.xml
+│   └── BidWinningRiskAnalysisMapper.xml
 ├── sql/ddl/                                # Flyway 兼容命名的 DDL 脚本（V1-V5，**未启用 Flyway**）
 │   ├── V1__create_handler_info.sql
 │   ├── V2__update_handler_info_structure.sql

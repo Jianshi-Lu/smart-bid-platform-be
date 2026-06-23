@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  BidWinningRiskAnalysisMapper.xml — 风险分析结果表 SQL 映射                 │
+  │                                                                    │
+  │  在整个开发链路中的位置：                                          │
+  │   ① 数据库表（V7 建表）                                            │
+  │   ② Entity 层（BidWinningRiskAnalysis）                                      │
+  │   ③ Mapper 接口（BidWinningRiskAnalysisMapper）                              │
+  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
+  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
+  │   ⑥ Controller 层                                                 │
+  │                                                                    │
+  │  关键约定：                                                        │
+  │   - namespace 必须等于 Mapper 接口全限定名（一个字符都不能错）    │
+  │   - 每个 <insert> / <update> / <delete> / <select> 标签的         │
+  │     id = Mapper 接口中的方法名                                    │
+  │   - parameterType / resultMap 用全限定名（最稳）                  │
+  │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
+  │                                                                    │
+  │  本表特点：写多读少（分析结果写入后一般不修改）                    │
+  │  业务关系：一条中标明细 → 多条分析记录（1:N）                      │
+  └────────────────────────────────────────────────────────────────────┘
+-->
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningRiskAnalysisMapper">
+
+    <!--
+      BaseResultMap：Java 字段 ↔ DB 列映射
+      即使 application.yml 配了 map-underscore-to-camel-case=true，
+      这里仍显式声明，避免魔法规则带来的隐式行为。
+    -->
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningRiskAnalysis">
+        <id     column="analysis_id"     property="analysisId"/>
+        <result column="detail_id"       property="detailId"/>
+        <result column="supplier_name"   property="supplierName"/>
+        <result column="notification_id" property="notificationId"/>
+        <result column="risk_level"      property="riskLevel"/>
+        <result column="risk_score"      property="riskScore"/>
+        <result column="summary"         property="summary"/>
+        <result column="key_points"      property="keyPoints"/>
+        <result column="suggestions"     property="suggestions"/>
+        <result column="raw_response"    property="rawResponse"/>
+        <result column="model_name"      property="modelName"/>
+        <result column="prompt_version"  property="promptVersion"/>
+        <result column="analyzed_at"     property="analyzedAt"/>
+    </resultMap>
+
+    <!--
+      插入：自增主键回填
+      - analysis_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.analysisId）
+      - analyzed_at 省略（DB 默认 CURRENT_TIMESTAMP）
+    -->
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningRiskAnalysis"
+            useGeneratedKeys="true"
+            keyProperty="analysisId">
+        INSERT INTO bid_winning_risk_analysis
+            (detail_id, supplier_name, notification_id,
+             risk_level, risk_score, summary, key_points, suggestions,
+             raw_response, model_name, prompt_version)
+        VALUES
+            (#{detailId}, #{supplierName}, #{notificationId},
+             #{riskLevel}, #{riskScore}, #{summary}, #{keyPoints}, #{suggestions},
+             #{rawResponse}, #{modelName}, #{promptVersion})
+    </insert>
+
+    <!--
+      按 ID 查询：resultMap 复用 BaseResultMap
+    -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bid_winning_risk_analysis
+        WHERE analysis_id = #{analysisId}
+    </select>
+
+    <!--
+      按 detailId 查询历史分析记录（按时间倒序，最新在前）
+    -->
+    <select id="selectByDetailId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bid_winning_risk_analysis
+        WHERE detail_id = #{detailId}
+        ORDER BY analyzed_at DESC
+    </select>
+
+    <!--
+      查询全部（无参）：用 resultMap 复用
+    -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bid_winning_risk_analysis
+    </select>
+
+    <!--
+      按 ID 列表批量查询
+    -->
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM bid_winning_risk_analysis
+        WHERE analysis_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <!--
+      按 ID 删除
+    -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM bid_winning_risk_analysis
+        WHERE analysis_id = #{analysisId}
+    </delete>
+
+    <!--
+      按 ID 列表批量删除
+    -->
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM bid_winning_risk_analysis
+        WHERE analysis_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
