@@ -1,7 +1,12 @@
 package io.gitee.lujianshi.bidwinningbackend.service.riskanalysis;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -13,20 +18,21 @@ import java.util.Map;
  * <h3>占位符格式</h3>
  * <pre>
  * &#123;&#123;supplierName&#125;&#125;   — 供应商名称
- * &#123;&#123;amount&#125;&#125;        — 中标金额
- * &#123;&#123;projectName&#125;&#125;   — 项目名称
- * &#123;&#123;handlerName&#125;&#125;   — 经办人姓名
+ * &#123;&#123;quotePrice&#125;&#125;    — 报价
+ * &#123;&#123;supplierContact&#125;&#125; — 联系方式
  * &#123;&#123;background&#125;&#125;    — 供应商背景信息（由 BidBackgroundLoader 拼装）
  * </pre>
  *
  * <h3>渲染方式</h3>
- * <p>当前版本使用简单的 {@code String.replace()} 逐个替换占位符。
- * 未来可升级为 FreeMarker 或 Thymeleaf（项目已有 Thymeleaf 依赖）。</p>
+ * <p>使用简单的 {@code String.replace()} 逐个替换占位符。</p>
  *
  * @see BidBackgroundLoader
  */
 @Component
 public class PromptFiller {
+
+    @Autowired(required = false)
+    private ResourceLoader resourceLoader;
 
     /**
      * 填充 prompt 模板中的变量占位符。
@@ -36,9 +42,16 @@ public class PromptFiller {
      * @return 填充后的字符串（占位符无对应值时保持原样）
      */
     public String fill(String template, Map<String, String> vars) {
-        // TODO: 实现变量替换逻辑
-        // 当前版本直接返回原模板
-        return template;
+        if (template == null || vars == null || vars.isEmpty()) {
+            return template;
+        }
+        String result = template;
+        for (Map.Entry<String, String> entry : vars.entrySet()) {
+            String placeholder = "{{" + entry.getKey() + "}}";
+            String value = entry.getValue() != null ? entry.getValue() : "";
+            result = result.replace(placeholder, value);
+        }
+        return result;
     }
 
     /**
@@ -49,9 +62,15 @@ public class PromptFiller {
      * @return 填充后的字符串
      */
     public String fillFromResource(String templatePath, Map<String, String> vars) {
-        // TODO: 1. ResourceLoader 加载 classpath 模板文件
-        // TODO: 2. 读取为 String
-        // TODO: 3. 调用 fill() 填充变量
-        return "";
+        if (resourceLoader == null) {
+            return fill("", vars);
+        }
+        try {
+            Resource resource = resourceLoader.getResource("classpath:" + templatePath);
+            String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return fill(template, vars);
+        } catch (IOException e) {
+            return fill("", vars);
+        }
     }
 }

@@ -1,0 +1,8 @@
+请分析以下供应商的风险情况：
+
+## 供应商信息
+- 供应商名称：{{supplierName}}
+- 报价：{{quotePrice}}元
+- 联系方式：{{supplierContact}}
+
+{{background}}
