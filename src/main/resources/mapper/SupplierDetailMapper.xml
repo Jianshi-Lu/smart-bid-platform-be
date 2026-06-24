@@ -3,12 +3,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
   ┌────────────────────────────────────────────────────────────────────┐
-  │  BidWinningSupplierDetailMapper.xml — 中标结果明细表 SQL 映射      │
+  │  SupplierDetailMapper.xml — 供应商明细表 SQL 映射                   │
   │                                                                    │
   │  在整个开发链路中的位置：                                          │
-  │   ① 数据库表（V5 建表）                                            │
-  │   ② Entity 层（BidWinningSupplierDetail）                          │
-  │   ③ Mapper 接口（BidWinningSupplierDetailMapper）                  │
+  │   ① 数据库表（V10 重构）                                          │
+  │   ② Entity 层（SupplierDetail）                                    │
+  │   ③ Mapper 接口（SupplierDetailMapper）                            │
   │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
   │   ⑤ Service 层（注入 Mapper 接口调用）                            │
   │   ⑥ DTO 层                                                        │
@@ -21,74 +21,73 @@
   │   - parameterType / resultMap 用全限定名（最稳）                  │
   │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
   │                                                                    │
-  │  本表特点（最简实现）：4 字段、无 DB 默认值、无时间字段            │
-  │  业务关系：一条定标通知 → 多条中标明细（1:N）                       │
+  │  本表特点：4 字段、无 DB 默认值、无时间字段                       │
+  │  业务关系：与 bid_winning_notification 通过项目编号间接关联         │
+  │           与 risk_analysis 通过 supplier_id 关联                   │
   └────────────────────────────────────────────────────────────────────┘
 -->
-<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningSupplierDetailMapper">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.SupplierDetailMapper">
 
     <!--
       BaseResultMap：Java 字段 ↔ DB 列映射
       即使 application.yml 配了 map-underscore-to-camel-case=true，
       这里仍显式声明，避免魔法规则带来的隐式行为。
     -->
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail">
-        <id     column="detail_id"       property="detailId"/>
-        <result column="notification_id" property="notificationId"/>
-        <result column="supplier_name"   property="supplierName"/>
-        <result column="amount"          property="amount"/>
-        <result column="target_email"   property="targetEmail"/>
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.SupplierDetail">
+        <id     column="supplier_id"      property="supplierId"/>
+        <result column="supplier_name"    property="supplierName"/>
+        <result column="quote_price"      property="quotePrice"/>
+        <result column="supplier_contact" property="supplierContact"/>
     </resultMap>
 
     <!--
       插入：自增主键回填
-      - detail_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.detailId）
-      - 其余 3 字段全部为 NOT NULL，必须显式传入
+      - supplier_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.supplierId）
+      - 其余 4 字段全部为 NOT NULL（除 supplier_contact），必须显式传入
     -->
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.SupplierDetail"
             useGeneratedKeys="true"
-            keyProperty="detailId">
-        INSERT INTO bid_winning_supplier_detail
-            (notification_id, supplier_name, amount, target_email)
+            keyProperty="supplierId">
+        INSERT INTO supplier_detail
+            (supplier_name, quote_price, supplier_contact)
         VALUES
-            (#{notificationId}, #{supplierName}, #{amount}, #{targetEmail})
+            (#{supplierName}, #{quotePrice}, #{supplierContact})
     </insert>
 
     <!--
       按 ID 更新（PATCH 风格动态 SQL）：
-      - 传入 entity 必须携带 detailId（WHERE 条件）
+      - 传入 entity 必须携带 supplierId（WHERE 条件）
       - 使用 <set> + <if> 实现 PATCH 语义：
         * 字段为 null → 不更新（保留 DB 原值）
         * 字段非 null → 更新
     -->
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningSupplierDetail">
-        UPDATE bid_winning_supplier_detail
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.SupplierDetail">
+        UPDATE supplier_detail
         <set>
-            <if test="notificationId != null">notification_id = #{notificationId},</if>
             <if test="supplierName != null">supplier_name = #{supplierName},</if>
-            <if test="amount != null">amount = #{amount},</if>
-            <if test="targetEmail != null">target_email = #{targetEmail},</if>
+            <if test="quotePrice != null">quote_price = #{quotePrice},</if>
+            <if test="supplierContact != null">supplier_contact = #{supplierContact},</if>
         </set>
-        WHERE detail_id = #{detailId}
+        WHERE supplier_id = #{supplierId}
     </update>
 
     <!--
-      按 ID 删除：#{detailId} 名称 = Mapper 接口方法参数名
+      按 ID 删除：#{supplierId} 名称 = Mapper 接口方法参数名
     -->
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM bid_winning_supplier_detail
-        WHERE detail_id = #{detailId}
+        DELETE FROM supplier_detail
+        WHERE supplier_id = #{supplierId}
     </delete>
 
     <!--
       按 ID 查询：resultMap 复用 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount, target_email
-        FROM bid_winning_supplier_detail
-        WHERE detail_id = #{detailId}
+        SELECT supplier_id, supplier_name, quote_price, supplier_contact
+        FROM supplier_detail
+        WHERE supplier_id = #{supplierId}
     </select>
 
     <!--
@@ -96,22 +95,22 @@
       数据量小时可直接用，数据量大时建议后续加分页
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount, target_email
-        FROM bid_winning_supplier_detail
+        SELECT supplier_id, supplier_name, quote_price, supplier_contact
+        FROM supplier_detail
     </select>
 
     <delete id="deleteByIds" parameterType="java.util.List">
-        DELETE FROM bid_winning_supplier_detail
-        WHERE detail_id IN
+        DELETE FROM supplier_detail
+        WHERE supplier_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>
     </delete>
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT detail_id, notification_id, supplier_name, amount, target_email
-        FROM bid_winning_supplier_detail
-        WHERE detail_id IN
+        SELECT supplier_id, supplier_name, quote_price, supplier_contact
+        FROM supplier_detail
+        WHERE supplier_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>

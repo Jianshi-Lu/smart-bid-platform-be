@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  RiskAnalysisMapper.xml — 风险分析结果表 SQL 映射                 │
+  │                                                                    │
+  │  在整个开发链路中的位置：                                          │
+  │   ① 数据库表（V7 建表，V8 重命名，V9 精简字段）                   │
+  │   ② Entity 层（RiskAnalysis）                                      │
+  │   ③ Mapper 接口（RiskAnalysisMapper）                              │
+  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
+  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
+  │   ⑥ Controller 层                                                 │
+  │                                                                    │
+  │  本表特点：写多读少（分析结果写入后一般不修改）                    │
+  │  业务关系：一条供应商明细 → 多条分析记录（1:N）                    │
+  └────────────────────────────────────────────────────────────────────┘
+-->
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper">
+
+    <!--
+      BaseResultMap：Java 字段 ↔ DB 列映射
+      V9 精简字段后仅保留 9 列（去掉了 notification_id/risk_score/key_points/model_name）。
+    -->
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis">
+        <id     column="analysis_id"     property="analysisId"/>
+        <result column="supplier_id"     property="supplierId"/>
+        <result column="supplier_name"   property="supplierName"/>
+        <result column="risk_level"     property="riskLevel"/>
+        <result column="summary"        property="summary"/>
+        <result column="suggestions"     property="suggestions"/>
+        <result column="raw_response"   property="rawResponse"/>
+        <result column="prompt_version" property="promptVersion"/>
+        <result column="analyzed_at"    property="analyzedAt"/>
+    </resultMap>
+
+    <!--
+      插入：自增主键回填
+      - analysis_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.analysisId）
+      - analyzed_at 省略（DB 默认 CURRENT_TIMESTAMP）
+      V9 精简后仅 7 个可写字段。
+    -->
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis"
+            useGeneratedKeys="true"
+            keyProperty="analysisId">
+        INSERT INTO risk_analysis
+            (supplier_id, supplier_name, risk_level, summary, suggestions,
+             raw_response, prompt_version)
+        VALUES
+            (#{supplierId}, #{supplierName}, #{riskLevel}, #{summary}, #{suggestions},
+             #{rawResponse}, #{promptVersion})
+    </insert>
+
+    <!--
+      按 ID 查询：resultMap 复用 BaseResultMap
+    -->
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT
+            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            suggestions, raw_response, prompt_version, analyzed_at
+        FROM risk_analysis
+        WHERE analysis_id = #{analysisId}
+    </select>
+
+    <!--
+      按供应商 ID 查询历史分析记录（按时间倒序，最新在前）
+    -->
+    <select id="selectBySupplierId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT
+            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            suggestions, raw_response, prompt_version, analyzed_at
+        FROM risk_analysis
+        WHERE supplier_id = #{supplierId}
+        ORDER BY analyzed_at DESC
+    </select>
+
+    <!--
+      查询全部（无参）
+    -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT
+            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            suggestions, raw_response, prompt_version, analyzed_at
+        FROM risk_analysis
+    </select>
+
+    <!--
+      按 ID 列表批量查询
+    -->
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT
+            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            suggestions, raw_response, prompt_version, analyzed_at
+        FROM risk_analysis
+        WHERE analysis_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <!--
+      按 ID 删除
+    -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM risk_analysis
+        WHERE analysis_id = #{analysisId}
+    </delete>
+
+    <!--
+      按 ID 列表批量删除
+    -->
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM risk_analysis
+        WHERE analysis_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
