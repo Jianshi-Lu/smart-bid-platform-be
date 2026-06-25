@@ -24,8 +24,8 @@
     -->
     <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis">
         <id     column="analysis_id"     property="analysisId"/>
-        <result column="supplier_id"     property="supplierId"/>
-        <result column="supplier_name"   property="supplierName"/>
+        <result column="tenderer_id"     property="tendererId"/>
+        <result column="tenderer_name"   property="tendererName"/>
         <result column="risk_level"     property="riskLevel"/>
         <result column="summary"        property="summary"/>
         <result column="suggestions"     property="suggestions"/>
@@ -45,10 +45,10 @@
             useGeneratedKeys="true"
             keyProperty="analysisId">
         INSERT INTO risk_analysis
-            (supplier_id, supplier_name, risk_level, summary, suggestions,
+            (tenderer_id, tenderer_name, risk_level, summary, suggestions,
              raw_response, prompt_version)
         VALUES
-            (#{supplierId}, #{supplierName}, #{riskLevel}, #{summary}, #{suggestions},
+            (#{tendererId}, #{tendererName}, #{riskLevel}, #{summary}, #{suggestions},
              #{rawResponse}, #{promptVersion})
     </insert>
 
@@ -57,7 +57,7 @@
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT
-            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            analysis_id, tenderer_id, tenderer_name, risk_level, summary,
             suggestions, raw_response, prompt_version, analyzed_at
         FROM risk_analysis
         WHERE analysis_id = #{analysisId}
@@ -66,12 +66,12 @@
     <!--
       按供应商 ID 查询历史分析记录（按时间倒序，最新在前）
     -->
-    <select id="selectBySupplierId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    <select id="selectByTendererId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT
-            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            analysis_id, tenderer_id, tenderer_name, risk_level, summary,
             suggestions, raw_response, prompt_version, analyzed_at
         FROM risk_analysis
-        WHERE supplier_id = #{supplierId}
+        WHERE tenderer_id = #{tendererId}
         ORDER BY analyzed_at DESC
     </select>
 
@@ -80,7 +80,7 @@
     -->
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT
-            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            analysis_id, tenderer_id, tenderer_name, risk_level, summary,
             suggestions, raw_response, prompt_version, analyzed_at
         FROM risk_analysis
     </select>
@@ -90,7 +90,7 @@
     -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
         SELECT
-            analysis_id, supplier_id, supplier_name, risk_level, summary,
+            analysis_id, tenderer_id, tenderer_name, risk_level, summary,
             suggestions, raw_response, prompt_version, analyzed_at
         FROM risk_analysis
         WHERE analysis_id IN

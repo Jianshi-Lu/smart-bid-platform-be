@@ -1,92 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<!--
-  ┌────────────────────────────────────────────────────────────────────┐
-  │  TenderNoticeMapper.xml — 定标通知主表 SQL 映射          │
-  │                                                                    │
-  │  在整个开发链路中的位置：                                          │
-  │   ① 数据库表（V4 建表）                                            │
-  │   ② Entity 层（TenderNotice）                            │
-  │   ③ Mapper 接口（TenderNoticeMapper，待实现）             │
-  │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
-  │   ⑤ Service 层（注入 Mapper 接口调用）                            │
-  │   ⑥ DTO 层                                                        │
-  │   ⑦ Controller 层                                                 │
-  │                                                                    │
-  │  关键约定：                                                        │
-  │   - namespace 必须等于 Mapper 接口全限定名（一个字符都不能错）    │
-  │   - 每个 <insert> / <update> / <delete> / <select> 标签的         │
-  │     id = Mapper 接口中的方法名                                    │
-  │   - parameterType / resultMap 用全限定名（最稳）                  │
-  │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
-  │                                                                    │
-  │  本次提交范围：仅 XML（保持最小实现，Mapper 接口待后续补全）      │
-  └────────────────────────────────────────────────────────────────────┘
--->
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeMapper">
 
-    <!--
-      BaseResultMap：Java 字段 ↔ DB 列映射
-      即使 application.yml 配了 map-underscore-to-camel-case=true，
-      这里仍显式声明，避免魔法规则带来的隐式行为。
-    -->
     <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
-        <id     column="notice_id"        property="noticeId"/>
-        <result column="tender_handler_id"             property="tenderHandlerId"/>
-        <result column="project_no"             property="projectNo"/>
-        <result column="purchase_task_no"       property="purchaseTaskNo"/>
-        <result column="platform_category"      property="platformCategory"/>
-        <result column="bidding_process"        property="biddingProcess"/>
-        <result column="bidding_method"         property="biddingMethod"/>
-        <result column="purchase_method"        property="purchaseMethod"/>
-        <result column="is_fixed_price"         property="isFixedPrice"/>
-        <result column="target_cost"            property="targetCost"/>
-        <result column="document_fee"           property="documentFee"/>
-        <result column="deposit"                property="deposit"/>
-        <result column="credit_report_required" property="creditReportRequired"/>
-        <result column="registration_deadline"  property="registrationDeadline"/>
-        <result column="tech_bid_deadline"      property="techBidDeadline"/>
-        <result column="business_bid_deadline"  property="businessBidDeadline"/>
-        <result column="bidding_status"         property="biddingStatus"/>
-        <result column="notes"                  property="notes"/>
-        <result column="created_at"             property="createdAt"/>
-        <result column="target_email"         property="targetEmail"/>
+        <id     column="notice_id"                property="noticeId"/>
+        <result column="tender_handler_id"        property="tenderHandlerId"/>
+        <result column="project_no"               property="projectNo"/>
+        <result column="purchase_task_no"         property="purchaseTaskNo"/>
+        <result column="platform_category"        property="platformCategory"/>
+        <result column="tender_process"           property="tenderProcess"/>
+        <result column="tender_method"            property="tenderMethod"/>
+        <result column="purchase_method"          property="purchaseMethod"/>
+        <result column="is_fixed_price"           property="isFixedPrice"/>
+        <result column="has_document_fee"         property="hasDocumentFee"/>
+        <result column="deposit"                  property="deposit"/>
+        <result column="credit_report_required"   property="creditReportRequired"/>
+        <result column="registration_deadline"    property="registrationDeadline"/>
+        <result column="technical_tender_deadline" property="technicalTenderDeadline"/>
+        <result column="business_tender_deadline"  property="businessTenderDeadline"/>
+        <result column="notes"                     property="notes"/>
+        <result column="created_at"                property="createdAt"/>
+        <result column="purchase_company"          property="purchaseCompany"/>
+        <result column="purchase_department"       property="purchaseDepartment"/>
+        <result column="tendering_party"           property="tenderingParty"/>
+        <result column="status"                    property="status"/>
     </resultMap>
 
-    <!--
-      插入：自增主键回填 + 依赖 DB 默认值
-      - notice_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.noticeId）
-      - created_at 省略（DB DEFAULT CURRENT_TIMESTAMP 自动填）
-      - bidding_status 省略（DB DEFAULT '已完成' 自动填）
-    -->
     <insert id="insert"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice"
             useGeneratedKeys="true"
             keyProperty="noticeId">
         INSERT INTO tender_notice
             (tender_handler_id, project_no, purchase_task_no, platform_category,
-             bidding_process, bidding_method, purchase_method, is_fixed_price,
-             target_cost, document_fee, deposit, credit_report_required,
-             registration_deadline, tech_bid_deadline, business_bid_deadline,
-             notes, target_email)
+             tender_process, tender_method, purchase_method, is_fixed_price,
+             has_document_fee, deposit, credit_report_required,
+             registration_deadline, technical_tender_deadline, business_tender_deadline,
+             notes, purchase_company, purchase_department, tendering_party, status)
         VALUES
             (#{tenderHandlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
-             #{biddingProcess}, #{biddingMethod}, #{purchaseMethod}, #{isFixedPrice},
-             #{targetCost}, #{documentFee}, #{deposit}, #{creditReportRequired},
-             #{registrationDeadline}, #{techBidDeadline}, #{businessBidDeadline},
-             #{notes}, #{targetEmail})
+             #{tenderProcess}, #{tenderMethod}, #{purchaseMethod}, #{isFixedPrice},
+             #{hasDocumentFee}, #{deposit}, #{creditReportRequired},
+             #{registrationDeadline}, #{technicalTenderDeadline}, #{businessTenderDeadline},
+             #{notes}, #{purchaseCompany}, #{purchaseDepartment}, #{tenderingParty}, #{status})
     </insert>
 
-    <!--
-      按 ID 更新（PATCH 风格动态 SQL）：
-      - 传入 entity 必须携带 noticeId（WHERE 条件）
-      - 排除 created_at（DB 维护，不应被业务更新）
-      - 使用 <set> + <if> 实现 PATCH 语义：
-        * 字段为 null → 不更新（保留 DB 原值）
-        * 字段非 null → 更新
-      - 配合 UpdateRequest 使用（PATCH 请求体）
-    -->
     <update id="updateById"
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
         UPDATE tender_notice
@@ -95,65 +53,48 @@
             <if test="projectNo != null">project_no = #{projectNo},</if>
             <if test="purchaseTaskNo != null">purchase_task_no = #{purchaseTaskNo},</if>
             <if test="platformCategory != null">platform_category = #{platformCategory},</if>
-            <if test="biddingProcess != null">bidding_process = #{biddingProcess},</if>
-            <if test="biddingMethod != null">bidding_method = #{biddingMethod},</if>
+            <if test="tenderProcess != null">tender_process = #{tenderProcess},</if>
+            <if test="tenderMethod != null">tender_method = #{tenderMethod},</if>
             <if test="purchaseMethod != null">purchase_method = #{purchaseMethod},</if>
             <if test="isFixedPrice != null">is_fixed_price = #{isFixedPrice},</if>
-            <if test="targetCost != null">target_cost = #{targetCost},</if>
-            <if test="documentFee != null">document_fee = #{documentFee},</if>
+            <if test="hasDocumentFee != null">has_document_fee = #{hasDocumentFee},</if>
             <if test="deposit != null">deposit = #{deposit},</if>
             <if test="creditReportRequired != null">credit_report_required = #{creditReportRequired},</if>
             <if test="registrationDeadline != null">registration_deadline = #{registrationDeadline},</if>
-            <if test="techBidDeadline != null">tech_bid_deadline = #{techBidDeadline},</if>
-            <if test="businessBidDeadline != null">business_bid_deadline = #{businessBidDeadline},</if>
-            <if test="biddingStatus != null">bidding_status = #{biddingStatus},</if>
+            <if test="technicalTenderDeadline != null">technical_tender_deadline = #{technicalTenderDeadline},</if>
+            <if test="businessTenderDeadline != null">business_tender_deadline = #{businessTenderDeadline},</if>
             <if test="notes != null">notes = #{notes},</if>
-            <if test="targetEmail != null">target_email = #{targetEmail},</if>
+            <if test="purchaseCompany != null">purchase_company = #{purchaseCompany},</if>
+            <if test="purchaseDepartment != null">purchase_department = #{purchaseDepartment},</if>
+            <if test="tenderingParty != null">tendering_party = #{tenderingParty},</if>
+            <if test="status != null">status = #{status},</if>
         </set>
         WHERE notice_id = #{noticeId}
     </update>
 
-    <!--
-      按 ID 删除：#{noticeId} 名称 = Mapper 接口方法参数名
-    -->
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM tender_notice
-        WHERE notice_id = #{noticeId}
+        DELETE FROM tender_notice WHERE notice_id = #{noticeId}
     </delete>
 
-    <!--
-      按 ID 查询：resultMap 引用上面定义的 BaseResultMap
-    -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
-               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
-               document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
+               tender_process, tender_method, purchase_method, is_fixed_price,
+               has_document_fee, deposit, credit_report_required, registration_deadline,
+               technical_tender_deadline, business_tender_deadline, notes, created_at,
+               purchase_company, purchase_department, tendering_party, status
         FROM tender_notice
         WHERE notice_id = #{noticeId}
     </select>
 
-    <!--
-      查询全部（无参）：用 resultMap 复用
-      数据量小时可直接用，数据量大时建议后续加分页
-    -->
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
-               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
-               document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
+               tender_process, tender_method, purchase_method, is_fixed_price,
+               has_document_fee, deposit, credit_report_required, registration_deadline,
+               technical_tender_deadline, business_tender_deadline, notes, created_at,
+               purchase_company, purchase_department, tendering_party, status
         FROM tender_notice
     </select>
 
-    <!--
-      批量删除（按主键列表）：用 <foreach> 拼接 IN 子句
-      - 传 null / 空列表时，调用方 Service 拦截返 0，不进入 SQL
-      - 列表中不存在的 ID 不会报错（IN 不会匹配到任何行，影响行数相应减少）
-      - 单条 SQL 一次完成，由 MySQL 自动事务保证原子性
-      - 配合 BatchDeleteRequest 使用（最大 500 条由 DTO @Size 限制）
-      - 注意：本表 notice_id 在 bid_winning_supplier_detail 中是逻辑外键，
-        删除本表后明细行会变孤儿（应用层不保证完整性，p3 最小实现）
-    -->
     <delete id="deleteByIds" parameterType="java.util.List">
         DELETE FROM tender_notice
         WHERE notice_id IN
@@ -162,20 +103,12 @@
         </foreach>
     </delete>
 
-    <!--
-      按主键列表查询（用于批量删除前置查询，知道哪些 ID 真的存在）
-      - 用 <foreach> 拼接 IN 子句
-      - 列表中不存在的 ID 不会出现在结果中（IN 自然不匹配）
-      - 单次查询，PK 索引，毫秒级
-      - 配合 deleteByIds 使用：先 selectByIds 拿存在行 → deleteByIds 删它们 → 返回删掉的行
-      - 排序：DB 物理顺序（无 ORDER BY），最小实现
-      - 19 字段全查（含 created_at），用 BaseResultMap 映射
-    -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
         SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
-               bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
-               document_fee, deposit, credit_report_required, registration_deadline,
-               tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
+               tender_process, tender_method, purchase_method, is_fixed_price,
+               has_document_fee, deposit, credit_report_required, registration_deadline,
+               technical_tender_deadline, business_tender_deadline, notes, created_at,
+               purchase_company, purchase_department, tendering_party, status
         FROM tender_notice
         WHERE notice_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">

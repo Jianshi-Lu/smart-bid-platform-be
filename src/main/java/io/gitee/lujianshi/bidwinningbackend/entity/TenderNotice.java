@@ -1,7 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.entity;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,9 +12,9 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
- * 招标公告 — 数据库实体。对应表 {@code tender_notice}（V4 建表，V12 重命名，19 字段）。
+ * 招标公告 — 数据库实体。对应表 {@code tender_notice}（V4 建表，V14 重构，V15 加 status，17 字段）。
  *
- * <p>{@code handlerId} 为逻辑外键，关联 {@code bid_handler_info.handler_id}，DB 层不强制 FK。</p>
+ * <p>{@code tenderHandlerId} 为逻辑外键，关联 {@code tender_handler_info.tender_handler_id}，DB 层不强制 FK。</p>
  */
 @Data
 @NoArgsConstructor
@@ -25,27 +23,24 @@ import com.baomidou.mybatisplus.annotation.TableName;
 public class TenderNotice {
     @TableId(type = IdType.AUTO)
     private Integer noticeId;
-    @NotNull
     private Integer tenderHandlerId;
-    @NotBlank
     private String projectNo;
-    @NotBlank
     private String purchaseTaskNo;
     private String platformCategory;
-    private String biddingProcess;
-    private String biddingMethod;
+    private String tenderProcess;
+    private String tenderMethod;
     private String purchaseMethod;
     private Boolean isFixedPrice;
-    private BigDecimal targetCost;
-    private BigDecimal documentFee;
+    private Boolean hasDocumentFee;
     private BigDecimal deposit;
     private Boolean creditReportRequired;
     private LocalDateTime registrationDeadline;
-    private LocalDateTime techBidDeadline;
-    private LocalDateTime businessBidDeadline;
-    private String biddingStatus;
+    private LocalDateTime technicalTenderDeadline;
+    private LocalDateTime businessTenderDeadline;
     private String notes;
     private LocalDateTime createdAt;
-
-    private String targetEmail;
+    private String purchaseCompany;
+    private String purchaseDepartment;
+    private String tenderingParty;
+    private String status;
 }

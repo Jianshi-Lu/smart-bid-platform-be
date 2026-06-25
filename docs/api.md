@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 23 端点（含 2 AI 风险分析端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 24 端点（含 2 AI 风险分析端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -23,16 +23,16 @@
 |------|:---:|---------|
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 经办人 (TenderHandlerInfo) | 6 | `/tender-handler-info/...` |
-| 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
-| 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
-| **AI 风险分析**（v0.1+） | 2 | `/supplier-detail/{action}/{id}` |
+| 招标公告 (TenderNotice) | 7 | `/tender-notice/...` |
+| 投标人明细 (TendererDetail) | 6 | `/tenderer-detail/...` |
+| **AI 风险分析**（v0.1+） | 2 | `/tenderer-detail/{action}/{id}` |
 
 **AI 风险分析端点**（详细见 Controller 源码）：
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/supplier-detail/analyze-risk/{id}` | 同步调 DeepSeek，解析 JSON，落库，返全字段 `RiskAnalysis` |
-| GET | `/supplier-detail/risk-history/{id}` | 历史分析记录（按 `analyzedAt` 倒序） |
+| POST | `/tenderer-detail/analyze-risk/{id}` | 同步调 DeepSeek，解析 JSON，落库，返全字段 `RiskAnalysis` |
+| GET | `/tenderer-detail/risk-history/{id}` | 历史分析记录（按 `analyzedAt` 倒序） |
 
 ---
 
@@ -198,7 +198,7 @@ curl -X POST http://{host}:{port}/send-email \
 | `projectCode` | String | ✅ | 项目编号（模板变量） |
 | `handlerName` | String | ✅ | 经办人姓名（模板变量） |
 | `bidWinningList` | Array | ✅ | 中标结果列表（模板 `th:each` 循环） |
-| `bidWinningList[].supplierName` | String | ✅ | 供应商名称 |
+| `bidWinningList[].tendererName` | String | ✅ | 投标人名称 |
 | `bidWinningList[].bidWinningAmount` | String | ✅ | 中标价 |
 | `templateName` | String | ✅ | 模板文件名（不含 `.html`） |
 
@@ -216,7 +216,7 @@ curl -X POST http://{host}:{port}/send-notification \
     "handlerName": "张三",
     "templateName": "tender-notice",
     "bidWinningList": [
-      { "supplierName": "A供应商", "bidWinningAmount": "67500.00" }
+      { "tendererName": "A投标人", "bidWinningAmount": "67500.00" }
     ]
   }'
 ```
@@ -305,7 +305,7 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 
 ---
 
-## 4. 定标通知（TenderNotice）
+## 4. 招标公告（TenderNotice）
 
 对应表 `tender_notice`，主键 `notice_id`。
 
@@ -313,14 +313,15 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 |--------|------|------|------|
 | POST | `/tender-notice/add` | 创建 | `Result<TenderNotice>` |
 | GET | `/tender-notice/{id}` | 按主键查询 | `Result<TenderNotice>` |
-| PATCH | `/tender-notice/{id}` | 部分更新（17 字段） | `Result<Diff<TenderNotice>>` |
+| PATCH | `/tender-notice/{id}` | 部分更新（16 字段） | `Result<Diff<TenderNotice>>` |
 | DELETE | `/tender-notice/{id}` | 按主键删除 | `Result<Void>` |
 | GET | `/tender-notice` | 列表查询（分页） | `Result<PageInfo<TenderNotice>>` |
 | POST | `/tender-notice/batch-delete` | 批量删除 | `Result<List<TenderNotice>>` |
+| POST | `/tender-notice/{id}/status` | 状态变更 | `Result<TenderNotice>` |
 
 ### 4.1 `POST /tender-notice/add`
 
-**请求体**（`AddRequest`，17 字段：3 必填 + 14 可选）：
+**请求体**（`AddRequest`，16 字段：3 必填 + 13 可选）：
 
 **必填（3 字段）**：
 
@@ -330,26 +331,27 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 | `projectNo` | String | @NotBlank, @Size(max=50) |
 | `purchaseTaskNo` | String | @NotBlank, @Size(max=50) |
 
-**可选（14 字段）**：
+**可选（13 字段）**：
 
 | 字段 | 类型 | 校验 |
 |------|------|------|
 | `platformCategory` | String | @Size(max=50) |
-| `biddingProcess` | String | @Size(max=50) |
-| `biddingMethod` | String | @Size(max=50) |
+| `tenderProcess` | String | @Size(max=50) |
+| `tenderMethod` | String | @Size(max=50) |
 | `purchaseMethod` | String | @Size(max=50) |
 | `isFixedPrice` | Boolean | — |
-| `targetCost` | BigDecimal | — |
-| `documentFee` | BigDecimal | — |
+| `hasDocumentFee` | Boolean | — |
 | `deposit` | BigDecimal | — |
 | `creditReportRequired` | Boolean | — |
 | `registrationDeadline` | LocalDateTime | — |
-| `techBidDeadline` | LocalDateTime | — |
-| `businessBidDeadline` | LocalDateTime | — |
-| `biddingStatus` | String | @Size(max=20) |
+| `technicalTenderDeadline` | LocalDateTime | — |
+| `businessTenderDeadline` | LocalDateTime | — |
 | `notes` | String | — |
+| `purchaseCompany` | String | @Size(max=100) |
+| `purchaseDepartment` | String | @Size(max=100) |
+| `tenderingParty` | String | @Size(max=100) |
 
-> `createdAt` 由 DB 默认 `CURRENT_TIMESTAMP` 自动维护。
+> `createdAt` 由 DB 默认 `CURRENT_TIMESTAMP` 自动维护。`status` 由 Service 自动设为 `DRAFT`，不可通过创建接口指定。
 
 ```bash
 curl -X POST http://{host}:{port}/tender-notice/add \
@@ -363,21 +365,17 @@ curl -X POST http://{host}:{port}/tender-notice/add \
 
 ### 4.3 `PATCH /tender-notice/{id}`
 
-**请求体**（`UpdateRequest`，17 字段全可选，仅 `@Size` 校验）：
+**请求体**（`UpdateRequest`，16 字段全可选，仅 `@Size` 校验）：
 
-17 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
+16 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
+
+> `status` 不支持通过 PATCH 修改，请使用 `POST /tender-notice/{id}/status` 端点。
 
 > 排除：`noticeId`（由路径传入）、`createdAt`（DB 维护）。
 
-```bash
-curl -X PATCH http://{host}:{port}/tender-notice/1 \
-  -H "Content-Type: application/json" \
-  -d '{"biddingStatus":"已完成"}'
-```
-
 ### 4.4 `DELETE /tender-notice/{id}`
 
-> ⚠️ **逻辑外键警告**：`supplier_detail.notice_id` 是逻辑外键（DB 无 FK 约束），删除本表后明细行可能变孤儿，应用层自行处理。
+> ⚠️ **逻辑外键警告**：`tenderer_detail.notice_id` 是逻辑外键（DB 无 FK 约束），删除本表后明细行可能变孤儿，应用层自行处理。
 
 ### 4.5 `GET /tender-notice`
 
@@ -393,70 +391,91 @@ curl -X PATCH http://{host}:{port}/tender-notice/1 \
 { "ids": [1, 2, 3] }
 ```
 
+### 4.7 `POST /tender-notice/{id}/status`
+
+变更招标公告状态（DRAFT → IN_PROGRESS → COMPLETED，不可逆向/跳跃）。
+
+**请求体**（`StatusUpdateRequest`）：
+
+| 字段 | 类型 | 必填 | 校验 | 说明 |
+|------|------|:---:|------|------|
+| `status` | String | ✅ | @NotBlank, @Size(max=20) | 目标状态：IN_PROGRESS / COMPLETED |
+| `remark` | String | ❌ | @Size(max=255) | 变更备注 |
+
+**响应**：`Result<TenderNotice>`（变更后的实体，含最新 status）。
+
+```bash
+curl -X POST http://{host}:{port}/tender-notice/1/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"IN_PROGRESS","remark":"收到第一个投标"}'
+```
+
 ---
 
-## 5. 供应商明细（SupplierDetail）
+## 5. 投标人明细（TendererDetail）
 
-对应表 `supplier_detail`，主键 `supplier_id`。
+对应表 `tenderer_detail`，主键 `tenderer_id`。
 
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
-| POST | `/add-supplier-detail` | 创建 | `Result<SupplierDetail>` |
-| GET | `/supplier-detail/{id}` | 按主键查询 | `Result<SupplierDetail>` |
-| PATCH | `/supplier-detail/{id}` | 部分更新 | `Result<Diff<SupplierDetail>>` |
-| DELETE | `/supplier-detail/{id}` | 按主键删除 | `Result<Void>` |
-| GET | `/supplier-detail` | 列表查询（分页） | `Result<PageInfo<SupplierDetail>>` |
-| POST | `/supplier-detail/batch-delete` | 批量删除 | `Result<List<SupplierDetail>>` |
+| POST | `/add-tenderer-detail` | 创建 | `Result<TendererDetail>` |
+| GET | `/tenderer-detail/{id}` | 按主键查询 | `Result<TendererDetail>` |
+| PATCH | `/tenderer-detail/{id}` | 部分更新 | `Result<Diff<TendererDetail>>` |
+| DELETE | `/tenderer-detail/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/tenderer-detail` | 列表查询（分页） | `Result<PageInfo<TendererDetail>>` |
+| POST | `/tenderer-detail/batch-delete` | 批量删除 | `Result<List<TendererDetail>>` |
 
-### 5.1 `POST /add-supplier-detail`
+### 5.1 `POST /add-tenderer-detail`
 
-**请求体**（`AddRequest`，3 字段必填）：
+**请求体**（`AddRequest`，3 字段必填 + 1 可选）：
 
 | 字段 | 类型 | 校验 |
 |------|------|------|
-| `supplierName` | String | @NotBlank, @Size(max=100) |
+| `tendererName` | String | @NotBlank, @Size(max=100) |
 | `quotePrice` | BigDecimal | @NotNull |
-| `supplierContact` | String | @NotBlank, @Size(max=255) |
+| `tendererContact` | String | @NotBlank, @Size(max=255) |
+| `credentials` | String | @Size(max=500) |
 
 ```bash
-curl -X POST http://{host}:{port}/add-supplier-detail \
+curl -X POST http://{host}:{port}/add-tenderer-detail \
   -H "Content-Type: application/json" \
-  -d '{"supplierName":"ABC公司","quotePrice":1234567.89,"supplierContact":"abc@example.com"}'
+  -d '{"tendererName":"ABC公司","quotePrice":1234567.89,"tendererContact":"abc@example.com"}'
 ```
 
-### 5.2 `GET /supplier-detail/{id}`
+### 5.2 `GET /tenderer-detail/{id}`
 
 返回 200 + 实体 或 404 + null。
 
-### 5.3 `PATCH /supplier-detail/{id}`
+### 5.3 `PATCH /tenderer-detail/{id}`
 
-**请求体**（`UpdateRequest`，3 字段全可选）：
+**请求体**（`UpdateRequest`，4 字段全可选）：
 
 | 字段 | 类型 | 校验 |
 |------|------|------|
-| `supplierName` | String | @Size(max=100) |
+| `tendererName` | String | @Size(max=100) |
 | `quotePrice` | BigDecimal | — |
-| `supplierContact` | String | @Size(max=255) |
+| `tendererContact` | String | @Size(max=255) |
+| `credentials` | String | @Size(max=500) |
 
 ```bash
-curl -X PATCH http://{host}:{port}/supplier-detail/1 \
+curl -X PATCH http://{host}:{port}/tenderer-detail/1 \
   -H "Content-Type: application/json" \
   -d '{"quotePrice":999999.99}'
 ```
 
-### 5.4 `DELETE /supplier-detail/{id}`
+### 5.4 `DELETE /tenderer-detail/{id}`
 
 返回 200 + null 或 404 + null。
 
-### 5.5 `GET /supplier-detail`
+### 5.5 `GET /tenderer-detail`
 
 | Query | 类型 | 默认 |
 |------|------|------|
 | `page` | Integer | 1 |
 | `pageSize` | Integer | 10 |
-| `sort` | String | `supplier_id desc` |
+| `sort` | String | `tenderer_id desc` |
 
-### 5.6 `POST /supplier-detail/batch-delete`
+### 5.6 `POST /tenderer-detail/batch-delete`
 
 ```json
 { "ids": [1, 2, 3] }

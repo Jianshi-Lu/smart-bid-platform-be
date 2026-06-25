@@ -12,10 +12,10 @@ import java.util.List;
 public interface RiskAnalysisMapper extends BaseMapper<RiskAnalysis> {
 
     /**
-     * 按供应商 ID 查询历史分析记录（按时间倒序）。
+     * 按投标人 ID 查询历史分析记录（按时间倒序）。
      *
-     * @param supplierId 供应商 ID
+     * @param tendererId 投标人 ID
      * @return 历史分析记录列表，无记录时返回空列表
      */
-    List<RiskAnalysis> selectBySupplierId(Integer supplierId);
+    List<RiskAnalysis> selectByTendererId(Integer tendererId);
 }

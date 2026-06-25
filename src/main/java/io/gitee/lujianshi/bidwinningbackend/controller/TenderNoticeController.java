@@ -4,10 +4,11 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.dto.tender.AddRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tender.BatchAddRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tender.BatchDeleteRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tender.UpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.BatchAddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.BatchDeleteRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.StatusUpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
 import io.gitee.lujianshi.bidwinningbackend.service.TenderNoticeService;
 import jakarta.annotation.Resource;
@@ -17,10 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 招标公告 Controller。6 端点标准 CRUD。端点详情 / curl 示例见 {@code docs/api.md}。
- *
- * <p>注意：删除主表后 {@code supplier_detail} 中引用本表 {@code notice_id} 的行变孤儿
- * （应用层不保证完整性）。</p>
+ * 招标公告 Controller。6 端点标准 CRUD。端点详情见 {@code docs/api.md}。
  */
 @RestController
 public class TenderNoticeController {
@@ -36,22 +34,21 @@ public class TenderNoticeController {
         entity.setProjectNo(request.getProjectNo());
         entity.setPurchaseTaskNo(request.getPurchaseTaskNo());
         entity.setPlatformCategory(request.getPlatformCategory());
-        entity.setBiddingProcess(request.getBiddingProcess());
-        entity.setBiddingMethod(request.getBiddingMethod());
+        entity.setTenderProcess(request.getTenderProcess());
+        entity.setTenderMethod(request.getTenderMethod());
         entity.setPurchaseMethod(request.getPurchaseMethod());
         entity.setIsFixedPrice(request.getIsFixedPrice());
-        entity.setTargetCost(request.getTargetCost());
-        entity.setDocumentFee(request.getDocumentFee());
+        entity.setHasDocumentFee(request.getHasDocumentFee());
         entity.setDeposit(request.getDeposit());
         entity.setCreditReportRequired(request.getCreditReportRequired());
         entity.setRegistrationDeadline(request.getRegistrationDeadline());
-        entity.setTechBidDeadline(request.getTechBidDeadline());
-        entity.setBusinessBidDeadline(request.getBusinessBidDeadline());
-        entity.setBiddingStatus(request.getBiddingStatus());
+        entity.setTechnicalTenderDeadline(request.getTechnicalTenderDeadline());
+        entity.setBusinessTenderDeadline(request.getBusinessTenderDeadline());
         entity.setNotes(request.getNotes());
-        entity.setTargetEmail(request.getTargetEmail());
+        entity.setPurchaseCompany(request.getPurchaseCompany());
+        entity.setPurchaseDepartment(request.getPurchaseDepartment());
+        entity.setTenderingParty(request.getTenderingParty());
         service.add(entity);
-        service.sendOperationEmail(entity);
         return Result.success(entity, "创建成功");
     }
 
@@ -59,7 +56,6 @@ public class TenderNoticeController {
     public Result<List<TenderNotice>> batchAddTenderNotice(
             @Valid @RequestBody BatchAddRequest request) {
         List<TenderNotice> created = service.batchAdd(request.getItems());
-        service.sendBatchAddEmail(created, request.getTargetEmail());
         return Result.success(created, "批量新增成功");
     }
 
@@ -85,20 +81,20 @@ public class TenderNoticeController {
         after.setProjectNo(request.getProjectNo());
         after.setPurchaseTaskNo(request.getPurchaseTaskNo());
         after.setPlatformCategory(request.getPlatformCategory());
-        after.setBiddingProcess(request.getBiddingProcess());
-        after.setBiddingMethod(request.getBiddingMethod());
+        after.setTenderProcess(request.getTenderProcess());
+        after.setTenderMethod(request.getTenderMethod());
         after.setPurchaseMethod(request.getPurchaseMethod());
         after.setIsFixedPrice(request.getIsFixedPrice());
-        after.setTargetCost(request.getTargetCost());
-        after.setDocumentFee(request.getDocumentFee());
+        after.setHasDocumentFee(request.getHasDocumentFee());
         after.setDeposit(request.getDeposit());
         after.setCreditReportRequired(request.getCreditReportRequired());
         after.setRegistrationDeadline(request.getRegistrationDeadline());
-        after.setTechBidDeadline(request.getTechBidDeadline());
-        after.setBusinessBidDeadline(request.getBusinessBidDeadline());
-        after.setBiddingStatus(request.getBiddingStatus());
+        after.setTechnicalTenderDeadline(request.getTechnicalTenderDeadline());
+        after.setBusinessTenderDeadline(request.getBusinessTenderDeadline());
         after.setNotes(request.getNotes());
-        after.setTargetEmail(request.getTargetEmail());
+        after.setPurchaseCompany(request.getPurchaseCompany());
+        after.setPurchaseDepartment(request.getPurchaseDepartment());
+        after.setTenderingParty(request.getTenderingParty());
         int rows = service.update(after);
         if (rows == 0) {
             return Result.error(404, "记录不存在");
@@ -136,5 +132,17 @@ public class TenderNoticeController {
     public Result<List<TenderNotice>> batchDeleteTenderNotice(@Valid @RequestBody BatchDeleteRequest request) {
         List<TenderNotice> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
+    }
+
+    @PostMapping("/tender-notice/{id}/status")
+    public Result<TenderNotice> updateTenderNoticeStatus(
+            @PathVariable Integer id,
+            @Valid @RequestBody StatusUpdateRequest request) {
+        try {
+            TenderNotice updated = service.transitionStatus(id, request.getStatus(), request.getRemark());
+            return Result.success(updated, "状态变更成功");
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        }
     }
 }

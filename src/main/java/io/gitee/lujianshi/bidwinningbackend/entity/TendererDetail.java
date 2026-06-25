@@ -10,20 +10,22 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * 供应商明细 — 数据库实体。对应表 {@code supplier_detail}（V10 重构，4 字段）。
+ * 投标人明细 — 数据库实体。对应表 {@code tenderer_detail}（V16 重命名自 supplier_detail，5 字段）。
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("supplier_detail")
-public class SupplierDetail {
+@TableName("tenderer_detail")
+public class TendererDetail {
 
     @TableId(type = IdType.AUTO)
-    private Integer supplierId;
+    private Integer tendererId;
 
-    private String supplierName;
+    private String tendererName;
 
     private BigDecimal quotePrice;
 
-    private String supplierContact;
+    private String tendererContact;
+
+    private String credentials;
 }

@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tender;
+package io.gitee.lujianshi.bidwinningbackend.dto.tendernotice;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 更新定标通知请求 DTO（PATCH 语义，17 字段全可选，null 字段表示"不修改"）。
+ * 更新招标公告请求 DTO（PATCH 语义，16 字段全可选，null 字段表示"不修改"）。
  */
 @Data
 public class UpdateRequest {
@@ -24,19 +24,17 @@ public class UpdateRequest {
     private String platformCategory;
 
     @Size(max = 50, message = "招标流程长度不能超过50")
-    private String biddingProcess;
+    private String tenderProcess;
 
     @Size(max = 50, message = "招标方式长度不能超过50")
-    private String biddingMethod;
+    private String tenderMethod;
 
     @Size(max = 50, message = "采购方式长度不能超过50")
     private String purchaseMethod;
 
     private Boolean isFixedPrice;
 
-    private BigDecimal targetCost;
-
-    private BigDecimal documentFee;
+    private Boolean hasDocumentFee;
 
     private BigDecimal deposit;
 
@@ -44,14 +42,18 @@ public class UpdateRequest {
 
     private LocalDateTime registrationDeadline;
 
-    private LocalDateTime techBidDeadline;
+    private LocalDateTime technicalTenderDeadline;
 
-    private LocalDateTime businessBidDeadline;
-
-    @Size(max = 20, message = "状态长度不能超过20")
-    private String biddingStatus;
+    private LocalDateTime businessTenderDeadline;
 
     private String notes;
 
-    private String targetEmail;
+    @Size(max = 100, message = "采购公司长度不能超过100")
+    private String purchaseCompany;
+
+    @Size(max = 100, message = "采购部门长度不能超过100")
+    private String purchaseDepartment;
+
+    @Size(max = 100, message = "招标主体长度不能超过100")
+    private String tenderingParty;
 }

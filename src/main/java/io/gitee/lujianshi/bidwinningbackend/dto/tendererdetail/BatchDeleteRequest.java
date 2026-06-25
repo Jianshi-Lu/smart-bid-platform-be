@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.supplierdetail;
+package io.gitee.lujianshi.bidwinningbackend.dto.tendererdetail;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
@@ -7,7 +7,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 批量删除供应商明细请求 DTO。ids 非空，最多 500 条。
+ * 批量删除投标人明细请求 DTO。ids 非空，最多 500 条。
  */
 @Data
 public class BatchDeleteRequest {

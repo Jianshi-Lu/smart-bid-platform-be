@@ -43,7 +43,7 @@
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
-│   ├── SupplierDetailController.java       # 供应商明细（6 端点 + 2 AI 风险分析）
+│   ├── TendererDetailController.java       # 投标人明细（6 端点 + 2 AI 风险分析）
 │   ├── TenderHandlerInfoController.java       # 经办人（6 端点）
 │   ├── TenderNoticeController.java  # 定标通知（6 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
@@ -52,18 +52,18 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── common/                             # Result / Diff
 │   ├── bidhandlerinfo/                     # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
 │   ├── bidwinningnotification/             # 同上
-│   ├── supplierdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
+│   ├── tendererdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 4 实体：TenderHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
+├── entity/                                 # 5 实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
 ├── mapper/                                 # @Mapper 接口 extends BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
-│   ├── SupplierDetailService.java
+│   ├── TendererDetailService.java
 │   ├── TenderHandlerInfoService.java
 │   ├── TenderNoticeService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
-│   │   ├── SupplierDetailLoader.java
+│   │   ├── TendererDetailLoader.java
 │   │   └── RiskAnalysisService.java        # 构造器注入 ChatClient.Builder
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
@@ -156,7 +156,7 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段。`analyzeRisk(Integer supplierId)` 同步调 DeepSeek、解析 JSON、落库。
+构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段。`analyzeRisk(Integer tendererId)` 同步调 DeepSeek、解析 JSON、落库。
 
 ---
 

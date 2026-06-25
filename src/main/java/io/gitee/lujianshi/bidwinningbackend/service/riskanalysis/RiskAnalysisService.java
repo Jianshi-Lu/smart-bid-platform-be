@@ -4,9 +4,9 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
-import io.gitee.lujianshi.bidwinningbackend.entity.SupplierDetail;
+import io.gitee.lujianshi.bidwinningbackend.entity.TendererDetail;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
-import io.gitee.lujianshi.bidwinningbackend.mapper.SupplierDetailMapper;
+import io.gitee.lujianshi.bidwinningbackend.mapper.TendererDetailMapper;
 import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -31,13 +31,13 @@ public class RiskAnalysisService {
     private final ChatClient chatClient;
 
     @Resource
-    private SupplierDetailLoader loader;
+    private TendererDetailLoader loader;
 
     @Resource
     private RiskAnalysisMapper mapper;
 
     @Resource
-    private SupplierDetailMapper supplierDetailMapper;
+    private TendererDetailMapper tendererDetailMapper;
 
     @Resource
     private PromptFiller promptFiller;
@@ -49,27 +49,27 @@ public class RiskAnalysisService {
     /**
      * 触发一次风险分析。同步调用 DeepSeek API，解析 JSON 填字段，落库并返全字段实体。
      *
-     * @param supplierId 供应商 ID
+     * @param tendererId 投标人 ID
      * @return 含 analysisId 的完整 RiskAnalysis
-     * @throws IllegalArgumentException 供应商不存在
+     * @throws IllegalArgumentException 投标人不存在
      */
-    public RiskAnalysis analyzeRisk(Integer supplierId) {
-        log.info(">>> [风险分析] 开始 supplierId={}", supplierId);
+    public RiskAnalysis analyzeRisk(Integer tendererId) {
+        log.info(">>> [风险分析] 开始 tendererId={}", tendererId);
 
-        SupplierDetail detail = supplierDetailMapper.selectById(supplierId);
+        TendererDetail detail = tendererDetailMapper.selectById(tendererId);
         if (detail == null) {
-            log.warn("<<< [风险分析] 供应商不存在 supplierId={}", supplierId);
-            throw new IllegalArgumentException("供应商不存在: " + supplierId);
+            log.warn("<<< [风险分析] 投标人不存在 tendererId={}", tendererId);
+            throw new IllegalArgumentException("投标人不存在: " + tendererId);
         }
 
-        log.info(">>> [风险分析] 供应商信息 name={} quotePrice={} contact={}",
-                detail.getSupplierName(), detail.getQuotePrice(), detail.getSupplierContact());
+        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
+                detail.getTendererName(), detail.getQuotePrice(), detail.getTendererContact());
 
-        String detailInfo = loader.loadDetail(supplierId);
+        String detailInfo = loader.loadDetail(tendererId);
         Map<String, String> vars = Map.of(
-                "supplierName", detail.getSupplierName() != null ? detail.getSupplierName() : "",
+                "tendererName", detail.getTendererName() != null ? detail.getTendererName() : "",
                 "quotePrice", detail.getQuotePrice() != null ? detail.getQuotePrice().toString() : "",
-                "supplierContact", detail.getSupplierContact() != null ? detail.getSupplierContact() : "",
+                "tendererContact", detail.getTendererContact() != null ? detail.getTendererContact() : "",
                 "detail", detailInfo
         );
 
@@ -91,14 +91,14 @@ public class RiskAnalysisService {
         log.info("<<< [风险分析] AI 响应 (length={}, elapsed={}ms, analyzedAt={}):\n{}",
                 raw != null ? raw.length() : 0, elapsedMs, analyzedAt, raw);
 
-        RiskAnalysis analysis = parseAndBuild(supplierId, detail.getSupplierName(), raw, analyzedAt);
+        RiskAnalysis analysis = parseAndBuild(tendererId, detail.getTendererName(), raw, analyzedAt);
 
         RiskAnalysis saved = persist(analysis);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
     }
 
-    private RiskAnalysis parseAndBuild(Integer supplierId, String supplierName, String raw, LocalDateTime analyzedAt) {
+    private RiskAnalysis parseAndBuild(Integer tendererId, String tendererName, String raw, LocalDateTime analyzedAt) {
         String riskLevel = null;
         String summary = null;
         String suggestions = null;
@@ -116,8 +116,8 @@ public class RiskAnalysisService {
         }
 
         RiskAnalysis a = new RiskAnalysis();
-        a.setSupplierId(supplierId);
-        a.setSupplierName(supplierName);
+        a.setTendererId(tendererId);
+        a.setTendererName(tendererName);
         a.setRiskLevel(riskLevel);
         a.setSummary(summary);
         a.setSuggestions(suggestions);
@@ -137,9 +137,9 @@ public class RiskAnalysisService {
     }
 
     /**
-     * 查询指定供应商的历史分析记录（按时间倒序）。
+     * 查询指定投标人的历史分析记录（按时间倒序）。
      */
-    public List<RiskAnalysis> getHistory(Integer supplierId) {
-        return mapper.selectBySupplierId(supplierId);
+    public List<RiskAnalysis> getHistory(Integer tendererId) {
+        return mapper.selectByTendererId(tendererId);
     }
 }

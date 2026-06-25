@@ -18,30 +18,41 @@
            │ 1:N（逻辑外键）
            ▼
 ┌────────────────────────────────────────┐
-│ tender_notice (V4)          │  定标通知主表
+│ tender_notice (V14)         │  招标公告主表
 │  ├─ notice_id PK                │
 │  ├─ tender_handler_id (FK)                    │
 │  ├─ project_no / purchase_task_no      │
 │  ├─ 招标规则（流程/方式/采购方式等）  │
 │  ├─ 时间线（报名/技术/商务截止）      │
-│  ├─ bidding_status / notes / created_at│
-│  └─ target_email (V6)                  │
+│  ├─ 采购公司/部门/tendering_party     │
+│  ├─ status (DRAFT/IN_PROGRESS/COMPLETED)│
+│  └─ notes / created_at                 │
 └────────────────────────────────────────┘
            │ 1:N（逻辑外键）
            ▼
+┌──────────────────────────────────────────────┐
+│ tender_notice_status_history (V15)           │  状态变更审计
+│  ├─ history_id PK                            │
+│  ├─ notice_id (FK)                           │
+│  ├─ from_status / to_status / remark         │
+│  └─ created_at                               │
+└──────────────────────────────────────────────┘
+           │ 1:N（逻辑外键）
+           ▼
 ┌──────────────────────────────┐
-│ supplier_detail (V10)        │  供应商明细
-│  ├─ supplier_id PK          │
-│  ├─ supplier_name            │
+│ tenderer_detail (V16)       │  投标人明细
+│  ├─ tenderer_id PK          │
+│  ├─ tenderer_name            │
 │  ├─ quote_price (DECIMAL)    │
-│  └─ supplier_contact (V10)   │
+│  ├─ tenderer_contact (V16)   │
+│  └─ credentials (V16)        │
 └──────────────────────────────┘
 
 ┌──────────────────────────────────┐
 │ risk_analysis (V7→V9)            │  AI 风险分析结果
 │  ├─ analysis_id PK              │
-│  ├─ supplier_id (V9, FK)         │
-│  ├─ supplier_name                │
+│  ├─ tenderer_id (V9→V16, FK)     │
+│  ├─ tenderer_name                │
 │  ├─ risk_level / summary / suggestions
 │  ├─ raw_response (V11: JSON)     │
 │  ├─ prompt_version / analyzed_at  │
@@ -52,6 +63,7 @@
 - V8：`bid_winning_risk_analysis` → `risk_analysis`
 - V9：`detail_id` → `supplier_id`；删除 `notification_id` / `risk_score` / `key_points` / `model_name` 字段
 - V10：`bid_winning_supplier_detail` → `supplier_detail`；`detail_id` → `supplier_id`；`amount` → `quote_price`；`target_email` → `supplier_contact`；删除 `notification_id`
+- V16：`supplier_detail` → `tenderer_detail`；`supplier_id` → `tenderer_id`；`supplier_name` → `tenderer_name`；`supplier_contact` → `tenderer_contact`；新增 `credentials`；`risk_analysis` 列同步
 - V11：`raw_response` 类型 `MEDIUMTEXT` → `JSON`
 
 ---
@@ -72,7 +84,7 @@
 
 **演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V13（重命名 `tender_handler_info`）→ V6（加 `target_email`）
 
-### 2.2 `tender_notice`（定标通知）
+### 2.2 `tender_notice`（招标公告）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
@@ -81,50 +93,51 @@
 | `project_no` | VARCHAR(50) | ✅ | 项目编号 |
 | `purchase_task_no` | VARCHAR(50) | ✅ | 采购任务编号 |
 | `platform_category` | VARCHAR(50) | ❌ | 平台采购类别 |
-| `bidding_process` | VARCHAR(50) | ❌ | 招标流程 |
-| `bidding_method` | VARCHAR(50) | ❌ | 招标方式 |
+| `tender_process` | VARCHAR(50) | ❌ | 招标流程 |
+| `tender_method` | VARCHAR(50) | ❌ | 招标方式 |
 | `purchase_method` | VARCHAR(50) | ❌ | 采购方式 |
 | `is_fixed_price` | TINYINT(1) | ❌ | 是否固定总价 |
-| `target_cost` | DECIMAL(15,2) | ❌ | 目标成本 |
-| `document_fee` | DECIMAL(10,2) | ❌ | 标书费 |
+| `has_document_fee` | TINYINT(1) | ❌ | 标书费（1有 0无） |
 | `deposit` | DECIMAL(15,2) | ❌ | 保证金 |
 | `credit_report_required` | TINYINT(1) | ❌ | 是否需要征信报告 |
 | `registration_deadline` | DATETIME | ❌ | 报名截止时间 |
-| `tech_bid_deadline` | DATETIME | ❌ | 技术回标截止时间 |
-| `business_bid_deadline` | DATETIME | ❌ | 商务回标截止时间 |
-| `bidding_status` | VARCHAR(20) | ❌ | 状态（默认 "已完成"） |
+| `technical_tender_deadline` | DATETIME | ❌ | 技术回标截止时间 |
+| `business_tender_deadline` | DATETIME | ❌ | 商务回标截止时间 |
 | `notes` | TEXT | ❌ | 备注 |
 | `created_at` | DATETIME | ✅ | 创建时间（默认 CURRENT_TIMESTAMP） |
-| `target_email` | VARCHAR(255) | ❌ | 通知邮件收件人（V6+，已落库） |
+| `purchase_company` | VARCHAR(100) | ❌ | 采购公司 |
+| `purchase_department` | VARCHAR(100) | ❌ | 采购部门 |
+| `tendering_party` | VARCHAR(100) | ❌ | 招标主体 |
+| `status` | VARCHAR(20) | ✅ | 状态：DRAFT / IN_PROGRESS / COMPLETED（默认 DRAFT） |
 
 **索引**：PK（notice_id） + `idx_staff_id`（tender_handler_id）
 
-**演进**：V4（创建）→ V6（加 `target_email`）
+**演进**：V4（创建）→ V6（加 `target_email`）→ V14（重构字段）→ V15（加 status + 状态变更历史表）
 
-### 2.3 `supplier_detail`（供应商明细）
+### 2.3 `tenderer_detail`（投标人明细）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
-| `supplier_id` | INT | ✅ | 主键，自增 |
-| `supplier_name` | VARCHAR(100) | ✅ | 中标供应商名称 |
-| `quote_price` | DECIMAL(15,2) | ✅ | 中标价（元） |
-| `supplier_contact` | VARCHAR(255) | ✅ | 联系方式（邮箱/电话/微信，V10 重命名自 `target_email`） |
+| `tenderer_id` | INT | ✅ | 主键，自增 |
+| `tenderer_name` | VARCHAR(100) | ✅ | 投标人名称 |
+| `quote_price` | DECIMAL(15,2) | ✅ | 报价（元） |
+| `tenderer_contact` | VARCHAR(255) | ✅ | 联系方式（邮箱/电话/微信，V16 重命名自 `supplier_contact`） |
+| `credentials` | VARCHAR(500) | ❌ | 资信材料文件链接（V16 新增） |
 
-**索引**：PK（supplier_id）
+**索引**：PK（tenderer_id）
 
 **演进**：
-- V5（创建 `bid_winning_supplier_detail`，4 字段含 `detail_id` / `notification_id` / `supplier_name` / `amount` / `target_email`）
-- V10（重命名 `supplier_detail`；`detail_id` → `supplier_id`；`amount` → `quote_price`；`target_email` → `supplier_contact`；删除 `notification_id` 字段）
-
-> ⚠️ V10 删除了 `notification_id` 后，`supplier_detail` 与 `tender_notice` 的关联断开。背景模块未来需重新建立关联。
+- V5（创建 `bid_winning_supplier_detail`，含 `detail_id` / `notification_id` / `supplier_name` / `amount` / `target_email`）
+- V10（重命名 `supplier_detail`；`detail_id` → `supplier_id`；`amount` → `quote_price`；`target_email` → `supplier_contact`；删除 `notification_id`）
+- V16（重命名 `tenderer_detail`；`supplier_id` → `tenderer_id`；`supplier_name` → `tenderer_name`；`supplier_contact` → `tenderer_contact`；新增 `credentials`）
 
 ### 2.4 `risk_analysis`（AI 风险分析结果）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
 | `analysis_id` | INT | ✅ | 主键，自增 |
-| `supplier_id` | INT | ✅ | 逻辑外键 → `supplier_detail.supplier_id`（V9 重命名自 `detail_id`） |
-| `supplier_name` | VARCHAR(255) | ✅ | 供应商名称（冗余存储） |
+| `tenderer_id` | INT | ✅ | 逻辑外键 → `tenderer_detail.tenderer_id`（V9 重命名自 `detail_id`，V16 重命名） |
+| `tenderer_name` | VARCHAR(255) | ✅ | 投标人名称（冗余存储，V16 重命名） |
 | `risk_level` | VARCHAR(20) | ✅ | LOW / MEDIUM / HIGH / CRITICAL |
 | `summary` | TEXT | ✅ | 风险摘要 |
 | `suggestions` | TEXT | ❌ | 建议措施 |
@@ -132,12 +145,28 @@
 | `prompt_version` | VARCHAR(20) | ❌ | prompt 模板版本号 |
 | `analyzed_at` | DATETIME | ✅ | 分析时间（默认 CURRENT_TIMESTAMP） |
 
-**索引**：PK（analysis_id） + `idx_supplier`（supplier_id，V9 重命名） + `idx_analyzed_at`
+**索引**：PK（analysis_id） + `idx_tenderer`（tenderer_id，V9 重命名，V16 同步） + `idx_analyzed_at`
+
+### 2.5 `tender_notice_status_history`（招标公告状态变更历史）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `history_id` | INT | ✅ | 主键，自增 |
+| `notice_id` | INT | ✅ | 逻辑外键 → `tender_notice.notice_id` |
+| `from_status` | VARCHAR(20) | ❌ | 变更前状态（首次为 null） |
+| `to_status` | VARCHAR(20) | ✅ | 变更后状态 |
+| `remark` | VARCHAR(255) | ❌ | 变更备注 |
+| `created_at` | DATETIME | ✅ | 变更时间（默认 CURRENT_TIMESTAMP） |
+
+**索引**：PK（history_id） + `idx_notice_id`（notice_id）
+
+**演进**：V15（新建）
 
 **演进**：
 - V7（创建 `bid_winning_risk_analysis`，13 字段）
 - V8（重命名为 `risk_analysis`）
 - V9（精简字段：`detail_id` → `supplier_id`；删除 `notification_id` / `risk_score` / `key_points` / `model_name`）
+- V16（`supplier_id` → `tenderer_id`；`supplier_name` → `tenderer_name`）
 - V11（`raw_response` 类型 `MEDIUMTEXT` → `JSON`）
 
 **前置检查**（执行 V11 前必跑）：
@@ -163,10 +192,14 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | V8 | `V8__rename_bid_winning_risk_analysis_to_risk_analysis.sql` | 重命名 `risk_analysis` |
 | V9 | `V9__simplify_risk_analysis_and_rename_detail_id.sql` | 精简字段；`detail_id` → `supplier_id` |
 | V10 | `V10__restructure_supplier_detail.sql` | 重构 `supplier_detail` |
+| V16 | `V16__rename_supplier_to_tenderer.sql` | 重命名 `tenderer_detail` + `credentials` + `risk_analysis` 列同步 |
 | V11 | `V11__change_raw_response_to_json.sql` | `raw_response` 改 JSON |
 | V12 | `V12__rename_to_tender_notice.sql` | 重命名 `tender_notice` + `notice_id` |
+| V13 | `V13__rename_to_tender_handler_info.sql` | 重命名 `tender_handler_info` + `tender_handler_id` |
+| V14 | `V14__restructure_tender_notice.sql` | 重构 `tender_notice` 字段（对标招标公告业务场景） |
+| V15 | `V15__add_tender_notice_status.sql` | `tender_notice` 加 status + 新建 `tender_notice_status_history` 表 |
 
-**执行顺序**：V1 → V2 → ... → V12
+**执行顺序**：V1 → V2 → ... → V15
 
 ---
 
@@ -176,8 +209,9 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 |-------------|----------|------|----------------|
 | `TenderHandlerInfo` | `tender_handler_info` | `tender_handler_id` | `tenderHandlerId` |
 | `TenderNotice` | `tender_notice` | `notice_id` | `noticeId` |
-| `SupplierDetail` | `supplier_detail` | `supplier_id` | `supplierId` |
+| `TendererDetail` | `tenderer_detail` | `tenderer_id` | `tendererId` |
 | `RiskAnalysis` | `risk_analysis` | `analysis_id` | `analysisId` |
+| `TenderNoticeStatusHistory` | `tender_notice_status_history` | `history_id` | `historyId` |
 
 Entity 字段命名遵循 Java 驼峰 ↔ DB 下划线（`map-underscore-to-camel-case: true`），主键用 `Integer` 包装类（区分 null 与 0），金额用 `BigDecimal`，布尔用 `Boolean`，时间用 `LocalDateTime`。
 
@@ -191,7 +225,7 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）基本�
 |------------|----------|---------|------|
 | `TenderNotice.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` | DTO 跨实体复用（mail 模板） |
 | `TenderNotice.tenderHandlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念）| `tender_handler_id` | mail 模板只需名字 |
-| `SupplierDetail.supplierName` | `BidWinningListItem.supplierName` | `supplier_name` | 中标结果项 |
-| `SupplierDetail.quotePrice` | `BidWinningListItem.bidWinningAmount` | `quote_price` | 中标结果项 |
+| `TendererDetail.tendererName` | `BidWinningListItem.tendererName` | `tenderer_name` | 中标结果项 |
+| `TendererDetail.quotePrice` | `BidWinningListItem.bidWinningAmount` | `quote_price` | 中标结果项 |
 
 差异源自 `BidWinningMailRequest` 跨实体复用 mail 模板（`templates/tender-notice.html`），不影响业务 Service。

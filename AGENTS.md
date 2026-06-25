@@ -33,7 +33,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 ├── dto/                                    # 按业务模块分包
 │   └── common/                             # Result / Diff
-├── entity/                                 # TenderHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
+├── entity/                                 # TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
 ├── mapper/                                 # @Mapper 接口，extends BaseMapper
 ├── service/                                # BaseService + 各业务模块
 │   ├── mail/                               # MailService
@@ -116,8 +116,8 @@ src/main/resources/
 |------|:---:|------|
 | 经办人 (TenderHandlerInfo) | 6 | `/tender-handler-info/...` |
 | 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
-| 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
-| **AI 风险分析** | 2 | `/supplier-detail/{action}/{id}` |
+| 投标人明细 (TendererDetail) | 6 | `/tenderer-detail/...` |
+| **AI 风险分析** | 2 | `/tenderer-detail/{action}/{id}` |
 
 ### 服务状态 + 邮件测试
 
@@ -131,8 +131,8 @@ src/main/resources/
 
 | Method | Path | 说明 |
 |-------|------|------|
-| POST | `/supplier-detail/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
-| GET | `/supplier-detail/risk-history/{id}` | 历史分析记录（按时间倒序） |
+| POST | `/tenderer-detail/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
+| GET | `/tenderer-detail/risk-history/{id}` | 历史分析记录（按时间倒序） |
 
 ## Async Task（`AsyncTaskManager`）
 
