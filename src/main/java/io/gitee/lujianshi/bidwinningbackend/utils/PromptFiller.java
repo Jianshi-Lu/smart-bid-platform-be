@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.riskanalysis;
+package io.gitee.lujianshi.bidwinningbackend.utils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -26,7 +26,11 @@ import java.util.Map;
  * <h3>渲染方式</h3>
  * <p>使用简单的 {@code String.replace()} 逐个替换占位符。</p>
  *
- * @see BidBackgroundLoader
+ * <h3>API 选择</h3>
+ * <ul>
+ *   <li>{@link #loadFromResource(String)} — 用于无占位符的静态模板（如 system prompt）</li>
+ *   <li>{@link #fillFromResource(String, Map)} — 用于含占位符的动态模板（如 user prompt）</li>
+ * </ul>
  */
 @Component
 public class PromptFiller {
@@ -52,6 +56,25 @@ public class PromptFiller {
             result = result.replace(placeholder, value);
         }
         return result;
+    }
+
+    /**
+     * 从 classpath 加载模板文件（不填充变量）。
+     *
+     * <p>用于无占位符的静态模板（如 system prompt），比 {@link #fillFromResource}
+     * 节省无意义的 String.replace 迭代。</p>
+     *
+     * @param templatePath classpath 下的模板路径，如 {@code prompts/risk-analysis-system-v1.txt}
+     * @return 模板原文；ResourceLoader 未配置或读取失败时返回空字符串
+     */
+    public String loadFromResource(String templatePath) {
+        if (resourceLoader == null) return "";
+        try {
+            Resource resource = resourceLoader.getResource("classpath:" + templatePath);
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     /**

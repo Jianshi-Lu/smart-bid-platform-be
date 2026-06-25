@@ -71,10 +71,15 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── BidWinningSupplierDetailService.java # @Service
 │   ├── mail/
 │   │   └── MailService.java                # 邮件发送（sendEmail 纯文本 + sendHtmlEmail HTML）
+│   ├── riskanalysis/                        # AI 风险分析服务（v0.1-min 起步）
+│   │   ├── BidBackgroundLoader.java         # 供应商背景加载接口
+│   │   ├── DatabaseBidBackgroundLoader.java # 默认 DB 实现（查 supplier_detail）
+│   │   └── RiskAnalysisService.java         # @Service，构造器注入 ChatClient.Builder
 │   └── statuscheck/
 │       └── StatusCheckService.java         # 中标通知书邮件发送（Thymeleaf 渲染 + 异步）
 └── utils/
     ├── AsyncTaskManager.java               # 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
+    ├── PromptFiller.java                   # classpath prompt 模板加载 + {{var}} 占位符填充
     └── ResourceSearcher.java               # classpath 模板文件存在性校验
 
 src/main/resources/

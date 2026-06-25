@@ -7,6 +7,7 @@ import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
 import io.gitee.lujianshi.bidwinningbackend.entity.SupplierDetail;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.SupplierDetailMapper;
+import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,7 @@ public class RiskAnalysisService {
                 "background", background
         );
 
-        String systemPrompt = promptFiller.fillFromResource("prompts/risk-analysis-system-v1.txt", vars);
+        String systemPrompt = promptFiller.loadFromResource("prompts/risk-analysis-system-v1.txt");
         String userPrompt = promptFiller.fillFromResource("prompts/risk-analysis-user-v1.txt", vars);
 
         log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", systemPrompt, userPrompt);
@@ -87,11 +88,13 @@ public class RiskAnalysisService {
         return saved;
     }
 
+    // 构建落库Entity
     private RiskAnalysis parseAndBuild(Integer supplierId, String supplierName, String raw, LocalDateTime analyzedAt) {
         String riskLevel = null;
         String summary = null;
         String suggestions = null;
 
+        // 构建raw_response（JSON）
         if (raw != null && !raw.isBlank()) {
             try {
                 JSONObject obj = JSON.parseObject(raw);
@@ -104,6 +107,7 @@ public class RiskAnalysisService {
             }
         }
 
+        //构建其余字段
         RiskAnalysis a = new RiskAnalysis();
         a.setSupplierId(supplierId);
         a.setSupplierName(supplierName);
@@ -116,6 +120,7 @@ public class RiskAnalysisService {
         return a;
     }
 
+    // 落库持久化
     @Transactional(rollbackFor = Exception.class)
     public RiskAnalysis persist(RiskAnalysis analysis) {
         mapper.insert(analysis);
