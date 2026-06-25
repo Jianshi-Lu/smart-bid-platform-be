@@ -32,7 +32,7 @@ public class TenderNoticeController {
     public Result<TenderNotice> createTenderNotice(
             @Valid @RequestBody AddRequest request) {
         TenderNotice entity = new TenderNotice();
-        entity.setHandlerId(request.getHandlerId());
+        entity.setTenderHandlerId(request.getTenderHandlerId());
         entity.setProjectNo(request.getProjectNo());
         entity.setPurchaseTaskNo(request.getPurchaseTaskNo());
         entity.setPlatformCategory(request.getPlatformCategory());
@@ -81,7 +81,7 @@ public class TenderNoticeController {
         }
         TenderNotice after = new TenderNotice();
         after.setNoticeId(id);
-        after.setHandlerId(request.getHandlerId());
+        after.setTenderHandlerId(request.getTenderHandlerId());
         after.setProjectNo(request.getProjectNo());
         after.setPurchaseTaskNo(request.getPurchaseTaskNo());
         after.setPlatformCategory(request.getPlatformCategory());

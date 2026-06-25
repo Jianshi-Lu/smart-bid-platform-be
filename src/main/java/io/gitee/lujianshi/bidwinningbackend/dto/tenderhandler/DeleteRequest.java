@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.bidhandlerinfo;
+package io.gitee.lujianshi.bidwinningbackend.dto.tenderhandler;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;

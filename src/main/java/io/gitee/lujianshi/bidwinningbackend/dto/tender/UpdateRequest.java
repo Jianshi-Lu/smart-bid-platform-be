@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Data
 public class UpdateRequest {
 
-    private Integer handlerId;
+    private Integer tenderHandlerId;
 
     @Size(max = 50, message = "项目编号长度不能超过50")
     private String projectNo;

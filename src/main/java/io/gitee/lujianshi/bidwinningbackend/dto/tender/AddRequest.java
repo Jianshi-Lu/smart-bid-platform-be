@@ -9,13 +9,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 创建定标通知请求 DTO。3 字段必填（handlerId / projectNo / purchaseTaskNo），其余 14 字段可选。
+ * 创建招标公告请求 DTO。3 字段必填（tenderHandlerId / projectNo / purchaseTaskNo），其余 14 字段可选。
  */
 @Data
 public class AddRequest {
 
     @NotNull(message = "经办人ID不能为空")
-    private Integer handlerId;
+    private Integer tenderHandlerId;
 
     @NotBlank(message = "项目编号不能为空")
     @Size(max = 50, message = "项目编号长度不能超过50")

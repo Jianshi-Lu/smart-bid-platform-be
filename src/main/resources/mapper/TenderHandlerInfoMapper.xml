@@ -3,12 +3,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
   ┌────────────────────────────────────────────────────────────────────┐
-  │  BidHandlerInfoMapper.xml — 经办人 SQL 映射                       │
+  │  TenderHandlerInfoMapper.xml — 经办人 SQL 映射                       │
   │                                                                    │
   │  在整个开发链路中的位置：                                          │
   │   ① 数据库表（V1~V3 演进）                                        │
-  │   ② Entity 层（BidHandlerInfo）                                   │
-  │   ③ Mapper 接口（BidHandlerInfoMapper）                           │
+  │   ② Entity 层（TenderHandlerInfo）                                   │
+  │   ③ Mapper 接口（TenderHandlerInfoMapper）                           │
   │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
   │   ⑤ Service 层（注入 Mapper 接口调用）                            │
   │   ⑥ DTO 层                                                        │
@@ -22,15 +22,15 @@
   │   - <resultMap> 定义 Java 字段 ↔ DB 列映射                       │
   └────────────────────────────────────────────────────────────────────┘
 -->
-<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.TenderHandlerInfoMapper">
 
     <!--
       BaseResultMap：Java 字段 ↔ DB 列映射
       即使 application.yml 配了 map-underscore-to-camel-case=true，
       这里仍显式声明，避免魔法规则带来的隐式行为。
     -->
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
-        <id     column="handler_id"      property="handlerId"/>
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.TenderHandlerInfo">
+        <id     column="tender_handler_id"      property="tenderHandlerId"/>
         <result column="handler_name"    property="handlerName"/>
         <result column="company_name"    property="companyName"/>
         <result column="department_name" property="departmentName"/>
@@ -39,52 +39,52 @@
 
     <!--
       插入：自增主键回填
-      useGeneratedKeys="true" 让 MySQL 把自增 ID 写回 Java 对象的 handlerId 字段
+      useGeneratedKeys="true" 让 MySQL 把自增 ID 写回 Java 对象的 tenderHandlerId 字段
       keyProperty 必须等于 Entity 中的 @TableId 字段名
     -->
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderHandlerInfo"
             useGeneratedKeys="true"
-            keyProperty="handlerId">
-        INSERT INTO bid_handler_info (handler_name, company_name, department_name, target_email)
+            keyProperty="tenderHandlerId">
+        INSERT INTO tender_handler_info (handler_name, company_name, department_name, target_email)
         VALUES (#{handlerName}, #{companyName}, #{departmentName}, #{targetEmail})
     </insert>
 
     <!--
       按 ID 更新（PATCH 风格动态 SQL）：
-      - 传入 entity 必须携带 handlerId（WHERE 条件）
+      - 传入 entity 必须携带 tenderHandlerId（WHERE 条件）
       - 使用 <set> + <if> 实现 PATCH 语义：
         * 字段为 null → 不更新（保留 DB 原值）
         * 字段非 null → 更新
       - 配合 UpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
-        UPDATE bid_handler_info
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderHandlerInfo">
+        UPDATE tender_handler_info
         <set>
             <if test="handlerName != null">handler_name = #{handlerName},</if>
             <if test="companyName != null">company_name = #{companyName},</if>
             <if test="departmentName != null">department_name = #{departmentName},</if>
             <if test="targetEmail != null">target_email = #{targetEmail},</if>
         </set>
-        WHERE handler_id    = #{handlerId}
+        WHERE tender_handler_id    = #{tenderHandlerId}
     </update>
 
     <!--
-      按 ID 删除：#{handlerId} 名称 = Mapper 接口方法参数名
+      按 ID 删除：#{tenderHandlerId} 名称 = Mapper 接口方法参数名
     -->
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM bid_handler_info
-        WHERE handler_id = #{handlerId}
+        DELETE FROM tender_handler_info
+        WHERE tender_handler_id = #{tenderHandlerId}
     </delete>
 
     <!--
       按 ID 查询：resultMap 引用上面定义的 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name, target_email
-        FROM bid_handler_info
-        WHERE handler_id = #{handlerId}
+        SELECT tender_handler_id, handler_name, company_name, department_name, target_email
+        FROM tender_handler_info
+        WHERE tender_handler_id = #{tenderHandlerId}
     </select>
 
     <!--
@@ -92,8 +92,8 @@
       数据量小时可直接用，数据量大时建议加分页（后续可加 PageHelper / Plus PaginationInnerInterceptor）
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name, target_email
-        FROM bid_handler_info
+        SELECT tender_handler_id, handler_name, company_name, department_name, target_email
+        FROM tender_handler_info
     </select>
 
     <!--
@@ -104,8 +104,8 @@
       - 配合 BatchDeleteRequest 使用（最大 500 条由 DTO @Size 限制）
     -->
     <delete id="deleteByIds" parameterType="java.util.List">
-        DELETE FROM bid_handler_info
-        WHERE handler_id IN
+        DELETE FROM tender_handler_info
+        WHERE tender_handler_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>
@@ -120,9 +120,9 @@
       - 排序：DB 物理顺序（无 ORDER BY），最小实现
     -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT handler_id, handler_name, company_name, department_name, target_email
-        FROM bid_handler_info
-        WHERE handler_id IN
+        SELECT tender_handler_id, handler_name, company_name, department_name, target_email
+        FROM tender_handler_info
+        WHERE tender_handler_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>

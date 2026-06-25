@@ -51,7 +51,7 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
         List<TenderNotice> created = new ArrayList<>();
         for (AddRequest item : items) {
             TenderNotice entity = new TenderNotice();
-            entity.setHandlerId(item.getHandlerId());
+            entity.setTenderHandlerId(item.getTenderHandlerId());
             entity.setProjectNo(item.getProjectNo());
             entity.setPurchaseTaskNo(item.getPurchaseTaskNo());
             entity.setPlatformCategory(item.getPlatformCategory());

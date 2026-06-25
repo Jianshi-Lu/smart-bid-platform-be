@@ -26,7 +26,7 @@ public class TenderNotice {
     @TableId(type = IdType.AUTO)
     private Integer noticeId;
     @NotNull
-    private Integer handlerId;
+    private Integer tenderHandlerId;
     @NotBlank
     private String projectNo;
     @NotBlank

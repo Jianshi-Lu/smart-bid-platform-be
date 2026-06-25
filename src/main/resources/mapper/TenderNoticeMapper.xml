@@ -33,7 +33,7 @@
     -->
     <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
         <id     column="notice_id"        property="noticeId"/>
-        <result column="handler_id"             property="handlerId"/>
+        <result column="tender_handler_id"             property="tenderHandlerId"/>
         <result column="project_no"             property="projectNo"/>
         <result column="purchase_task_no"       property="purchaseTaskNo"/>
         <result column="platform_category"      property="platformCategory"/>
@@ -65,13 +65,13 @@
             useGeneratedKeys="true"
             keyProperty="noticeId">
         INSERT INTO tender_notice
-            (handler_id, project_no, purchase_task_no, platform_category,
+            (tender_handler_id, project_no, purchase_task_no, platform_category,
              bidding_process, bidding_method, purchase_method, is_fixed_price,
              target_cost, document_fee, deposit, credit_report_required,
              registration_deadline, tech_bid_deadline, business_bid_deadline,
              notes, target_email)
         VALUES
-            (#{handlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
+            (#{tenderHandlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
              #{biddingProcess}, #{biddingMethod}, #{purchaseMethod}, #{isFixedPrice},
              #{targetCost}, #{documentFee}, #{deposit}, #{creditReportRequired},
              #{registrationDeadline}, #{techBidDeadline}, #{businessBidDeadline},
@@ -91,7 +91,7 @@
             parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
         UPDATE tender_notice
         <set>
-            <if test="handlerId != null">handler_id = #{handlerId},</if>
+            <if test="tenderHandlerId != null">tender_handler_id = #{tenderHandlerId},</if>
             <if test="projectNo != null">project_no = #{projectNo},</if>
             <if test="purchaseTaskNo != null">purchase_task_no = #{purchaseTaskNo},</if>
             <if test="platformCategory != null">platform_category = #{platformCategory},</if>
@@ -125,7 +125,7 @@
       按 ID 查询：resultMap 引用上面定义的 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
@@ -138,7 +138,7 @@
       数据量小时可直接用，数据量大时建议后续加分页
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
@@ -172,7 +172,7 @@
       - 19 字段全查（含 created_at），用 BaseResultMap 映射
     -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
