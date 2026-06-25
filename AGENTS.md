@@ -114,8 +114,8 @@ src/main/resources/
 
 | 模块 | 端点数 | 路径前缀 |
 |------|:---:|------|
-| 经办人 (TenderHandlerInfo) | 6 | `/tender-handler-info/...` |
-| 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
+| 经办人 (TenderHandlerInfo) | 7 | `/tender-handler-info/...` |
+| 招标公告 (TenderNotice) | 8 | `/tender-notice/...` |
 | 投标人明细 (TendererDetail) | 6 | `/tenderer-detail/...` |
 | **AI 风险分析** | 2 | `/tenderer-detail/{action}/{id}` |
 

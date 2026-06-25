@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 24 端点（含 2 AI 风险分析端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 26 端点（含 2 AI 风险分析端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -22,8 +22,8 @@
 | 模块 | 端点数 | 路径前缀 |
 |------|:---:|---------|
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
-| 经办人 (TenderHandlerInfo) | 6 | `/tender-handler-info/...` |
-| 招标公告 (TenderNotice) | 7 | `/tender-notice/...` |
+| 经办人 (TenderHandlerInfo) | 7 | `/tender-handler-info/...` |
+| 招标公告 (TenderNotice) | 8 | `/tender-notice/...` |
 | 投标人明细 (TendererDetail) | 6 | `/tenderer-detail/...` |
 | **AI 风险分析**（v0.1+） | 2 | `/tenderer-detail/{action}/{id}` |
 
@@ -230,6 +230,7 @@ curl -X POST http://{host}:{port}/send-notification \
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
 | POST | `/tender-handler-info/add` | 创建 | `Result<TenderHandlerInfo>` |
+| POST | `/tender-handler-info/batch-add` | 批量新增 | `Result<List<TenderHandlerInfo>>` |
 | GET | `/tender-handler-info/{id}` | 按主键查询 | `Result<TenderHandlerInfo>` |
 | PATCH | `/tender-handler-info/{id}` | 按主键部分更新 | `Result<Diff<TenderHandlerInfo>>` |
 | DELETE | `/tender-handler-info/{id}` | 按主键删除 | `Result<Void>` |
@@ -312,8 +313,9 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
 | POST | `/tender-notice/add` | 创建 | `Result<TenderNotice>` |
+| POST | `/tender-notice/batch-add` | 批量新增 | `Result<List<TenderNotice>>` |
 | GET | `/tender-notice/{id}` | 按主键查询 | `Result<TenderNotice>` |
-| PATCH | `/tender-notice/{id}` | 部分更新（16 字段） | `Result<Diff<TenderNotice>>` |
+| PATCH | `/tender-notice/{id}` | 部分更新（18 字段） | `Result<Diff<TenderNotice>>` |
 | DELETE | `/tender-notice/{id}` | 按主键删除 | `Result<Void>` |
 | GET | `/tender-notice` | 列表查询（分页） | `Result<PageInfo<TenderNotice>>` |
 | POST | `/tender-notice/batch-delete` | 批量删除 | `Result<List<TenderNotice>>` |
@@ -321,7 +323,7 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 
 ### 4.1 `POST /tender-notice/add`
 
-**请求体**（`AddRequest`，16 字段：3 必填 + 13 可选）：
+**请求体**（`AddRequest`，18 字段：3 必填 + 15 可选）：
 
 **必填（3 字段）**：
 
@@ -365,9 +367,9 @@ curl -X POST http://{host}:{port}/tender-notice/add \
 
 ### 4.3 `PATCH /tender-notice/{id}`
 
-**请求体**（`UpdateRequest`，16 字段全可选，仅 `@Size` 校验）：
+**请求体**（`UpdateRequest`，18 字段全可选，仅 `@Size` 校验）：
 
-16 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
+18 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
 
 > `status` 不支持通过 PATCH 修改，请使用 `POST /tender-notice/{id}/status` 端点。
 

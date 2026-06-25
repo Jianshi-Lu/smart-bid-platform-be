@@ -1,6 +1,6 @@
 # 数据库结构（bid-winning-backend）
 
-> 4 张表的最终结构（V1-V11）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
+> 4 张表的最终结构（V1-V17）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
 >
 > API 契约：[`docs/api.md`](api.md) · 项目架构：[`docs/architecture.md`](architecture.md)
 
@@ -145,7 +145,7 @@
 | `prompt_version` | VARCHAR(20) | ❌ | prompt 模板版本号 |
 | `analyzed_at` | DATETIME | ✅ | 分析时间（默认 CURRENT_TIMESTAMP） |
 
-**索引**：PK（analysis_id） + `idx_tenderer`（tenderer_id，V9 重命名，V16 同步） + `idx_analyzed_at`
+**索引**：PK（analysis_id） + `idx_tenderer`（tenderer_id，V9 重命名，V16 同步，V17 索引名同步） + `idx_analyzed_at`
 
 ### 2.5 `tender_notice_status_history`（招标公告状态变更历史）
 
@@ -192,14 +192,15 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | V8 | `V8__rename_bid_winning_risk_analysis_to_risk_analysis.sql` | 重命名 `risk_analysis` |
 | V9 | `V9__simplify_risk_analysis_and_rename_detail_id.sql` | 精简字段；`detail_id` → `supplier_id` |
 | V10 | `V10__restructure_supplier_detail.sql` | 重构 `supplier_detail` |
-| V16 | `V16__rename_supplier_to_tenderer.sql` | 重命名 `tenderer_detail` + `credentials` + `risk_analysis` 列同步 |
 | V11 | `V11__change_raw_response_to_json.sql` | `raw_response` 改 JSON |
 | V12 | `V12__rename_to_tender_notice.sql` | 重命名 `tender_notice` + `notice_id` |
 | V13 | `V13__rename_to_tender_handler_info.sql` | 重命名 `tender_handler_info` + `tender_handler_id` |
 | V14 | `V14__restructure_tender_notice.sql` | 重构 `tender_notice` 字段（对标招标公告业务场景） |
 | V15 | `V15__add_tender_notice_status.sql` | `tender_notice` 加 status + 新建 `tender_notice_status_history` 表 |
+| V16 | `V16__rename_supplier_to_tenderer.sql` | 重命名 `tenderer_detail` + `credentials` + `risk_analysis` 列同步 |
+| V17 | `V17__rename_idx_supplier_to_idx_tenderer.sql` | `risk_analysis` 索引名 `idx_supplier` → `idx_tenderer`（V16 漏改） |
 
-**执行顺序**：V1 → V2 → ... → V15
+**执行顺序**：V1 → V2 → ... → V17
 
 ---
 

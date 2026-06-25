@@ -44,14 +44,14 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 │   ├── TendererDetailController.java       # 投标人明细（6 端点 + 2 AI 风险分析）
-│   ├── TenderHandlerInfoController.java       # 经办人（6 端点）
-│   ├── TenderNoticeController.java  # 定标通知（6 端点）
+│   ├── TenderHandlerInfoController.java       # 经办人（7 端点：6 标准 CRUD + 1 批量新增）
+│   ├── TenderNoticeController.java  # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── dto/                                    # 按业务模块分包
 │   ├── common/                             # Result / Diff
-│   ├── bidhandlerinfo/                     # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
-│   ├── bidwinningnotification/             # 同上
+│   ├── tenderhandler/                      # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
+│   ├── tendernotice/                       # 同上
 │   ├── tendererdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
 ├── entity/                                 # 5 实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
@@ -317,7 +317,7 @@ service.sendOperationEmail(entity);
 4. **Mapper XML**：`resources/mapper/XxxMapper.xml`（namespace = FQN，7 个标准 SQL 标签 + 可选 `<selectByXxxId>`）
 5. **Service**：`service/XxxService.java extends BaseService<Xxx>`（getMapper + getIdExtractor 两个方法）
 6. **DTO**：`dto/xxx/{AddRequest, UpdateRequest, BatchDeleteRequest}.java`
-7. **Controller**：`controller/XxxController.java`（6 端点：add / getById / patch / delete / list / batch-delete）
+7. **Controller**：`controller/XxxController.java`（6 标准 CRUD 端点：add / getById / patch / delete / list / batch-delete；可选 batch-add / status / AI 子端点）
 8. **AI 风险分析（如需要）**：`service/riskanalysis/XxxRiskAnalysisService.java`（参考 RiskAnalysisService）
 
 ---

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 招标经办人 Controller。6 端点标准 CRUD。端点详情 / curl 示例见 {@code docs/api.md}。
+ * 招标经办人 Controller。7 端点（6 标准 CRUD + 1 批量新增）。端点详情 / curl 示例见 {@code docs/api.md}。
  */
 @RestController
 public class TenderHandlerInfoController {
