@@ -11,26 +11,10 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 /**
- * 邮件发送服务 — 统一入口
+ * 邮件发送服务。类名 {@code MailService} 而非 {@code MailSender}，避免与 Spring Boot 自动配置的
+ * {@code JavaMailSender}（Bean 名 {@code mailSender}）同名冲突。
  *
- * <p>扁平合并原 {@code PlainTextMailSender} + {@code BidWinningMailSender}，共享 {@code JavaMailSender}
- * 与发件人邮箱字段，避免两套 Sender 各自声明。</p>
- *
- * <h3>职责</h3>
- * <ul>
- *   <li>{@link #sendEmail(PlainTextMailRequest)} — 纯文本邮件（原 {@code PlainTextMailSender.sendEmail}）</li>
- *   <li>{@link #sendHtmlEmail(String, String, String)} — HTML 邮件（原 {@code BidWinningMailSender.sendHtmlEmail}）</li>
- * </ul>
- *
- * <h3>共享字段</h3>
- * <ul>
- *   <li>{@link #mailSender}（JavaMailSender）— Spring SMTP 协议客户端（Spring Boot 自动配置 Bean，名 {@code mailSender}）</li>
- *   <li>{@link #senderEmail}（{@code spring.mail.username} 配置）— 发件人邮箱（DTO 中 {@code from} 字段保留但不使用）</li>
- * </ul>
- *
- * <h3>类名说明</h3>
- * <p>类名 {@code MailService} 而非 {@code MailSender}，避免与 Spring Boot 自动配置的
- * {@code JavaMailSender}（Bean 名 {@code mailSender}）同名冲突。</p>
+ * <p>{@code from} 字段保留但不使用，发件人固定走 {@code spring.mail.username}。</p>
  */
 @Service
 public class MailService {
@@ -42,9 +26,9 @@ public class MailService {
     private String senderEmail;
 
     /**
-     * 发送纯文本邮件（{@code SimpleMailMessage}）
+     * 发送纯文本邮件。
      *
-     * @param request 邮件请求对象（to / subject / content；{@code from} 字段不使用，发件人固定走 {@code spring.mail.username}）
+     * @param request 邮件请求（{@code from} 字段不使用）
      */
     public void sendEmail(PlainTextMailRequest request) {
         SimpleMailMessage message = new SimpleMailMessage();
@@ -57,12 +41,12 @@ public class MailService {
     }
 
     /**
-     * 发送 HTML 格式邮件（{@code MimeMessage} + {@code MimeMessageHelper}）
+     * 发送 HTML 邮件。
      *
-     * @param to          收件人邮箱
-     * @param subject     邮件主题
-     * @param htmlContent 渲染后的 HTML 内容（Thymeleaf 模板填充结果）
-     * @throws MessagingException 邮件发送失败时抛出
+     * @param to          收件人
+     * @param subject     主题
+     * @param htmlContent HTML 内容（Thymeleaf 渲染结果）
+     * @throws MessagingException SMTP 发送失败
      */
     public void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
         MimeMessage mimeMessage = mailSender.createMimeMessage();

@@ -12,24 +12,6 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 
 /**
  * 服务状态检查与邮件测试 Service。
- *
- * <p>本类的职责：
- * <ul>
- *   <li>{@link #sendNotification(BidWinningMailRequest)} — 中标通知书 HTML 邮件发送（异步，延迟 5 秒）</li>
- * </ul>
- *
- * <p>遵循与其他业务 Service（{@code BidHandlerInfoService} / {@code BidWinningNotificationService}
- * 相同的架构模式：Controller 注入 Service，Service 内部编排 MailService / Thymeleaf / ResourceSearcher。
- *
- * <h3>调用链路</h3>
- * <pre>
- *   StatusCheckController
- *     → StatusCheckService.sendNotification(request)
- *       → ResourceSearcher.validateTemplateExists()
- *       → SpringTemplateEngine.process(templateName, context)
- *       → AsyncTaskManager.execute(..., 5000)
- *         → MailService.sendHtmlEmail()
- * </pre>
  */
 @Service
 public class StatusCheckService {
@@ -44,14 +26,11 @@ public class StatusCheckService {
     private MailService mailService;
 
     /**
-     * 发送中标通知书 HTML 邮件（异步，延迟 5 秒）。
-     *
-     * <p>主线程立即返回"发送成功"，不等待实际 SMTP 发送完成。
-     * 邮件发送在后台子线程执行，失败仅打印日志，不抛异常。</p>
+     * 异步发送中标通知书 HTML 邮件（延迟 5 秒）。主线程立即返回，邮件发送在后台子线程。
      *
      * @param request 含 to / subject / projectCode / handlerName / bidWinningList / templateName
      * @return "发送成功"（主线程立即返回）
-     * @throws IllegalArgumentException 模板文件在 classpath:/templates/ 下不存在时抛出
+     * @throws IllegalArgumentException 模板文件不存在时抛出
      */
     public String sendNotification(BidWinningMailRequest request) {
         String templateName = request.getTemplateName();

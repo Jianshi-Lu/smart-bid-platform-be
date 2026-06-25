@@ -2,14 +2,12 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
-import io.gitee.lujianshi.bidwinningbackend.utils.ResourceSearcher;
 import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
+import io.gitee.lujianshi.bidwinningbackend.utils.ResourceSearcher;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.transaction.annotation.Transactional;
-
 import org.thymeleaf.context.Context;
-
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.beans.PropertyDescriptor;
@@ -22,24 +20,9 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * 通用 CRUD Service 基类。
- * <p>封装 7 个标准业务方法（create / update / delete / getById / listAll / deleteByIds），
+ * 通用 CRUD Service 基类。封装 7 个标准方法（add / update / delete / getById / listAll / deleteByIds / selectByIds），
  * 写方法统一加 {@code @Transactional(rollbackFor = Exception.class)}。
- * 子类只需实现 {@link #getMapper()} 和 {@link #getIdExtractor()} 两个抽象方法。</p>
- *
- * <h3>继承链路</h3>
- * <pre>
- *   BaseService&lt;T&gt;                         ← 本类，泛型 T = Entity 类型
- *     ↑ extends
- *   BidHandlerInfoService                  ← 经办人业务
- *   BidWinningNotificationService          ← 定标通知业务（重写 create 设 createdAt）
- *   BidWinningSupplierDetailService        ← 中标明细业务
- * </pre>
- *
- * <h3>调用链路</h3>
- * <pre>
- *   Controller → Service（本类方法）→ Mapper 接口（BaseMapper&lt;T&gt; ）→ Mapper XML → MySQL
- * </pre>
+ * 子类实现 {@link #getMapper()} 和 {@link #getIdExtractor()}。
  *
  * @param <T> 实体类型
  */
@@ -59,28 +42,24 @@ public abstract class BaseService<T> {
     @Resource
     protected MailService mailService;
 
-    // ====== 子类 override ======
-
-    /** 邮件主题前缀（子类 override，如 "[经办人创建]" / "[定标通知]"） */
+    /** 邮件主题前缀（子类 override，如 "[经办人创建]" / "[定标通知]"）。 */
     protected String emailSubjectPrefix = "[数据操作通知]";
 
-    /** 操作类型（子类 override，如 CREATE / UPDATE / DELETE） */
+    /** 操作类型（子类 override，如 CREATE / UPDATE / DELETE）。 */
     protected String emailOperation = "OPERATION";
 
-    /** 端点描述（子类 override，如 "POST BidInfoController#create"） */
+    /** 端点描述（子类 override，如 "POST BidInfoController#create"）。 */
     protected String emailEndpoint = "ENDPOINT";
 
-    // ==========================================
     protected void sendEmail(T entity, String targetEmail, String endpoint, String operation) {
         if (targetEmail == null || targetEmail.isBlank()) return;
 
         final String formName = endpoint;
         final String actionName = operation;
-        final String operateTime = LocalDateTime.now().format(TS_FMT);                     // 操作时间
-        final String status = operation + " 成功";                                         // 执行状态
-        final String subject = emailSubjectPrefix + " " + endpoint + " - " + operateTime; // 邮件主题
+        final String operateTime = LocalDateTime.now().format(TS_FMT);
+        final String status = operation + " 成功";
+        final String subject = emailSubjectPrefix + " " + endpoint + " - " + operateTime;
 
-        // 构造 data 列表（List<Map.Entry<String, Object>>），供模板动态遍历
         List<Map.Entry<String, Object>> dataList;
         try {
             Map<String, Object> dataMap = new LinkedHashMap<>();
@@ -105,7 +84,7 @@ public abstract class BaseService<T> {
                 context.setVariable("actionName", actionName);
                 context.setVariable("operateTime", operateTime);
                 context.setVariable("status", status);
-                context.setVariable("data", finalDataList);     // 返回数据
+                context.setVariable("data", finalDataList);
                 String html = templateEngine.process("crud-email-template", context);
                 mailService.sendHtmlEmail(targetEmail, subject, html);
                 System.out.println("[BASE-EMAIL] 发送成功: to=" + targetEmail);
@@ -116,8 +95,7 @@ public abstract class BaseService<T> {
     }
 
     /**
-     * sendEmail 重载——targetEmail 从 entity.targetEmail 字段反射读取。
-     * entity 需携带 targetEmail 字段（已落库），否则跳过发邮件。
+     * 反射从 entity.targetEmail 读取收件人并发邮件；字段不存在则跳过。
      */
     protected void sendEmail(T entity, String endpoint, String operation) {
         String targetEmail = null;
@@ -132,14 +110,7 @@ public abstract class BaseService<T> {
     }
 
     /**
-     * 发送批量操作汇总邮件。
-     * <p>仅当 {@code outerTargetEmail} 非空时发送 1 封汇总邮件至此地址；
-     * 为空/blank 时跳过，不发邮件。</p>
-     *
-     * @param entities         操作后的实体列表
-     * @param outerTargetEmail 外层指定的汇总收件人（可选，为空则不发送）
-     * @param endpoint         端点描述
-     * @param operation        操作类型
+     * 发送批量操作汇总邮件。{@code outerTargetEmail} 为空/blank 或 entities 为空时跳过。
      */
     protected void sendBatchEmail(List<T> entities, String outerTargetEmail, String endpoint, String operation) {
         if (outerTargetEmail == null || outerTargetEmail.isBlank()) return;

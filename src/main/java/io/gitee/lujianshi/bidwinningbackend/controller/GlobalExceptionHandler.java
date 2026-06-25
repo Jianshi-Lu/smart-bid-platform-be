@@ -6,14 +6,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * 全局异常处理器 — 统一捕获 Controller 层异常并返回 {@link Result} 格式。
- *
- * <h3>处理范围</h3>
- * <ul>
- *   <li>{@link MethodArgumentNotValidException} — {@code @Valid} 校验失败，返回 400 + 第一个错误消息</li>
- *   <li>{@link IllegalArgumentException} — 参数非法，返回 400 + 异常消息</li>
- *   <li>{@link Exception} — 兜底，返回 500，不泄漏堆栈</li>
- * </ul>
+ * 全局异常处理器。统一返回 {@link Result} 格式：
+ * {@code @Valid} 校验失败 → 400 + 第一个错误消息；
+ * {@link IllegalArgumentException} → 400 + 异常消息；
+ * 其他异常 → 500 兜底（不泄漏堆栈）。
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {

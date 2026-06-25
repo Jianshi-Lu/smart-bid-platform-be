@@ -6,22 +6,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 /**
- * 基于数据库的供应商背景信息加载实现。
- *
- * <p>查询 {@code supplier_detail}，拼装为 Markdown 文本片段返回。</p>
- *
- * <h3>拼装格式（示例）</h3>
- * <pre>
- * ## 供应商基本信息
- * - 供应商名称：XXX公司
- * - 报价：1234567.89元
- * - 联系方式：13800138000
- * </pre>
+ * 基于数据库的供应商背景加载实现。查询 {@code supplier_detail} 拼装为 Markdown。
  *
  * <p>注意：V10 重构后 supplier_detail 与 bid_winning_notification 的关联已断开，
- * 当前版本仅加载供应商基本信息。未来由后台模块重新建立关联。</p>
- *
- * @see BidBackgroundLoader
+ * 当前仅加载供应商基本信息。</p>
  */
 @Service
 public class DatabaseBidBackgroundLoader implements BidBackgroundLoader {

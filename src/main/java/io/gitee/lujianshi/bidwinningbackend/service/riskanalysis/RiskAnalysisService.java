@@ -19,6 +19,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 风险分析业务服务。同步调用 DeepSeek，落库风险分析结果。
+ */
 @Service
 public class RiskAnalysisService {
 
@@ -43,6 +46,13 @@ public class RiskAnalysisService {
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * 触发一次风险分析。同步调用 DeepSeek API，解析 JSON 填字段，落库并返全字段实体。
+     *
+     * @param supplierId 供应商 ID
+     * @return 含 analysisId 的完整 RiskAnalysis
+     * @throws IllegalArgumentException 供应商不存在
+     */
     public RiskAnalysis analyzeRisk(Integer supplierId) {
         log.info(">>> [风险分析] 开始 supplierId={}", supplierId);
 
@@ -88,13 +98,11 @@ public class RiskAnalysisService {
         return saved;
     }
 
-    // 构建落库Entity
     private RiskAnalysis parseAndBuild(Integer supplierId, String supplierName, String raw, LocalDateTime analyzedAt) {
         String riskLevel = null;
         String summary = null;
         String suggestions = null;
 
-        // 构建raw_response（JSON）
         if (raw != null && !raw.isBlank()) {
             try {
                 JSONObject obj = JSON.parseObject(raw);
@@ -107,7 +115,6 @@ public class RiskAnalysisService {
             }
         }
 
-        //构建其余字段
         RiskAnalysis a = new RiskAnalysis();
         a.setSupplierId(supplierId);
         a.setSupplierName(supplierName);
@@ -120,13 +127,18 @@ public class RiskAnalysisService {
         return a;
     }
 
-    // 落库持久化
+    /**
+     * 落库（独立事务）。analysisId 通过 useGeneratedKeys 回填。
+     */
     @Transactional(rollbackFor = Exception.class)
     public RiskAnalysis persist(RiskAnalysis analysis) {
         mapper.insert(analysis);
         return analysis;
     }
 
+    /**
+     * 查询指定供应商的历史分析记录（按时间倒序）。
+     */
     public List<RiskAnalysis> getHistory(Integer supplierId) {
         return mapper.selectBySupplierId(supplierId);
     }

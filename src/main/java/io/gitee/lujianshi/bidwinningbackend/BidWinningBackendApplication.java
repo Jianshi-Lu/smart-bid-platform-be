@@ -7,20 +7,9 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
- * Spring Boot 启动入口
+ * Spring Boot 启动入口。
  *
- * 组件扫描范围：io.gitee.lujianshi.bidwinningbackend 包及其子包下的所有组件注解类
- * - @Component、@Service、@Controller、@Repository、@Configuration 都会被扫描注册为 Bean
- * - @SpringBootApplication = @Configuration + @EnableAutoConfiguration + @ComponentScan
- *
- * 工作流程：
- * SpringApplication.run() -> 创建嵌入式 Tomcat -> 初始化 DispatcherServlet ->
- * 扫描 @RestController -> 注册 @GetMapping 到 URL 映射表 -> 请求进来 -> DispatcherServlet 查表路由
- *
- * @EnableAsync：开启异步支持后 @Async 注解才生效
- * Spring 会创建异步代理，使标注了 @Async 的方法在独立线程中执行
- *
- * 注意：启动类本身也是 Bean，被 @Autowired 注入时可用
+ * <p>{@code @EnableAsync} 开启异步支持；{@code @MapperScan} 扫描 mapper 包。</p>
  */
 @SpringBootApplication
 @EnableAsync

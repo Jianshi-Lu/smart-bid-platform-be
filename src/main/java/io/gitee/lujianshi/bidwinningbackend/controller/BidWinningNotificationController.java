@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 定标通知 Controller — 6 端点标准 CRUD
+ * 定标通知 Controller。6 端点标准 CRUD。端点详情 / curl 示例见 {@code docs/api.md}。
  *
-     * <p>端点列表 / PATCH 语义 / 分页机制 / 批量新增 / 批量删除 / Service 层邮件通知 / 7 层链路
-     * 详见 {@code docs/business-controllers.md}。</p>
+ * <p>注意：删除主表后 {@code supplier_detail} 中引用本表 {@code notification_id} 的行变孤儿
+ * （应用层不保证完整性）。</p>
  */
 @RestController
 public class BidWinningNotificationController {
@@ -28,40 +28,6 @@ public class BidWinningNotificationController {
     @Resource
     private BidWinningNotificationService service;
 
-    /**
-     * <h2>创建定标通知</h2>
-     *
-     * <h3>输入参数（JSON body，17 字段 = 3 必填 + 14 可选）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code handlerId}</td><td>Integer</td><td>是</td><td>经办人 ID</td></tr>
-     *   <tr><td>{@code projectNo}</td><td>String</td><td>是</td><td>项目编号</td></tr>
-     *   <tr><td>{@code purchaseTaskNo}</td><td>String</td><td>是</td><td>采购任务编号</td></tr>
-     *   <tr><td>{@code platformCategory}</td><td>String</td><td>否</td><td>平台采购类别</td></tr>
-     *   <tr><td>{@code biddingProcess}</td><td>String</td><td>否</td><td>招标流程</td></tr>
-     *   <tr><td>{@code biddingMethod}</td><td>String</td><td>否</td><td>招标方式</td></tr>
-     *   <tr><td>{@code purchaseMethod}</td><td>String</td><td>否</td><td>采购方式</td></tr>
-     *   <tr><td>{@code isFixedPrice}</td><td>Boolean</td><td>否</td><td>是否固定价</td></tr>
-     *   <tr><td>{@code targetCost}</td><td>BigDecimal</td><td>否</td><td>目标成本（元）</td></tr>
-     *   <tr><td>{@code documentFee}</td><td>BigDecimal</td><td>否</td><td>文件费（元）</td></tr>
-     *   <tr><td>{@code deposit}</td><td>BigDecimal</td><td>否</td><td>保证金（元）</td></tr>
-     *   <tr><td>{@code creditReportRequired}</td><td>Boolean</td><td>否</td><td>是否需要资信报告</td></tr>
-     *   <tr><td>{@code registrationDeadline}</td><td>LocalDateTime</td><td>否</td><td>注册截止时间</td></tr>
-     *   <tr><td>{@code techBidDeadline}</td><td>LocalDateTime</td><td>否</td><td>技术标截止时间</td></tr>
-     *   <tr><td>{@code businessBidDeadline}</td><td>LocalDateTime</td><td>否</td><td>商务标截止时间</td></tr>
-     *   <tr><td>{@code biddingStatus}</td><td>String</td><td>否</td><td>招标状态</td></tr>
-     *   <tr><td>{@code notes}</td><td>String</td><td>否</td><td>备注</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>
-     * curl -X POST http://localhost:8080/bid-winning-notification/add \
-     *   -H "Content-Type: application/json" \
-     *   -d '{"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001"}'
-     * </pre>
-     *
-     * @param request 创建请求 DTO（{@link AddRequest}）
-     */
     @PostMapping("/bid-winning-notification/add")
     public Result<BidWinningNotification> createBidWinningNotification(
             @Valid @RequestBody AddRequest request) {
@@ -89,31 +55,6 @@ public class BidWinningNotificationController {
         return Result.success(entity, "创建成功");
     }
 
-    /**
-     * <h2>批量新增定标通知</h2>
-     *
-     * <h3>输入参数（JSON body）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code targetEmail}</td><td>String</td><td>否</td><td>汇总邮件收件人；为空/blank 时不发送汇总邮件</td></tr>
-     *   <tr><td>{@code items}</td><td>List&lt;AddRequest&gt;</td><td>是</td><td>定标通知列表（1-100 条）</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>
-     * curl -X POST http://localhost:8080/bid-winning-notification/batch-add \
-     *   -H "Content-Type: application/json" \
-     *   -d '{
-     *     "targetEmail": "manager@company.com",
-     *     "items": [
-     *       {"handlerId":1,"projectNo":"PRJ-2024-001","purchaseTaskNo":"PT-2024-001"},
-     *       {"handlerId":2,"projectNo":"PRJ-2024-002","purchaseTaskNo":"PT-2024-002"}
-     *     ]
-     *   }'
-     * </pre>
-     *
-     * @param request 批量新增请求 DTO（{@link BatchAddRequest}）
-     */
     @PostMapping("/bid-winning-notification/batch-add")
     public Result<List<BidWinningNotification>> batchAddBidWinningNotification(
             @Valid @RequestBody BatchAddRequest request) {
@@ -122,20 +63,6 @@ public class BidWinningNotificationController {
         return Result.success(created, "批量新增成功");
     }
 
-    /**
-     * <h2>按主键查询定标通知</h2>
-     *
-     * <h3>输入参数（URL path）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code id}</td><td>Integer</td><td>是</td><td>定标通知主键 ID</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>curl http://localhost:8080/bid-winning-notification/1</pre>
-     *
-     * @param id 主键 ID
-     */
     @GetMapping("/bid-winning-notification/{id}")
     public Result<BidWinningNotification> getByIdBidWinningNotification(@PathVariable Integer id) {
         BidWinningNotification entity = service.getById(id);
@@ -144,22 +71,6 @@ public class BidWinningNotificationController {
                 : Result.error(404, "记录不存在");
     }
 
-    /**
-     * <h2>按主键部分更新定标通知（PATCH 语义，17 字段全可选）</h2>
-     *
-     * <h3>输入参数（URL path + JSON body）</h3>
-     * <p>同创建端点 17 字段，但 <b>全部可选</b>，null 字段不修改。详见创建端点的字段表。</p>
-     *
-     * <h3>请求示例</h3>
-     * <pre>
-     * curl -X PATCH http://localhost:8080/bid-winning-notification/1 \
-     *   -H "Content-Type: application/json" \
-     *   -d '{"biddingStatus":"已完成"}'
-     * </pre>
-     *
-     * @param id 主键 ID
-     * @param request 更新请求 DTO（{@link UpdateRequest}）
-     */
     @PatchMapping("/bid-winning-notification/{id}")
     public Result<Diff<BidWinningNotification>> patchBidWinningNotification(
             @PathVariable Integer id,
@@ -195,22 +106,6 @@ public class BidWinningNotificationController {
         return Result.success(new Diff<>(before, after), "更新成功");
     }
 
-    /**
-     * <h2>按主键删除定标通知</h2>
-     *
-     * <h3>输入参数（URL path）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code id}</td><td>Integer</td><td>是</td><td>定标通知主键 ID</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>curl -X DELETE http://localhost:8080/bid-winning-notification/1</pre>
-     *
-     * <p><b>注意</b>：删除主表后 {@code bid_winning_supplier_detail} 中引用本表 {@code notification_id} 的行会变孤儿（应用层不保证完整性）。</p>
-     *
-     * @param id 主键 ID
-     */
     @DeleteMapping("/bid-winning-notification/{id}")
     public Result<Void> deleteBidWinningNotification(@PathVariable Integer id) {
         int rows = service.delete(id);
@@ -219,20 +114,6 @@ public class BidWinningNotificationController {
                 : Result.error(404, "记录不存在");
     }
 
-    /**
-     * <h2>列表查询定标通知（分页）</h2>
-     *
-     * <h3>输入参数（URL query）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code page}</td><td>int</td><td>否</td><td>页码（默认 1）</td></tr>
-     *   <tr><td>{@code pageSize}</td><td>int</td><td>否</td><td>每页条数（默认 10）</td></tr>
-     *   <tr><td>{@code sort}</td><td>String</td><td>否</td><td>PageHelper 原生格式（空格分隔），默认 {@code "notification_id desc"}</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>curl "http://localhost:8080/bid-winning-notification?page=1&pageSize=10&sort=notification_id%20desc"</pre>
-     */
     @GetMapping("/bid-winning-notification")
     public Result<PageInfo<BidWinningNotification>> listBidWinningNotification(
             @RequestParam(defaultValue = "1") int page,
@@ -251,24 +132,6 @@ public class BidWinningNotificationController {
         }
     }
 
-    /**
-     * <h2>批量删除定标通知（按主键 ID 列表，p3 升级版）</h2>
-     *
-     * <h3>输入参数（JSON body）</h3>
-     * <table border="1">
-     *   <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-     *   <tr><td>{@code ids}</td><td>List&lt;Integer&gt;</td><td>是</td><td>主键 ID 列表（@NotEmpty，@Size max=500）</td></tr>
-     * </table>
-     *
-     * <h3>请求示例</h3>
-     * <pre>
-     * curl -X POST http://localhost:8080/bid-winning-notification/batch-delete \
-     *   -H "Content-Type: application/json" \
-     *   -d '{"ids":[1,2,3]}'
-     * </pre>
-     *
-     * @param request 批量删除请求 DTO（{@link BatchDeleteRequest}）
-     */
     @PostMapping("/bid-winning-notification/batch-delete")
     public Result<List<BidWinningNotification>> batchDeleteBidWinningNotification(@Valid @RequestBody BatchDeleteRequest request) {
         List<BidWinningNotification> deleted = service.deleteByIds(request.getIds());
