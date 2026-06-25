@@ -5,4 +5,4 @@
 - 报价：{{quotePrice}}元
 - 联系方式：{{supplierContact}}
 
-{{background}}
+{{detail}}

@@ -31,7 +31,7 @@ public class RiskAnalysisService {
     private final ChatClient chatClient;
 
     @Resource
-    private BidBackgroundLoader loader;
+    private SupplierDetailLoader loader;
 
     @Resource
     private RiskAnalysisMapper mapper;
@@ -65,12 +65,12 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 供应商信息 name={} quotePrice={} contact={}",
                 detail.getSupplierName(), detail.getQuotePrice(), detail.getSupplierContact());
 
-        String background = loader.loadBackground(supplierId);
+        String detailInfo = loader.loadDetail(supplierId);
         Map<String, String> vars = Map.of(
                 "supplierName", detail.getSupplierName() != null ? detail.getSupplierName() : "",
                 "quotePrice", detail.getQuotePrice() != null ? detail.getQuotePrice().toString() : "",
                 "supplierContact", detail.getSupplierContact() != null ? detail.getSupplierContact() : "",
-                "background", background
+                "detail", detailInfo
         );
 
         String systemPrompt = promptFiller.loadFromResource("prompts/risk-analysis-system-v1.txt");

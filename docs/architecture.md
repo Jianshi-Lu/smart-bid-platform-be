@@ -63,8 +63,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── BidWinningNotificationService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
-│   │   ├── BidBackgroundLoader.java
-│   │   ├── DatabaseBidBackgroundLoader.java
+│   │   ├── SupplierDetailLoader.java
 │   │   └── RiskAnalysisService.java        # 构造器注入 ChatClient.Builder
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
