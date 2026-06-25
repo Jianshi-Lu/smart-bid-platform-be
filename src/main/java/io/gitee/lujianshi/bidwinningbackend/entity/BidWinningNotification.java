@@ -13,6 +13,11 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+/**
+ * 定标通知 — 数据库实体。对应表 {@code bid_winning_notification}（V4 建表，19 字段）。
+ *
+ * <p>{@code handlerId} 为逻辑外键，关联 {@code bid_handler_info.handler_id}，DB 层不强制 FK。</p>
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

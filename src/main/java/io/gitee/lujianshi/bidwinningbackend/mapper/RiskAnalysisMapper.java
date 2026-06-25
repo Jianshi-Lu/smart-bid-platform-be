@@ -6,38 +6,16 @@ import org.apache.ibatis.annotations.Mapper;
 import java.util.List;
 
 /**
- * 风险分析结果 Mapper — 继承 {@link BaseMapper}，提供标准 CRUD + 按 supplierId 查询。
- *
- * <h3>继承的方法</h3>
- * <ul>
- *   <li>{@code int insert(RiskAnalysis entity)} — 插入分析记录（自增 analysisId 回填）</li>
- *   <li>{@code RiskAnalysis selectById(Integer id)} — 按 analysisId 查询</li>
- *   <li>{@code List&lt;RiskAnalysis&gt; selectAll()} — 查询全部</li>
- *   <li>{@code int deleteById(Integer id)} — 按 analysisId 删除</li>
- *   <li>{@code int updateById(RiskAnalysis entity)} — 按 analysisId 更新</li>
- *   <li>{@code List&lt;RiskAnalysis&gt; selectByIds(List&lt;Integer&gt; ids)} — 按 ID 列表批量查询</li>
- *   <li>{@code int deleteByIds(List&lt;Integer&gt; ids)} — 按 ID 列表批量删除</li>
- * </ul>
- *
- * <h3>本接口新增方法</h3>
- * <ul>
- *   <li>{@link #selectBySupplierId(Integer)} — 按供应商 ID 查询历史分析记录（按时间倒序）</li>
- * </ul>
- *
- * @see RiskAnalysis
- * @see io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper
+ * 风险分析 Mapper。继承 {@link BaseMapper}，绑定 {@code RiskAnalysisMapper.xml}。
  */
 @Mapper
 public interface RiskAnalysisMapper extends BaseMapper<RiskAnalysis> {
 
     /**
-     * 按供应商 ID 查询历史分析记录。
-     *
-     * <p>同一 {@code supplierId} 可有多条分析记录，按 {@code analyzed_at DESC} 排序，
-     * 第一条为最新分析结果。</p>
+     * 按供应商 ID 查询历史分析记录（按时间倒序）。
      *
      * @param supplierId 供应商 ID
-     * @return 分析记录列表（按时间倒序），无记录时返回空列表
+     * @return 历史分析记录列表，无记录时返回空列表
      */
     List<RiskAnalysis> selectBySupplierId(Integer supplierId);
 }

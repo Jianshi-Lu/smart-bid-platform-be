@@ -1,6 +1,8 @@
 # AGENTS.md
 
 > bid-winning-backend 项目的 Agent 工作约定。详细架构/API/表结构/开发流程见 `docs/` 下各 MD。
+>
+> **本文件以"代码规范"为核心**，业务实体/端点仅做简要索引，详细以具体业务代码为准。
 
 ## Build & Run
 
@@ -18,96 +20,39 @@
 - **Lombok 1.18.46**（`@Data` / `@NoArgsConstructor` / `@AllArgsConstructor`）
 - **Thymeleaf 3.1.5**（邮件 HTML 模板）
 - **Spring Boot Starter Mail**（`JavaMailSender`）
-- **AspectJ 1.9.25.1**（AOP 邮件通知，注意：Spring Boot 4 已移除 `spring-boot-starter-aop`，需手动引入 `org.aspectj:aspectjweaver`）
+- **Spring AI 2.0.0** + `spring-ai-starter-model-deepseek`（AI 风险分析）
 - **DevTools**（运行时重载）
 
-## Project Structure
+## Project Structure（简要索引）
 
-> 源根包：`io.gitee.lujianshi.bidwinningbackend`
-> 单模块 Maven 项目，标准 `src/main/java` + `src/main/resources` + `src/test/java` 布局
+> 详细业务字段/方法以具体源码为准。
 
 ```
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
-├── annotation/
-│   └── SendEmailOnSuccess.java             # @Target(METHOD) + @Retention(RUNTIME) 邮件通知标记
-├── aspect/
-│   └── CrudResultEmailAspect.java          # @AfterReturning 拦截 @SendEmailOnSuccess
-├── controller/
-│   ├── bidhandlerinfo/
-│   │   └── BidHandlerInfoController.java   # 经办人 CRUD（6 端点）
-│   ├── bidwinningnotification/
-│   │   └── BidWinningNotificationController.java   # 定标通知 CRUD（6 端点）
-│   ├── bidwinningsupplierdetail/
-│   │   └── BidWinningSupplierDetailController.java # 中标结果明细 CRUD（6 端点）
-│   └── statuscheck/
-│       └── StatusCheckController.java      # 服务状态 + 邮件测试（3 端点）
-├── dto/
-│   ├── common/
-│   │   ├── Result.java                     # 统一响应包装（code/message/data + success/error 工厂）
-│   │   └── Diff.java                       # PATCH before/after diff 包装
-│   ├── bidhandlerinfo/                     # 经办人 3 DTO（Create/Update/BatchDelete）
-│   ├── bidwinningnotification/             # 定标通知 3 DTO
-│   ├── bidwinningsupplierdetail/           # 中标明细 3 DTO
-│   └── mail/
-│       ├── PlainTextMailRequest.java       # 纯文本邮件（to/from/subject/content）
-│       ├── BidWinningMailRequest.java      # extends PlainTextMailRequest + projectCode/handlerName/bidWinningList/templateName
-│       └── BidWinningListItem.java         # 中标结果条目（supplierName/bidWinningAmount）
-├── entity/
-│   ├── BidHandlerInfo.java                 # 经办人实体
-│   ├── BidWinningNotification.java         # 定标通知实体（19 字段）
-│   ├── BidWinningSupplierDetail.java       # 中标明细实体
-│   └── BidWinningRiskAnalysis.java         # 风险分析结果实体
-├── mapper/
-│   ├── BaseMapper.java                      # 泛型 CRUD 基接口（7 标准方法），由具体 Mapper 继承
-│   ├── BidHandlerInfoMapper.java            # @Mapper 接口（extends BaseMapper<BidHandlerInfo>）
-│   ├── BidWinningNotificationMapper.java    # @Mapper 接口
-│   ├── BidWinningSupplierDetailMapper.java  # @Mapper 接口
-│   └── BidWinningRiskAnalysisMapper.java    # @Mapper 接口（+ selectByDetailId）
-├── service/
-│   ├── BaseService.java                     # 泛型 CRUD 基类（封装 7 标准方法 + @Transactional）
-│   ├── BidHandlerInfoService.java           # @Service（extends BaseService<BidHandlerInfo>）
-│   ├── BidWinningNotificationService.java   # @Service
-│   ├── BidWinningSupplierDetailService.java # @Service
-│   ├── mail/
-│   │   └── MailService.java                # 邮件发送（sendEmail 纯文本 + sendHtmlEmail HTML）
-│   ├── riskanalysis/                        # AI 风险分析服务（v0.1-min 起步）
-│   │   ├── BidBackgroundLoader.java         # 供应商背景加载接口
-│   │   ├── DatabaseBidBackgroundLoader.java # 默认 DB 实现（查 supplier_detail）
-│   │   └── RiskAnalysisService.java         # @Service，构造器注入 ChatClient.Builder
-│   └── statuscheck/
-│       └── StatusCheckService.java         # 中标通知书邮件发送（Thymeleaf 渲染 + 异步）
-└── utils/
-    ├── AsyncTaskManager.java               # 延迟异步任务执行器（纯 Java 线程，非 Spring Bean）
-    ├── PromptFiller.java                   # classpath prompt 模板加载 + {{var}} 占位符填充
-    └── ResourceSearcher.java               # classpath 模板文件存在性校验
+├── controller/                             # 4 Controller + GlobalExceptionHandler
+├── dto/                                    # 按业务模块分包
+│   └── common/                             # Result / Diff
+├── entity/                                 # BidHandlerInfo / BidWinningNotification / SupplierDetail / RiskAnalysis
+├── mapper/                                 # @Mapper 接口，extends BaseMapper
+├── service/                                # BaseService + 各业务模块
+│   ├── mail/                               # MailService
+│   ├── riskanalysis/                       # AI 风险分析
+│   └── statuscheck/                        # 中标通知书
+└── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 
 src/main/resources/
-├── mapper/                                 # MyBatis XML（namespace = Mapper 接口 FQN）
-│   ├── BidHandlerInfoMapper.xml
-│   ├── BidWinningNotificationMapper.xml
-│   ├── BidWinningSupplierDetailMapper.xml
-│   └── BidWinningRiskAnalysisMapper.xml
-├── sql/ddl/                                # Flyway 兼容命名的 DDL 脚本（V1-V5，**未启用 Flyway**）
-│   ├── V1__create_handler_info.sql
-│   ├── V2__update_handler_info_structure.sql
-│   ├── V3__update_handler_info_to_bid_handler_info.sql
-│   ├── V4__create_bid_winning_notification.sql
-│   └── V5__create_bid_winning_supplier_detail.sql
+├── mapper/                                 # MyBatis XML
+├── prompts/                                # AI prompt 模板（*.txt）
+├── sql/ddl/                                # Flyway 兼容 V1-V11，**未启用 Flyway**
 ├── templates/                              # Thymeleaf 邮件模板
-│   ├── bid-winning-notification.html       # 中标通知书模板
-│   ├── bid-winning-notification2.html      # 中标通知书模板变体
-│   └── crud-result-notification.html       # AOP CRUD 结果通知模板
-├── application.yml                         # 公共配置（应用名 + Thymeleaf 路径）
-├── application-dev.yml                     # 开发环境（默认，端口 8080）
-├── application-test.yml                    # 测试环境（端口 8080，DEBUG 日志）
-└── application-prod.yml                    # 生产环境（端口 80，敏感信息走环境变量）
+└── application*.yml                        # dev / test / prod 三套配置
 ```
 
 ## Entry Point
 
 - `BidWinningBackendApplication.java` — Spring Boot 启动入口（纯 bootstrap，无路由）
-  - 启用注解：`@SpringBootApplication` + `@EnableAsync` + `@EnableAspectJAutoProxy` + `@MapperScan`
+- 启用注解：`@SpringBootApplication` + `@EnableAsync` + `@EnableAspectJAutoProxy` + `@MapperScan`
 - Dev server: `http://localhost:8080`
 - 配置端口: `server.port=8080`（application-dev.yml）
 
@@ -128,18 +73,17 @@ src/main/resources/
 
 ### 占位符变量（启动时必须提供）
 
-| 变量 | 必填 | 用途 | 示例 |
-|------|:----:|------|------|
-| `MYSQL_URL` | ✅ dev/test | JDBC URL | `jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true` |
-| `MYSQL_USERNAME` | ✅ dev/test | DB 用户名 | `jianshi` |
-| `MYSQL_PASSWORD` | ✅ dev/test | DB 密码 | `Ljs83455012.` |
-| `PROD_MAIL_USERNAME` | ⚠️ prod | 发件邮箱 | `service@company.com` |
-| `PROD_MAIL_PASSWORD` | ⚠️ prod | 邮箱授权码 | `xxxx` |
-| `PROD_MAIL_HOST` | ❌ 默认 `smtp.qq.com` | SMTP 主机 | `smtp.exmail.qq.com` |
-| `PROD_MAIL_PORT` | ❌ 默认 `587` | SMTP 端口 | `465` |
+| 变量 | 必填 | 用途 |
+|------|:----:|------|
+| `MYSQL_URL` | ✅ dev/test | JDBC URL |
+| `MYSQL_USERNAME` | ✅ dev/test | DB 用户名 |
+| `MYSQL_PASSWORD` | ✅ dev/test | DB 密码 |
+| `DEEPSEEK_API_KEY` | ✅ dev | AI 风险分析 |
+| `MAIL_PASSWORD` | ⚠️ dev | 发件邮箱授权码 |
+| `PROD_MAIL_USERNAME` | ⚠️ prod | 发件邮箱 |
+| `PROD_MAIL_PASSWORD` | ⚠️ prod | 邮箱授权码 |
 
-> ⚠️ dev/test 必须设 `MYSQL_*` 三个变量；prod 必须设 `PROD_MAIL_USERNAME` + `PROD_MAIL_PASSWORD`。
-> dev 邮件密码明文配置（开发效率优先），prod 强制走环境变量。
+> ⚠️ dev/test 必须设 `MYSQL_*` 三个变量；prod 必须设 `PROD_MAIL_*`。
 
 ### dev 环境提供方式
 
@@ -159,111 +103,143 @@ src/main/resources/
 | 错误 | 现象 | 解决 |
 |------|------|------|
 | 变量名拼写错误 | `Access denied for user '${MYSQL_USERNAME}'` | 检查环境变量名拼写 |
-| 多个 Run Configuration 混淆 | 旧配置仍生效 | 删除或修正 Run Configuration |
-| 没点 Apply / OK | 环境变量未保存 | 改完配置点 Apply 再 OK |
 | dev 切到 prod | 缺 `${PROD_MAIL_*}` 占位符报错 | 加环境变量或切回 dev profile |
-| 缺 `allowPublicKeyRetrieval=true` | MySQL 8 + SSL 关闭时 `Public Key Retrieval is not allowed` | URL 末尾加 `&allowPublicKeyRetrieval=true` |
+| 缺 `allowPublicKeyRetrieval=true` | `Public Key Retrieval is not allowed` | URL 末尾加 `&allowPublicKeyRetrieval=true` |
 
-## API Endpoints（21 端点）
+## API Endpoints（简要索引）
 
-> 完整规范（请求/响应字段表 + curl 示例）见 `docs/api.md`。
-> 业务 Controller 详细规范见 `docs/business-controllers.md`。
-> 邮件通知 AOP 详细执行链路见 `docs/aop-execution-chain.md`。
+> 完整规范见 `docs/api.md`，每个端点请求/响应以具体 Controller 为准。
 
-### 服务状态 + 邮件测试（StatusCheckController，3 端点）
+### 业务 CRUD
 
-| Method | Path | Content-Type | Description |
-|-------|------|-------------|-------------|
-| GET | `/service-status` | - | 返回 "Service is up and running."（Spring 服务存活探活） |
-| POST | `/send-email` | `application/json` | 发送纯文本邮件（`MailService.sendEmail`） |
-| POST | `/send-notification` | `application/json` | 发送中标通知书 HTML 邮件（模板渲染 + 异步延迟5秒） |
+| 模块 | 端点数 | 路径前缀 |
+|------|:---:|------|
+| 经办人 (BidHandlerInfo) | 6 | `/bid-handler-info/...` |
+| 定标通知 (BidWinningNotification) | 6 | `/bid-winning-notification/...` |
+| 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
+| **AI 风险分析** | 2 | `/supplier-detail/{action}/{id}` |
 
-### 业务 CRUD（3 Controller × 6 端点 = 18 端点）
+### 服务状态 + 邮件测试
 
-> 所有业务端点：
-> - 统一返回 `Result<T>` 包装
-> - 均带 `@SendEmailOnSuccess(to = "ops@company.com")` 注解（AOP 拦截异步发邮件）
-> - 收件人优先级：`Target-Email-Address` HTTP Header > 注解 `to` > 默认 `ops@company.com`
+| Method | Path | 说明 |
+|-------|------|------|
+| GET | `/service-status` | Spring 服务存活探活 |
+| POST | `/send-email` | 纯文本邮件 |
+| POST | `/send-notification` | 中标通知书 HTML 邮件（异步延迟5秒） |
 
-**经办人（bid_handler_info）— `BidHandlerInfoController`**
+### AI 风险分析端点
 
-| Method | Path | Content-Type | Response data |
-|-------|------|-------------|---------------|
-| POST | `/bid-handler-info/add` | `application/json` | `BidHandlerInfo` |
-| GET | `/bid-handler-info/{id}` | - | `BidHandlerInfo`（404→null） |
-| PATCH | `/bid-handler-info/{id}` | `application/json` | `Diff<BidHandlerInfo>` |
-| DELETE | `/bid-handler-info/{id}` | - | `null` |
-| GET | `/bid-handler-info` | - | `PageInfo<BidHandlerInfo>`（query: page/size/sort） |
-| POST | `/bid-handler-info/batch-delete` | `application/json` | `List<BidHandlerInfo>`（p3 升级版，data=实际删除的实体列表） |
-
-**定标通知（bid_winning_notification）— `BidWinningNotificationController`**
-
-| Method | Path | Content-Type | Response data |
-|-------|------|-------------|---------------|
-| POST | `/bid-winning-notification/add` | `application/json` | `BidWinningNotification` |
-| GET | `/bid-winning-notification/{id}` | - | `BidWinningNotification` |
-| PATCH | `/bid-winning-notification/{id}` | `application/json` | `Diff<BidWinningNotification>` |
-| DELETE | `/bid-winning-notification/{id}` | - | `null` |
-| GET | `/bid-winning-notification` | - | `PageInfo<BidWinningNotification>` |
-| POST | `/bid-winning-notification/batch-delete` | `application/json` | `List<BidWinningNotification>` |
-
-**中标结果明细（bid_winning_supplier_detail）— `BidWinningSupplierDetailController`**
-
-| Method | Path | Content-Type | Response data |
-|-------|------|-------------|---------------|
-| POST | `/add-bid-winning-supplier-detail` | `application/json` | `BidWinningSupplierDetail` |
-| GET | `/bid-winning-supplier-detail/{id}` | - | `BidWinningSupplierDetail` |
-| PATCH | `/bid-winning-supplier-detail/{id}` | `application/json` | `Diff<BidWinningSupplierDetail>` |
-| DELETE | `/bid-winning-supplier-detail/{id}` | - | `null` |
-| GET | `/bid-winning-supplier-detail` | - | `PageInfo<BidWinningSupplierDetail>` |
-| POST | `/bid-winning-supplier-detail/batch-delete` | `application/json` | `List<BidWinningSupplierDetail>` |
-
-## AOP 邮件通知（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）
-
-> 完整执行链路（5 步主线程 + 4 步异步子线程）见 `docs/aop-execution-chain.md`
-
-**触发条件**：`@AfterReturning` 拦截带 `@SendEmailOnSuccess` 注解的方法，且返回 `Result` 且 `code == 200`
-
-**收件人解析优先级**：
-1. HTTP Header `Target-Email-Address`（非空时优先）
-2. 注解 `to()` 默认值
-3. 兜底 `ops@company.com`（注解 `to` 未设置时）
-
-**通知模板**：`templates/crud-result-notification.html`（`op-CREATE/UPDATE/DELETE/BATCH_DELETE` 颜色编码）
-
-**关键点**：
-- 异步执行：主线程不阻塞（微秒级）；子线程用 `AsyncTaskManager`（纯 Java `new Thread().start()`，非 Spring `@Async` 代理）
-- 主题格式：`[{op}] {endpoint 摘要}`（如 `[CREATE] /bid-handler-info/add`）
-- 响应 `data` 通过 fastjson2 序列化为 JSON 嵌入邮件
+| Method | Path | 说明 |
+|-------|------|------|
+| POST | `/supplier-detail/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
+| GET | `/supplier-detail/risk-history/{id}` | 历史分析记录（按时间倒序） |
 
 ## Async Task（`AsyncTaskManager`）
 
 - 静态方法 `execute(Runnable task, long delayMillis)`
 - 纯 Java 线程，非 Spring Bean（每次 `new Thread().start()`）
-- 使用场景：
-  - `/send-notification` 延迟 5 秒发邮件（让前端展示"发送中"状态）
-  - AOP 切面异步发邮件（0ms 延迟）
-- 优势：无需 `@Async` + Spring AOP 代理，支持任意延迟
-- 注意：高频调用建议改用线程池（当前每次 `new Thread` 有创建开销）
+- 使用场景：`/send-notification` 延迟 5 秒发邮件
+- 注意：高频调用建议改用线程池
+
+## JavaDoc 注释规范
+
+参考阿里/腾讯大厂规约，落地到本项目。
+
+### 基本结构
+
+- 注释以 `/**` 开头，`*/` 结束
+- 必须位于类、方法、字段声明**之前**
+- 默认 javadoc 命令只对 `public` / `protected` 生效（IDE 通常也为 `private` 生成）
+
+### 必须写 JavaDoc 的场景
+
+| 元素 | 是否必须 | 说明 |
+|------|:---:|------|
+| Controller / Service / Component | ✅ 强推荐 | 类级 JavaDoc 必写 |
+| 公共 API 方法 | ✅ 强推荐 | 已在项目内执行 |
+| 公共常量字段 | ✅ 推荐 | 说明业务含义 |
+| 简单 getter/setter | ❌ 可省略 | 除非有特殊业务含义 |
+| 私有方法 | ⚠️ 视复杂度 | 关键逻辑写 |
+
+### 标签使用规范
+
+| 标签 | 用途 | 必填场景 |
+|------|------|---------|
+| `@param` | 方法参数说明 | 每个参数必填 |
+| `@return` | 返回值说明 | 非 void 方法必填 |
+| `@throws` / `@exception` | 可能抛出的异常 | 显式抛异常时必填 |
+| `@see` | 关联类/方法 | 引用其他类时推荐 |
+| `@since` | 引入版本 | 新增 API 时必填 |
+| `@deprecated` | 已弃用 | 保留说明 + 替代方案 |
+| `@author` | 作者 | 团队约定 |
+
+### 标准模板
+
+```java
+/**
+ * 一句话功能描述（首句作索引摘要，应能脱离上下文理解）
+ *
+ * <p>详细描述：业务背景、设计决策、关键约束（可选）</p>
+ *
+ * <h3>使用示例</h3>（可选）
+ * <pre>
+ * service.doXxx(arg1, arg2);
+ * </pre>
+ *
+ * @param a 参数含义 + 取值范围
+ * @param b 参数含义
+ * @return 返回值含义 + 可能的取值
+ * @throws IllegalArgumentException 触发条件
+ * @see RelatedClass
+ * @since 1.0
+ */
+```
+
+### 编写原则（"黄金法则"）
+
+1. **解释"为什么"，而非重复"做什么"**：命名已表达意图，注释补充上下文
+2. **避免冗余**：不要对 getter/setter 过度描述
+3. **首句作摘要**：第一句话决定文档索引的可读性
+4. **与代码同步**：方法签名变了必须更新注释
+5. **边界条件必标**：null / 空集合 / 负数等特殊输入
+6. **线程安全必标**：并发场景明确说明
+7. **避免噪音注释**：`// 设置用户名` 对应 `user.setName(name)` 是反模式
+
+### HTML 标签（JavaDoc 支持）
+
+| 标签 | 用途 | 推荐度 |
+|------|------|:---:|
+| `<p>` | 段落 | ✅ |
+| `<pre>` | 代码块（保留缩进） | ✅ |
+| `<code>` | 行内代码 | ✅ |
+| `<ul>/<li>` | 列表 | ✅ |
+| `<h3>` | 子标题 | ✅ |
+| `<table>` | 表格 | ⚠️ 复杂，可读性差 |
+
+### IDE 工具
+
+- **IntelliJ IDEA**：`/** + Enter` 自动生成标签骨架
+- **Easy Javadoc 插件**：智能翻译 + 自动生成（可选）
+- **Alibaba Java Guidelines**：CI 集成 Checkstyle 检查（可选）
 
 ## 关键设计约定
 
 | 维度 | 约定 |
 |------|------|
-| Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口，7 标准方法），手写 XML SQL |
+| Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口），手写 XML SQL |
 | Service | 继承 `BaseService<T>`（项目自建泛型基类），子类实现 `getMapper()` + `getIdExtractor()` |
 | 写方法事务 | `@Transactional(rollbackFor = Exception.class)`（由 `BaseService` 统一加） |
-| DTO 命名 | `<Entity>CreateRequest` / `<Entity>UpdateRequest`（PATCH 风格，**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest`（独立，不复用） |
-| Controller 响应 | `Result<T>` 包装；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>`（p3 升级版） |
+| DTO 命名 | `<Entity>AddRequest` / `<Entity>UpdateRequest`（PATCH 风格，**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest` |
+| Controller 响应 | `Result<T>` 包装；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>` |
 | 业务状态码 | 200=成功, 400=参数错误, 404=资源不存在 |
 | 注入方式 | `jakarta.annotation.Resource`（field 注入） |
-| `@Valid` | 当前**未**在 Controller 加 `@Valid`，DTO 校验注解暂未生效（待 `GlobalExceptionHandler` 补全） |
+| 全局异常处理 | `GlobalExceptionHandler` 统一捕获，返回 `Result` 包装 |
 | 外键 | `handler_id` / `notification_id` 为**逻辑外键**，DB 层不强制 FK 约束 |
 | Flyway | **未**启用，仅借用 V*.sql 命名 |
-| JSON 序列化 | AOP 用 fastjson2（项目无 Jackson） |
-| Spring Boot 4 注意 | **无** `spring-boot-starter-aop` artifact，需用 `org.aspectj:aspectjweaver` |
+| JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类**不可**叫 `MailSender`（会冲突） |
 | `Page<Object>` | 不实现 `AutoCloseable`，**不可**用 try-with-resources |
+| Spring AI 实践 | 构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段 |
 
 ## 端到端开发流程（7 层链路）
 
