@@ -163,13 +163,12 @@ public class SupplierDetailController {
     /**
      * <h2>触发供应商风险分析</h2>
      *
-     * <p>异步调用 AI 模型对指定供应商进行风险分析，分析完成后结果落库。
-     * 当前版本直接返回 {@code null}，逻辑待实现。</p>
+     * <p>异步调用 AI 模型对指定供应商进行风险分析，分析完成后结果落库。</p>
      *
      * <h3>请求示例</h3>
-     * <pre>curl -X POST http://localhost:8080/supplier-detail/1/analyze-risk</pre>
+     * <pre>curl -X POST <a href="http://localhost:8080/supplier-detail/1/analyze-risk">...</a></pre>
      */
-    @PostMapping("/supplier-detail/{id}/analyze-risk")
+    @PostMapping("/supplier-detail/analyze-risk/{id}")
     public Result<RiskAnalysis> analyzeRisk(@PathVariable Integer id) {
         return Result.success(riskAnalysisService.analyzeRisk(id), "分析完成");
     }
@@ -181,9 +180,9 @@ public class SupplierDetailController {
      * 当前版本返回空列表，逻辑待实现。</p>
      *
      * <h3>请求示例</h3>
-     * <pre>curl http://localhost:8080/supplier-detail/1/risk-history</pre>
+     * <pre>curl <a href="http://localhost:8080/supplier-detail/1/risk-history">...</a></pre>
      */
-    @GetMapping("/supplier-detail/{id}/risk-history")
+    @GetMapping("/supplier-detail/risk-history/{id}")
     public Result<List<RiskAnalysis>> getRiskHistory(@PathVariable Integer id) {
         return Result.success(riskAnalysisService.getHistory(id), "查询成功");
     }

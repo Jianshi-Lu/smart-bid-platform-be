@@ -21,7 +21,6 @@
 
     <!--
       BaseResultMap：Java 字段 ↔ DB 列映射
-      V9 精简字段后仅保留 9 列（去掉了 notification_id/risk_score/key_points/model_name）。
     -->
     <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis">
         <id     column="analysis_id"     property="analysisId"/>
