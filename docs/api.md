@@ -1,29 +1,38 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述了 `bid-winning-backend` 提供的全部对外 HTTP 接口。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 23 端点（含 2 AI 风险分析端点）。
 >
-> 内部架构、表结构、扩展开发流程等内容不在本文档范围，分别见 [architecture.md](architecture.md) / [database.md](database.md) / [development-flow.md](development-flow.md)。
+> 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
 ---
 
 ## 0. 文档元信息
 
-| 项 | 值                                                                                         |
-| --- |-------------------------------------------------------------------------------------------|
-| Base URL（dev） | `http://192.168.76.177:8080`                                                                   |
-| Base URL（test） | `192.168.76.177:8080`                                                                     |
-| Base URL（prod） | N/A                                                                                       |
-| 请求体格式 | `application/json; charset=utf-8`（所有端点统一） |
-| 字符编码 | UTF-8                                                                                     |
+**Base URL**：`http://{host}:{port}`
 
-### 0.1 接口速览
+- dev 默认：`http://localhost:8080`
+- prod：`http://{prod-host}:80`
 
-| 模块       | 端点数    | 说明                                                         |
-|----------|--------|------------------------------------------------------------|
-| 服务状态 + 邮件测试 | 3      | `GET /service-status`、`POST /send-email`（纯文本）、`POST /send-notification`（HTML 模板） |
-| 经办人      | 6      | `bid_handler_info` 表 CRUD + 批量删除                           |
-| 定标通知     | 6      | `bid_winning_notification` 表 CRUD + 批量删除                   |
-| 中标结果明细   | 6      | `bid_winning_supplier_detail` 表 CRUD + 批量删除                |
+**请求体**：`application/json; charset=utf-8`（所有端点统一）
+
+**字符编码**：UTF-8
+
+### 端点速览
+
+| 模块 | 端点数 | 路径前缀 |
+|------|:---:|---------|
+| 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
+| 经办人 (BidHandlerInfo) | 6 | `/bid-handler-info/...` |
+| 定标通知 (BidWinningNotification) | 6 | `/bid-winning-notification/...` |
+| 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
+| **AI 风险分析**（v0.1+） | 2 | `/supplier-detail/{action}/{id}` |
+
+**AI 风险分析端点**（详细见 Controller 源码）：
+
+| Method | Path | 说明 |
+|--------|------|------|
+| POST | `/supplier-detail/analyze-risk/{id}` | 同步调 DeepSeek，解析 JSON，落库，返全字段 `RiskAnalysis` |
+| GET | `/supplier-detail/risk-history/{id}` | 历史分析记录（按 `analyzedAt` 倒序） |
 
 ---
 
@@ -31,9 +40,7 @@
 
 ### 1.1 统一响应结构（Result）
 
-所有业务端点（演示/邮件除外）统一返回 `Result<T>` 包装结构Fastjson2 自动
-序列化实体类为 JSON：
-
+所有业务端点统一返回 `Result<T>`：
 
 ```json
 {
@@ -44,45 +51,41 @@
 ```
 
 | 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `code` | Integer | 业务状态码，详见 §1.2 |
-| `message` | String | 文字消息（前端可直接展示） |
-| `data` | T（泛型） | 业务数据载荷，无数据时为 `null` |
+|------|------|------|
+| `code` | Integer | 业务状态码（见 §1.2） |
+| `message` | String | 文字消息 |
+| `data` | T | 业务数据，无数据时为 `null` |
 
-**data 类型与端点对应**：
+`data` 类型与端点对应：
 
-| 端点类型 | data 类型 | 备注 |
-| --- | --- | --- |
-| 创建 | `Entity` | 含自增 ID |
-| 查询（按主键） | `Entity` 或 `null`（404） | |
-| 部分更新 | `Diff<Entity>` | 见 §1.3 |
-| 删除 | `null` | |
-| 列表查询 | `PageInfo<Entity>` | 见 §1.5 |
-| 批量删除 | `List<Entity>` | 实际删除的实体列表（见 §1.4） |
+| 端点类型 | data 类型 |
+|---------|----------|
+| 创建 / 查询 | `Entity` |
+| 部分更新（PATCH） | `Diff<Entity>` |
+| 删除 | `null` |
+| 列表查询 | `PageInfo<Entity>` |
+| 批量删除 | `List<Entity>`（实际删除的实体列表） |
+
+**邮件端点**（`/send-email`、`/send-notification`）**不**返回 `Result<T>`，直接返回字符串。
 
 ### 1.2 业务状态码
 
 | code | 含义 | 触发场景 |
-| --- | --- | --- |
+|------|------|----------|
 | 200 | 成功 | 业务正常完成 |
-| 400 | 参数错误 | 分页参数错误、`@NotBlank`/`@Size` 校验失败等 |
+| 400 | 参数错误 | 分页参数错误 / `@Valid` 校验失败 |
 | 404 | 资源不存在 | 按主键查询/更新/删除时记录不存在 |
-| 500 | 服务器内部错误 | 异常未捕获（`GlobalExceptionHandler` 已统一处理） |
+| 500 | 服务器内部错误 | 异常未捕获（`GlobalExceptionHandler` 统一处理） |
 
-> 邮件端点（`/send-email`、`/send-notification`）**不**返回 `Result<T>`，直接返回字符串或 void（详见各端点章节）。
+### 1.3 PATCH 语义
 
-### 1.3 PATCH 语义（部分更新）
-
-`PATCH /{resource}/{id}` 端点遵循 RFC 5789 语义：
-
-- 调用方传哪些字段就更新哪些字段
+`PATCH /{resource}/{id}` 遵循 RFC 5789：
+- 传哪些字段就更新哪些字段
 - 未传的字段（`null`）在 DB 中保持原值
 - 由 XML 动态 SQL（`<set> + <if test="xxx != null">`）实现
-- **不**支持"将某字段置空"（与 PATCH 标准限制一致）
-- 响应 `data` 为 `Diff<Entity>` 包装，含 `before`（DB 原值）与 `after`（更新后）
+- **不**支持"将某字段置空"
 
 **Diff 结构**：
-
 ```json
 {
   "before": { /* 字段更新前的值 */ },
@@ -90,28 +93,23 @@
 }
 ```
 
-### 1.4 批量删除约定
+### 1.4 批量删除
 
-`POST /{resource}/batch-delete` 端点：
-
-- 入参：`{ "ids": [1, 2, 3] }`（1-500 条）
-- **永远返回 200**，`data` = 实际删除的实体列表（按 DB 物理顺序）
-- 列表中**不存在**的 ID 不会出现在 `data` 中
-- 前端 diff 用法：`missing = requested.filter(id => !data.map(e => e.id).includes(id))`
-- 业务约束：单次最多 500 条（`@Size(max=500)` 校验）
-
-**注意**：批量删除**不做**事务封装、不做级联删除、不保证外键引用完整性。删除有外键引用的记录时，子表相关行会变孤儿（应用层需自行处理）。
+`POST /{resource}/batch-delete`：
+- 入参：`{ "ids": [1, 2, 3] }`（1-500 条，`@Size(max=500)` 校验）
+- **永远 200**，`data` = 实际删除的实体列表（按 DB 物理顺序）
+- 不存在的 ID 不在 `data` 中，前端 diff 自己请求的 ids 即可知道 missing
+- 单次最多 500 条
+- **不**做事务封装 / 不做级联 / 不保证外键引用完整性
 
 ### 1.5 分页约定
 
-列表查询端点（`GET /{resource}`）：
-
-- Query 参数：`pageNum`（默认 1）、`pageSize`（默认 10）、`sort`（默认见各端点）
-- `sort` 格式：PageHelper 原生格式（空格分隔），例 `"notification_id desc"`
-- 异常处理：参数错误返 `code=400, message="分页查询参数错误"`
+`GET /{resource}`：
+- Query 参数：`page`（默认 1）、`pageSize`（默认 10）、`sort`（默认见各端点）
+- `sort` 格式：PageHelper 原生（空格分隔），例 `"notification_id desc"`
+- 参数错误返 `code=400, message="分页查询参数错误"`
 
 **PageInfo 结构**（`data` 字段）：
-
 ```json
 {
   "total": 100,
@@ -124,715 +122,18 @@
 }
 ```
 
-### 1.6 时间/金额格式
+### 1.6 时间 / 金额格式
 
-| 字段类型 | 格式 | 示例 |
-| --- | --- | --- |
+| 字段类型 | JSON 格式 | 示例 |
+|---------|-----------|------|
 | 时间（DATETIME） | ISO-8601 字符串 | `"2026-06-15T14:30:00"` |
 | 金额（DECIMAL） | JSON 数字（BigDecimal 序列化） | `67500.00` |
 | 布尔（TINYINT(1)） | JSON 布尔 | `true` / `false` |
 
-### 1.7 业务操作后邮件通知（Service 层显式调用）
-
-> **历史方案（已下线）**：早期使用 AOP 切面（`@SendEmailOnSuccess` + `CrudResultEmailAspect`）拦截 Controller 返回值异步发邮件。详见 [docs/aop-execution-chain.md](aop-execution-chain.md)（已标记为 offline，仅供历史参考）。
-
-**当前方案**：由 Service 层方法显式调用 `BaseService.sendEmail(entity, targetEmail, endpoint, operation)` 发送。
-
-**触发条件**：
-- 端点业务方法正常完成（异常不触发）
-- `targetEmail` 来自 `entity.target_email`（已落库），由 `BaseService.sendEmail` 反射读取
-- `targetEmail` 为 null 或空字符串时跳过发邮件
-
-**邮件内容**（HTML 模板 `crud-email-template.html`）：
-- 操作时间（yyyy-MM-dd HH:mm:ss）
-- 执行状态（"操作类型 成功"，如 "新增 成功"）
-- 实体字段键值对（`List<Map.Entry<String, Object>>`，动态遍历）
-
-**当前已接入端点**（3 Controller 中仅 1 个）：
-- `POST /bid-handler-info/add` — 创建经办人时发送（DTO 字段 `AddRequest.targetEmail`）
-- 其他 17 个端点**未**接入邮件通知
-
-**收件人邮箱来源**：
-
-```
-targetEmail (entity.target_email 字段，已落库) → null/空 = 跳过
-```
-
-`BaseService.sendEmail` 从 Entity 字段反射读取 `targetEmail`，无需 Controller 显式传参。
-
----
-
-## 2. 服务状态接口（测试用）
-
-### 2.1 `GET /service-status`
-
-**简述**：Spring 服务存活探活，返回固定字符串
-
-**请求**：无
-
-**响应**：
-
-```
-Content-Type: text/plain;charset=UTF-8
-
-Service is up and running.
-```
-
----
-
-## 3. 邮件接口（测试用）
-
-### 3.1 `POST /send-email`
-
-**简述**：发送纯文本邮件（同步）
-
-**请求体**：JSON（raw）
-
-**请求体**（`PlainTextMailRequest`）：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `to` | String | 是 | 收件人邮箱 |
-| `subject` | String | 是 | 邮件主题 |
-| `content` | String | 是 | 邮件正文（纯文本） |
-| `from` | String | 否 | **实际无效**，发件人固定从配置 `spring.mail.username` 读取，本字段保留仅为兼容 |
-
-**响应**：
-
-```
-Content-Type: text/plain;charset=UTF-8
-
-Email sent successfully.
-```
-
-**示例**：
-
-```bash
-curl -X POST http://192.168.76.177:8080/send-email \
-  -H "Content-Type: application/json" \
-  -d '{"to":"user@example.com","subject":"测试","content":"Hello"}'
-```
-
----
-
-### 3.2 `POST /send-notification`
-
-**简述**：发送中标通知书 HTML 邮件（异步，延迟 5 秒）
-
-**请求体**：JSON（raw）
-
-**请求体**（`BidWinningMailRequest`，继承 `PlainTextMailRequest`）：
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- |----| --- |
-| `to` | String | 是  | 收件人邮箱（继承自 PlainTextMailRequest） |
-| `subject` | String | 是  | 邮件主题（继承） |
-| `content` | String | 否  | 此端点不使用，由 HTML 模板替代 |
-| `projectCode` | String | 是  | 项目编号（模板变量 `${projectCode}`） |
-| `handlerName` | String | 是  | 经办人姓名（模板变量 `${handlerName}`） |
-| `bidWinningList` | Array | 是  | 中标结果列表（模板 `th:each` 循环） |
-| `bidWinningList[].supplierName` | String | 是  | 供应商名称 |
-| `bidWinningList[].bidWinningAmount` | String | 是  | 中标价（字符串格式，如 `"67,500.00 RMB"`） |
-| `templateName` | String | 是  | 模板文件名（不含 `.html` 后缀，如 `"bid-winning-notification"`） |
-
-**响应**：
-
-```
-Content-Type: text/plain;charset=UTF-8
-
-发送成功
-```
-
-**执行流程**：
-1. 立即渲染 Thymeleaf 模板
-2. 立即返回"发送成功"（主线程不阻塞）
-3. 5 秒后异步发送邮件 + 打印 MD 格式日志
-
-**示例**：
-
-```bash
-curl -X POST http://192.168.76.177:8080/send-notification \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": "user@example.com",
-    "subject": "中标通知书",
-    "projectCode": "WB20260325017",
-    "handlerName": "张三",
-    "bidWinningList": [
-      { "supplierName": "供应商A", "bidWinningAmount": "67,500.00 RMB" },
-      { "supplierName": "供应商B", "bidWinningAmount": "83,000.00 RMB" }
-    ],
-    "templateName": "bid-winning-notification"
-  }'
-```
-
-> **注意**：模板文件必须存在于 `src/main/resources/templates/{templateName}.html`，否则抛 `IllegalArgumentException`（本端点异常不返回 `Result`，直接抛 Spring 默认 500）。
-
----
-
-## 4. 经办人（bid_handler_info）
-
-> 表单：`bid_handler_info` 
-> 主键：`handler_id`（自增 INT）
-> Controller：`BidHandlerInfoController`
-
-> **本章端点邮件通知说明**：`POST /bid-handler-info/add` 端点支持 JSON body 字段 `targetEmail` 传入通知邮件收件人；其他 5 个端点**不**发送邮件通知。详见 §1.7。
-
-### 4.1 `POST /bid-handler-info/add`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/add`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `handlerName` | Body | String | 是 | @NotBlank, @Size(max=50) | 经办人姓名 |
-| `companyName` | Body | String | 是 | @NotBlank, @Size(max=100) | 所属采购公司 |
-| `departmentName` | Body | String | 是 | @NotBlank, @Size(max=100) | 所属部门 |
-| `targetEmail` | Body | String | 否 | — | 通知邮件收件人（**已落库**）；null/空字符串 = 不发邮件 |
-
-> **注意**：`@Valid` 校验当前**未启用**（`GlobalExceptionHandler` 已补全），字段缺失不会触发 400。
-
-**调用链路**：Controller → Service → Mapper → MySQL INSERT（自增回填 handlerId）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：`Result<BidHandlerInfo>`
-
-**示例**：
-```bash
-curl -X POST http://192.168.76.177:8080/bid-handler-info/add \
-  -H "Content-Type: application/json" \
-  -d '{"handlerName":"张三","companyName":"测试公司","departmentName":"采购部"}'
-```
-
-```json
-{
-  "code": 200,
-  "message": "创建成功",
-  "data": {
-    "handlerId": 1,
-    "handlerName": "张三",
-    "companyName": "测试公司",
-    "departmentName": "采购部"
-  }
-}
-```
-
----
-
-### 4.2 `GET /bid-handler-info/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/{id}`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 经办人主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<BidHandlerInfo>`，data = 实体
-- 404：`Result<null>`，message = "记录不存在"
-
----
-
-### 4.3 `PATCH /bid-handler-info/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/{id}`
-
-**请求方式**：`PATCH`
-
-**请求体**：JSON（raw）
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `handlerName` | Body | String | 否 | @Size(max=50) | 省略/为 null = 不修改 |
-| `companyName` | Body | String | 否 | @Size(max=100) | 同上 |
-| `departmentName` | Body | String | 否 | @Size(max=100) | 同上 |
-
-**调用链路**：Controller → Service.getById（取 before）→ 构造 after → Service.update → Mapper.updateById（动态 SQL，仅 SET 非 null 字段）
-
-**技术栈**：Spring MVC / MyBatis-Plus（动态 SQL `<set><if>`）/ MySQL
-
-**响应**：
-- 200：`Result<Diff<BidHandlerInfo>>`，data = { before, after }
-- 404：记录不存在
-
-**示例**：
-```bash
-curl -X PATCH http://192.168.76.177:8080/bid-handler-info/1 \
-  -H "Content-Type: application/json" \
-  -d '{"handlerName":"李四"}'
-```
-
-```json
-{
-  "code": 200,
-  "message": "更新成功",
-  "data": {
-    "before": { "handlerId": 1, "handlerName": "张三", "companyName": "原公司", "departmentName": "原部门" },
-    "after":  { "handlerId": 1, "handlerName": "李四", "companyName": "原公司", "departmentName": "原部门" }
-  }
-}
-```
-
----
-
-### 4.4 `DELETE /bid-handler-info/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/{id}`
-
-**请求方式**：`DELETE`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 经办人主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL DELETE
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<null>`，message = "删除成功"
-- 404：记录不存在
-
----
-
-### 4.5 `GET /bid-handler-info`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info?page=1&size=3&sort=handler_id%20desc`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `page` | Query | Integer | 1 | 页码（1-based） |
-| `size` | Query | Integer | 3 | 每页条数 |
-| `sort` | Query | String | `handler_id desc` | 排序（PageHelper 原生格式，空格分隔） |
-
-**调用链路**：Controller → PageHelper.startPage（ThreadLocal）→ Service.listAll → Mapper.selectAll（PageHelper 自动加 LIMIT + COUNT）→ PageInfo 包装 → finally clearPage
-
-**技术栈**：Spring MVC / MyBatis-Plus / PageHelper / MySQL
-
-**响应**：
-- 200：`Result<PageInfo<BidHandlerInfo>>`
-- 400：分页参数错误
-
-**示例**：
-```bash
-curl "http://192.168.76.177:8080/bid-handler-info?page=1&size=3&sort=handler_id%20desc"
-```
-
-```json
-{
-  "code": 200,
-  "message": "查询成功",
-  "data": {
-    "total": 8,
-    "list": [
-      { "handlerId": 8, "handlerName": "...", "companyName": "...", "departmentName": "..." }
-    ],
-    "pageNum": 1,
-    "pageSize": 3,
-    "pages": 3,
-    "hasNextPage": true
-  }
-}
-```
-
----
-
-### 4.6 `POST /bid-handler-info/batch-delete`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-handler-info/batch-delete`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除主键 ID 列表（1-500 条） |
-
-**调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表
-
-**技术栈**：Spring MVC / MyBatis-Plus（`<foreach>` 拼接 IN）/ MySQL
-
-**响应**：
-- 200：`Result<List<BidHandlerInfo>>`，data = 实际删除的实体列表（DB 物理顺序）
-- 400：@Valid 校验失败（GlobalExceptionHandler 已启用）
-
-**示例**：
-```bash
-curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
-  -H "Content-Type: application/json" \
-  -d '{"ids":[1,2,3]}'
-```
-
-```json
-{
-  "code": 200,
-  "message": "批量删除完成",
-  "data": [
-    { "handlerId": 2, "handlerName": "李四", "companyName": "...", "departmentName": "..." }
-  ]
-}
-```
-
----
-
-## 5. 定标通知（bid_winning_notification）
-
-> 表单：`bid_winning_notification` 
-> 主键：`notification_id`（自增 INT）
-> Controller：`BidWinningNotificationController`
-
-> **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
-
-### 5.1 `POST /bid-winning-notification/add`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/add`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**（`AddRequest`，17 字段）：
-
-**必填字段（3 个）**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `handlerId` | Body | Integer | 是 | @NotNull | 经办人 ID（关联 `bid_handler_info.handler_id`） |
-| `projectNo` | Body | String | 是 | @NotBlank, @Size(max=50) | 项目编号 |
-| `purchaseTaskNo` | Body | String | 是 | @NotBlank, @Size(max=50) | 采购任务编号 |
-
-**可选字段（14 个）**：
-
-| 参数 | 位置 | 类型 | 校验 | 说明 |
-| --- | --- | --- | --- | --- |
-| `platformCategory` | Body | String | @Size(max=50) | 平台采购类别 |
-| `biddingProcess` | Body | String | @Size(max=50) | 招标流程 |
-| `biddingMethod` | Body | String | @Size(max=50) | 招标方式 |
-| `purchaseMethod` | Body | String | @Size(max=50) | 采购方式 |
-| `isFixedPrice` | Body | Boolean | — | 是否固定总价 |
-| `targetCost` | Body | BigDecimal | — | 目标成本（元） |
-| `documentFee` | Body | BigDecimal | — | 标书费 |
-| `deposit` | Body | BigDecimal | — | 保证金 |
-| `creditReportRequired` | Body | Boolean | — | 是否需要征信报告 |
-| `registrationDeadline` | Body | LocalDateTime | — | 报名截止时间 |
-| `techBidDeadline` | Body | LocalDateTime | — | 技术回标截止时间 |
-| `businessBidDeadline` | Body | LocalDateTime | — | 商务回标截止时间 |
-| `biddingStatus` | Body | String | @Size(max=20) | 状态（DB 默认 "已完成"） |
-| `notes` | Body | String | — | 备注 |
-
-> **注意**：`createdAt` 由 DB 默认 `CURRENT_TIMESTAMP` 自动维护，请求中不传。
-
-**调用链路**：Controller → Service → Mapper → MySQL INSERT（自增回填 notificationId + DB 默认 createdAt）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：`Result<BidWinningNotification>`（含自增 `notificationId` 与 `createdAt`）
-
----
-
-### 5.2 `GET /bid-winning-notification/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/{id}`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 定标通知主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<BidWinningNotification>`
-- 404：记录不存在
-
----
-
-### 5.3 `PATCH /bid-winning-notification/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/{id}`
-
-**请求方式**：`PATCH`
-
-**请求体**：JSON（raw）
-
-**请求参数**（`BidWinningNotificationUpdateRequest`，17 字段全部可选）：
-
-17 字段结构同 §5.1，**全部**仅含 `@Size` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
-
-> **排除**：`notificationId`（由路径传入）、`createdAt`（DB 维护，结构上不可改）
-
-**调用链路**：Controller → Service.getById（取 before）→ 构造 after → Service.update → Mapper.updateById（动态 SQL，仅 SET 非 null 字段）
-
-**技术栈**：Spring MVC / MyBatis-Plus（动态 SQL `<set><if>`）/ MySQL
-
-**响应**：
-- 200：`Result<Diff<BidWinningNotification>>`
-- 404：记录不存在
-
----
-
-### 5.4 `DELETE /bid-winning-notification/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/{id}`
-
-**请求方式**：`DELETE`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 定标通知主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL DELETE
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<null>`，message = "删除成功"
-- 404：记录不存在
-
----
-
-### 5.5 `GET /bid-winning-notification`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification?pageNum=1&pageSize=10&sort=notification_id%20desc`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `pageNum` | Query | Integer | 1 | 页码 |
-| `pageSize` | Query | Integer | 10 | 每页条数 |
-| `sort` | Query | String | `notification_id desc` | 排序 |
-
-**调用链路**：Controller → PageHelper.startPage → Service.listAll → Mapper.selectAll（PageHelper 加 LIMIT + COUNT）→ PageInfo 包装 → finally clearPage
-
-**技术栈**：Spring MVC / MyBatis-Plus / PageHelper / MySQL
-
-**响应**：
-- 200：`Result<PageInfo<BidWinningNotification>>`
-- 400：分页参数错误
-
----
-
-### 5.6 `POST /bid-winning-notification/batch-delete`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-notification/batch-delete`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除 `notification_id` 列表 |
-
-**调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表
-
-**技术栈**：Spring MVC / MyBatis-Plus（`<foreach>` 拼接 IN）/ MySQL
-
-**响应**：
-- 200：`Result<List<BidWinningNotification>>`，data = 实际删除的实体列表
-
-> **逻辑外键警告**：`bid_winning_supplier_detail.notification_id` 是逻辑外键（DB 无 FK 约束）。删除本表后，明细行会变孤儿，应用层需自行处理。
-
----
-
-## 6. 中标结果明细（bid_winning_supplier_detail）
-
-> 表单：`bid_winning_supplier_detail` 表
-> 主键：`detail_id`（自增 INT）
-> Controller：`BidWinningSupplierDetailController`
-
-> **本章端点邮件通知说明**：本章 6 个端点**当前均不**发送邮件通知。详见 §1.7。
-
-### 6.1 `POST /add-bid-winning-supplier-detail`
-
-**完整请求路径**：`http://192.168.76.177:8080/add-bid-winning-supplier-detail`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**（`AddRequest`，3 字段）：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `notificationId` | Body | Integer | 是 | @NotNull | 定标通知 ID（关联 `bid_winning_notification.notification_id`） |
-| `supplierName` | Body | String | 是 | @NotBlank, @Size(max=100) | 中标供应商名称 |
-| `amount` | Body | BigDecimal | 是 | @NotNull | 中标价（元） |
-
-**调用链路**：Controller → Service → Mapper → MySQL INSERT（自增回填 detailId）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：`Result<BidWinningSupplierDetail>`（含自增 `detailId`）
-
----
-
-### 6.2 `GET /bid-winning-supplier-detail/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-supplier-detail/{id}`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 明细主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL SELECT（PK 索引）
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<BidWinningSupplierDetail>`
-- 404：记录不存在
-
----
-
-### 6.3 `PATCH /bid-winning-supplier-detail/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-supplier-detail/{id}`
-
-**请求方式**：`PATCH`
-
-**请求体**：JSON（raw）
-
-**请求参数**（`BidWinningSupplierDetailUpdateRequest`，3 字段全部可选）：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `notificationId` | Body | Integer | 否 | — | 省略/为 null = 不修改 |
-| `supplierName` | Body | String | 否 | @Size(max=100) | 同上 |
-| `amount` | Body | BigDecimal | 否 | — | 同上 |
-
-**调用链路**：Controller → Service.getById（取 before）→ 构造 after → Service.update → Mapper.updateById（动态 SQL，仅 SET 非 null 字段）
-
-**技术栈**：Spring MVC / MyBatis-Plus（动态 SQL `<set><if>`）/ MySQL
-
-**响应**：
-- 200：`Result<Diff<BidWinningSupplierDetail>>`
-- 404：记录不存在
-
----
-
-### 6.4 `DELETE /bid-winning-supplier-detail/{id}`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-supplier-detail/{id}`
-
-**请求方式**：`DELETE`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | Path | Integer | 是 | 明细主键 ID |
-
-**调用链路**：Controller → Service → Mapper → MySQL DELETE
-
-**技术栈**：Spring MVC / MyBatis-Plus / MySQL
-
-**响应**：
-- 200：`Result<null>`，message = "删除成功"
-- 404：记录不存在
-
----
-
-### 6.5 `GET /bid-winning-supplier-detail`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-supplier-detail?pageNum=1&pageSize=10&sort=detail_id%20desc`
-
-**请求方式**：`GET`
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `pageNum` | Query | Integer | 1 | 页码 |
-| `pageSize` | Query | Integer | 10 | 每页条数 |
-| `sort` | Query | String | `detail_id desc` | 排序 |
-
-**调用链路**：Controller → PageHelper.startPage → Service.listAll → Mapper.selectAll（PageHelper 加 LIMIT + COUNT）→ PageInfo 包装 → finally clearPage
-
-**技术栈**：Spring MVC / MyBatis-Plus / PageHelper / MySQL
-
-**响应**：
-- 200：`Result<PageInfo<BidWinningSupplierDetail>>`
-- 400：分页参数错误
-
----
-
-### 6.6 `POST /bid-winning-supplier-detail/batch-delete`
-
-**完整请求路径**：`http://192.168.76.177:8080/bid-winning-supplier-detail/batch-delete`
-
-**请求方式**：`POST`
-
-**请求体**：JSON（raw）
-
-**请求参数**：
-
-| 参数 | 位置 | 类型 | 必填 | 校验 | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `ids` | Body | Array\<Integer\> | 是 | @NotEmpty, @Size(max=500) | 待删除 `detail_id` 列表 |
-
-**调用链路**：Controller → Service.selectByIds（查存在行）→ Service.deleteByIds（删存在行）→ 返实际删除的实体列表
-
-**技术栈**：Spring MVC / MyBatis-Plus（`<foreach>` 拼接 IN）/ MySQL
-
-**响应**：
-- 200：`Result<List<BidWinningSupplierDetail>>`，data = 实际删除的实体列表
-
----
-
-## 附录 A：业务码速查
-
-| code | 触发条件 |
-| --- | --- |
-| 200 | 业务正常完成 |
-| 400 | 参数校验失败 / 分页参数错误 |
-| 404 | 按主键查询/更新/删除时记录不存在 |
-
-## 附录 B：字段类型映射
+### 1.7 字段类型映射
 
 | Java 类型 | JSON 类型 | 适用字段 |
-| --- | --- | --- |
+|----------|----------|---------|
 | String | string | 姓名、编号、文本 |
 | Integer | number | 主键 ID、外键 ID |
 | BigDecimal | number | 金额、成本、保证金 |
@@ -840,10 +141,340 @@ curl -X POST http://192.168.76.177:8080/bid-handler-info/batch-delete \
 | LocalDateTime | string (ISO-8601) | 截止时间、创建时间 |
 | List | array | 中标结果列表、批量删除 ID 列表 |
 
-## 附录 C：与内部文档的索引
+### 1.8 业务操作后邮件通知
 
-- 内部架构：[architecture.md](architecture.md)
-- 数据库表结构：[database.md](database.md)
-- 开发流程（含 7 层链路）：[development-flow.md](development-flow.md)
+> 历史方案（AOP 切面）已废弃。当前由 Service 层显式调用 `BaseService.sendEmail`。
 
+| 端点 | 触发 | 收件人来源 |
+|------|------|----------|
+| `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库） |
+| 其他 17 个端点 | — | 未发送 |
 
+`targetEmail` 为 null/空时跳过发邮件。详见 [architecture.md §8](architecture.md#8-邮件通知service-层-baseservicesendemail)。
+
+---
+
+## 2. 服务状态 + 邮件测试（StatusCheckController）
+
+### 2.1 `GET /service-status`
+
+Spring 服务存活探活，返回固定字符串。
+
+```
+Service is up and running.
+```
+
+### 2.2 `POST /send-email`
+
+发送纯文本邮件（同步）。
+
+**请求体**（`PlainTextMailRequest`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `to` | String | ✅ | 收件人邮箱 |
+| `subject` | String | ✅ | 邮件主题 |
+| `content` | String | ✅ | 邮件正文（纯文本） |
+| `from` | String | ❌ | **实际无效**，发件人固定从配置 `spring.mail.username` 读取 |
+
+**响应**：`Email sent successfully.`
+
+```bash
+curl -X POST http://{host}:{port}/send-email \
+  -H "Content-Type: application/json" \
+  -d '{"to":"user@example.com","subject":"测试","content":"Hello"}'
+```
+
+### 2.3 `POST /send-notification`
+
+发送中标通知书 HTML 邮件（异步，延迟 5 秒）。
+
+**请求体**（`BidWinningMailRequest`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `to` | String | ✅ | 收件人（继承自 `PlainTextMailRequest`） |
+| `subject` | String | ✅ | 邮件主题（继承） |
+| `projectCode` | String | ✅ | 项目编号（模板变量） |
+| `handlerName` | String | ✅ | 经办人姓名（模板变量） |
+| `bidWinningList` | Array | ✅ | 中标结果列表（模板 `th:each` 循环） |
+| `bidWinningList[].supplierName` | String | ✅ | 供应商名称 |
+| `bidWinningList[].bidWinningAmount` | String | ✅ | 中标价 |
+| `templateName` | String | ✅ | 模板文件名（不含 `.html`） |
+
+**响应**：`发送成功`（主线程立即返回，邮件后台异步发送）。
+
+> 模板文件必须存在于 `src/main/resources/templates/{templateName}.html`，否则抛 `IllegalArgumentException`。
+
+```bash
+curl -X POST http://{host}:{port}/send-notification \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "user@example.com",
+    "subject": "中标通知书",
+    "projectCode": "PROJ001",
+    "handlerName": "张三",
+    "templateName": "bid-winning-notification",
+    "bidWinningList": [
+      { "supplierName": "A供应商", "bidWinningAmount": "67500.00" }
+    ]
+  }'
+```
+
+---
+
+## 3. 经办人（BidHandlerInfo）
+
+对应表 `bid_handler_info`，主键 `handler_id`。
+
+| Method | Path | 用途 | 返回 |
+|--------|------|------|------|
+| POST | `/bid-handler-info/add` | 创建 | `Result<BidHandlerInfo>` |
+| GET | `/bid-handler-info/{id}` | 按主键查询 | `Result<BidHandlerInfo>` |
+| PATCH | `/bid-handler-info/{id}` | 按主键部分更新 | `Result<Diff<BidHandlerInfo>>` |
+| DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/bid-handler-info` | 列表查询（分页） | `Result<PageInfo<BidHandlerInfo>>` |
+| POST | `/bid-handler-info/batch-delete` | 批量删除 | `Result<List<BidHandlerInfo>>` |
+
+### 3.1 `POST /bid-handler-info/add`
+
+**请求体**（`AddRequest`，3 字段必填 + 通知邮件收件人）：
+
+| 字段 | 类型 | 校验 | 说明 |
+|------|------|------|------|
+| `handlerName` | String | @NotBlank, @Size(max=50) | 经办人姓名 |
+| `companyName` | String | @NotBlank, @Size(max=100) | 所属采购公司 |
+| `departmentName` | String | @NotBlank, @Size(max=100) | 所属部门 |
+| `targetEmail` | String | @NotBlank, @Size(max=255) | 通知邮件收件人（已落库） |
+
+```bash
+curl -X POST http://{host}:{port}/bid-handler-info/add \
+  -H "Content-Type: application/json" \
+  -d '{"handlerName":"张三","companyName":"测试公司","departmentName":"采购部","targetEmail":"zhang@example.com"}'
+```
+
+### 3.2 `GET /bid-handler-info/{id}`
+
+| Path 参数 | 类型 | 必填 |
+|----------|------|:---:|
+| `id` | Integer | ✅ |
+
+返回 200 + 实体 或 404 + null。
+
+### 3.3 `PATCH /bid-handler-info/{id}`
+
+**请求体**（`UpdateRequest`，PATCH 风格，全部可选）：
+
+| 字段 | 类型 | 校验 | 说明 |
+|------|------|------|------|
+| `handlerName` | String | @Size(max=50) | null = 不修改 |
+| `companyName` | String | @Size(max=100) | 同上 |
+| `departmentName` | String | @Size(max=100) | 同上 |
+
+```bash
+curl -X PATCH http://{host}:{port}/bid-handler-info/1 \
+  -H "Content-Type: application/json" \
+  -d '{"handlerName":"李四"}'
+```
+
+### 3.4 `DELETE /bid-handler-info/{id}`
+
+返回 200 + null 或 404 + null。
+
+### 3.5 `GET /bid-handler-info`
+
+| Query | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `page` | Integer | 1 | 页码 |
+| `pageSize` | Integer | 3 | 每页条数 |
+| `sort` | String | `handler_id desc` | 排序 |
+
+```bash
+curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%20desc"
+```
+
+### 3.6 `POST /bid-handler-info/batch-delete`
+
+**请求体**（`DeleteRequest`）：
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+返回 200 + 实际删除的实体列表。
+
+---
+
+## 4. 定标通知（BidWinningNotification）
+
+对应表 `bid_winning_notification`，主键 `notification_id`。
+
+| Method | Path | 用途 | 返回 |
+|--------|------|------|------|
+| POST | `/bid-winning-notification/add` | 创建 | `Result<BidWinningNotification>` |
+| GET | `/bid-winning-notification/{id}` | 按主键查询 | `Result<BidWinningNotification>` |
+| PATCH | `/bid-winning-notification/{id}` | 部分更新（17 字段） | `Result<Diff<BidWinningNotification>>` |
+| DELETE | `/bid-winning-notification/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/bid-winning-notification` | 列表查询（分页） | `Result<PageInfo<BidWinningNotification>>` |
+| POST | `/bid-winning-notification/batch-delete` | 批量删除 | `Result<List<BidWinningNotification>>` |
+
+### 4.1 `POST /bid-winning-notification/add`
+
+**请求体**（`AddRequest`，17 字段：3 必填 + 14 可选）：
+
+**必填（3 字段）**：
+
+| 字段 | 类型 | 校验 |
+|------|------|------|
+| `handlerId` | Integer | @NotNull |
+| `projectNo` | String | @NotBlank, @Size(max=50) |
+| `purchaseTaskNo` | String | @NotBlank, @Size(max=50) |
+
+**可选（14 字段）**：
+
+| 字段 | 类型 | 校验 |
+|------|------|------|
+| `platformCategory` | String | @Size(max=50) |
+| `biddingProcess` | String | @Size(max=50) |
+| `biddingMethod` | String | @Size(max=50) |
+| `purchaseMethod` | String | @Size(max=50) |
+| `isFixedPrice` | Boolean | — |
+| `targetCost` | BigDecimal | — |
+| `documentFee` | BigDecimal | — |
+| `deposit` | BigDecimal | — |
+| `creditReportRequired` | Boolean | — |
+| `registrationDeadline` | LocalDateTime | — |
+| `techBidDeadline` | LocalDateTime | — |
+| `businessBidDeadline` | LocalDateTime | — |
+| `biddingStatus` | String | @Size(max=20) |
+| `notes` | String | — |
+
+> `createdAt` 由 DB 默认 `CURRENT_TIMESTAMP` 自动维护。
+
+```bash
+curl -X POST http://{host}:{port}/bid-winning-notification/add \
+  -H "Content-Type: application/json" \
+  -d '{"handlerId":1,"projectNo":"PRJ-001","purchaseTaskNo":"PT-001"}'
+```
+
+### 4.2 `GET /bid-winning-notification/{id}`
+
+返回 200 + 实体 或 404 + null。
+
+### 4.3 `PATCH /bid-winning-notification/{id}`
+
+**请求体**（`UpdateRequest`，17 字段全可选，仅 `@Size` 校验）：
+
+17 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
+
+> 排除：`notificationId`（由路径传入）、`createdAt`（DB 维护）。
+
+```bash
+curl -X PATCH http://{host}:{port}/bid-winning-notification/1 \
+  -H "Content-Type: application/json" \
+  -d '{"biddingStatus":"已完成"}'
+```
+
+### 4.4 `DELETE /bid-winning-notification/{id}`
+
+> ⚠️ **逻辑外键警告**：`supplier_detail.notification_id` 是逻辑外键（DB 无 FK 约束），删除本表后明细行可能变孤儿，应用层自行处理。
+
+### 4.5 `GET /bid-winning-notification`
+
+| Query | 类型 | 默认 |
+|------|------|------|
+| `page` | Integer | 1 |
+| `pageSize` | Integer | 10 |
+| `sort` | String | `notification_id desc` |
+
+### 4.6 `POST /bid-winning-notification/batch-delete`
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+---
+
+## 5. 供应商明细（SupplierDetail）
+
+对应表 `supplier_detail`，主键 `supplier_id`。
+
+| Method | Path | 用途 | 返回 |
+|--------|------|------|------|
+| POST | `/add-supplier-detail` | 创建 | `Result<SupplierDetail>` |
+| GET | `/supplier-detail/{id}` | 按主键查询 | `Result<SupplierDetail>` |
+| PATCH | `/supplier-detail/{id}` | 部分更新 | `Result<Diff<SupplierDetail>>` |
+| DELETE | `/supplier-detail/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/supplier-detail` | 列表查询（分页） | `Result<PageInfo<SupplierDetail>>` |
+| POST | `/supplier-detail/batch-delete` | 批量删除 | `Result<List<SupplierDetail>>` |
+
+### 5.1 `POST /add-supplier-detail`
+
+**请求体**（`AddRequest`，3 字段必填）：
+
+| 字段 | 类型 | 校验 |
+|------|------|------|
+| `supplierName` | String | @NotBlank, @Size(max=100) |
+| `quotePrice` | BigDecimal | @NotNull |
+| `supplierContact` | String | @NotBlank, @Size(max=255) |
+
+```bash
+curl -X POST http://{host}:{port}/add-supplier-detail \
+  -H "Content-Type: application/json" \
+  -d '{"supplierName":"ABC公司","quotePrice":1234567.89,"supplierContact":"abc@example.com"}'
+```
+
+### 5.2 `GET /supplier-detail/{id}`
+
+返回 200 + 实体 或 404 + null。
+
+### 5.3 `PATCH /supplier-detail/{id}`
+
+**请求体**（`UpdateRequest`，3 字段全可选）：
+
+| 字段 | 类型 | 校验 |
+|------|------|------|
+| `supplierName` | String | @Size(max=100) |
+| `quotePrice` | BigDecimal | — |
+| `supplierContact` | String | @Size(max=255) |
+
+```bash
+curl -X PATCH http://{host}:{port}/supplier-detail/1 \
+  -H "Content-Type: application/json" \
+  -d '{"quotePrice":999999.99}'
+```
+
+### 5.4 `DELETE /supplier-detail/{id}`
+
+返回 200 + null 或 404 + null。
+
+### 5.5 `GET /supplier-detail`
+
+| Query | 类型 | 默认 |
+|------|------|------|
+| `page` | Integer | 1 |
+| `pageSize` | Integer | 10 |
+| `sort` | String | `supplier_id desc` |
+
+### 5.6 `POST /supplier-detail/batch-delete`
+
+```json
+{ "ids": [1, 2, 3] }
+```
+
+---
+
+## 附录 A：业务码速查
+
+| code | 触发条件 |
+|------|----------|
+| 200 | 业务正常完成 |
+| 400 | 参数校验失败 / 分页参数错误 |
+| 404 | 按主键查询/更新/删除时记录不存在 |
+| 500 | 异常未捕获（`GlobalExceptionHandler` 统一处理） |
+
+## 附录 B：相关文档
+
+- 内部架构：[`docs/architecture.md`](architecture.md)
+- 数据库结构：[`docs/database.md`](database.md)
+- 项目约定：[`AGENTS.md`](../AGENTS.md)
