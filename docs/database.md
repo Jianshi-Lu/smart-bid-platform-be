@@ -18,8 +18,8 @@
            │ 1:N（逻辑外键）
            ▼
 ┌────────────────────────────────────────┐
-│ bid_winning_notification (V4)          │  定标通知主表
-│  ├─ notification_id PK                │
+│ tender_notice (V4)          │  定标通知主表
+│  ├─ notice_id PK                │
 │  ├─ handler_id (FK)                    │
 │  ├─ project_no / purchase_task_no      │
 │  ├─ 招标规则（流程/方式/采购方式等）  │
@@ -72,11 +72,11 @@
 
 **演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V6（加 `target_email`）
 
-### 2.2 `bid_winning_notification`（定标通知）
+### 2.2 `tender_notice`（定标通知）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
-| `notification_id` | INT | ✅ | 主键，自增 |
+| `notice_id` | INT | ✅ | 主键，自增 |
 | `handler_id` | INT | ✅ | 逻辑外键 → `bid_handler_info.handler_id` |
 | `project_no` | VARCHAR(50) | ✅ | 项目编号 |
 | `purchase_task_no` | VARCHAR(50) | ✅ | 采购任务编号 |
@@ -97,7 +97,7 @@
 | `created_at` | DATETIME | ✅ | 创建时间（默认 CURRENT_TIMESTAMP） |
 | `target_email` | VARCHAR(255) | ❌ | 通知邮件收件人（V6+，已落库） |
 
-**索引**：PK（notification_id） + `idx_staff_id`（handler_id）
+**索引**：PK（notice_id） + `idx_staff_id`（handler_id）
 
 **演进**：V4（创建）→ V6（加 `target_email`）
 
@@ -116,7 +116,7 @@
 - V5（创建 `bid_winning_supplier_detail`，4 字段含 `detail_id` / `notification_id` / `supplier_name` / `amount` / `target_email`）
 - V10（重命名 `supplier_detail`；`detail_id` → `supplier_id`；`amount` → `quote_price`；`target_email` → `supplier_contact`；删除 `notification_id` 字段）
 
-> ⚠️ V10 删除了 `notification_id` 后，`supplier_detail` 与 `bid_winning_notification` 的关联断开。背景模块未来需重新建立关联。
+> ⚠️ V10 删除了 `notification_id` 后，`supplier_detail` 与 `tender_notice` 的关联断开。背景模块未来需重新建立关联。
 
 ### 2.4 `risk_analysis`（AI 风险分析结果）
 
@@ -155,7 +155,7 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | V1 | `V1__create_handler_info.sql` | 创建 `handler_info` 表 |
 | V2 | `V2__update_handler_info_structure.sql` | 加 `company_name` / `department_name` |
 | V3 | `V3__update_handler_info_to_bid_handler_info.sql` | 重命名为 `bid_handler_info` |
-| V4 | `V4__create_bid_winning_notification.sql` | 创建 `bid_winning_notification` |
+| V4 | `V4__create_tender_notice.sql` | 创建 `tender_notice` |
 | V5 | `V5__create_bid_winning_supplier_detail.sql` | 创建 `bid_winning_supplier_detail` |
 | V6 | `V6__add_target_email.sql` | 三个业务表加 `target_email` |
 | V7 | `V7__create_bid_winning_risk_analysis.sql` | 创建 `bid_winning_risk_analysis` |
@@ -163,8 +163,9 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | V9 | `V9__simplify_risk_analysis_and_rename_detail_id.sql` | 精简字段；`detail_id` → `supplier_id` |
 | V10 | `V10__restructure_supplier_detail.sql` | 重构 `supplier_detail` |
 | V11 | `V11__change_raw_response_to_json.sql` | `raw_response` 改 JSON |
+| V12 | `V12__rename_to_tender_notice.sql` | 重命名 `tender_notice` + `notice_id` |
 
-**执行顺序**：V1 → V2 → ... → V11
+**执行顺序**：V1 → V2 → ... → V12
 
 ---
 
@@ -173,7 +174,7 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | Java Entity | 数据库表 | 主键 | 主键 Java 字段 |
 |-------------|----------|------|----------------|
 | `BidHandlerInfo` | `bid_handler_info` | `handler_id` | `handlerId` |
-| `BidWinningNotification` | `bid_winning_notification` | `notification_id` | `notificationId` |
+| `TenderNotice` | `tender_notice` | `notice_id` | `noticeId` |
 | `SupplierDetail` | `supplier_detail` | `supplier_id` | `supplierId` |
 | `RiskAnalysis` | `risk_analysis` | `analysis_id` | `analysisId` |
 
@@ -187,9 +188,9 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）基本�
 
 | Entity 字段 | DTO 字段 | DB 字段 | 备注 |
 |------------|----------|---------|------|
-| `BidWinningNotification.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` | DTO 跨实体复用（mail 模板） |
-| `BidWinningNotification.handlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念）| `handler_id` | mail 模板只需名字 |
+| `TenderNotice.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` | DTO 跨实体复用（mail 模板） |
+| `TenderNotice.handlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念）| `handler_id` | mail 模板只需名字 |
 | `SupplierDetail.supplierName` | `BidWinningListItem.supplierName` | `supplier_name` | 中标结果项 |
 | `SupplierDetail.quotePrice` | `BidWinningListItem.bidWinningAmount` | `quote_price` | 中标结果项 |
 
-差异源自 `BidWinningMailRequest` 跨实体复用 mail 模板（`templates/bid-winning-notification.html`），不影响业务 Service。
+差异源自 `BidWinningMailRequest` 跨实体复用 mail 模板（`templates/tender-notice.html`），不影响业务 Service。

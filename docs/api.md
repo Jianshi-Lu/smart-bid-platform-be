@@ -23,7 +23,7 @@
 |------|:---:|---------|
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 经办人 (BidHandlerInfo) | 6 | `/bid-handler-info/...` |
-| 定标通知 (BidWinningNotification) | 6 | `/bid-winning-notification/...` |
+| 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
 | 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
 | **AI 风险分析**（v0.1+） | 2 | `/supplier-detail/{action}/{id}` |
 
@@ -106,7 +106,7 @@
 
 `GET /{resource}`：
 - Query 参数：`page`（默认 1）、`pageSize`（默认 10）、`sort`（默认见各端点）
-- `sort` 格式：PageHelper 原生（空格分隔），例 `"notification_id desc"`
+- `sort` 格式：PageHelper 原生（空格分隔），例 `"notice_id desc"`
 - 参数错误返 `code=400, message="分页查询参数错误"`
 
 **PageInfo 结构**（`data` 字段）：
@@ -214,7 +214,7 @@ curl -X POST http://{host}:{port}/send-notification \
     "subject": "中标通知书",
     "projectCode": "PROJ001",
     "handlerName": "张三",
-    "templateName": "bid-winning-notification",
+    "templateName": "tender-notice",
     "bidWinningList": [
       { "supplierName": "A供应商", "bidWinningAmount": "67500.00" }
     ]
@@ -305,20 +305,20 @@ curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%2
 
 ---
 
-## 4. 定标通知（BidWinningNotification）
+## 4. 定标通知（TenderNotice）
 
-对应表 `bid_winning_notification`，主键 `notification_id`。
+对应表 `tender_notice`，主键 `notice_id`。
 
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
-| POST | `/bid-winning-notification/add` | 创建 | `Result<BidWinningNotification>` |
-| GET | `/bid-winning-notification/{id}` | 按主键查询 | `Result<BidWinningNotification>` |
-| PATCH | `/bid-winning-notification/{id}` | 部分更新（17 字段） | `Result<Diff<BidWinningNotification>>` |
-| DELETE | `/bid-winning-notification/{id}` | 按主键删除 | `Result<Void>` |
-| GET | `/bid-winning-notification` | 列表查询（分页） | `Result<PageInfo<BidWinningNotification>>` |
-| POST | `/bid-winning-notification/batch-delete` | 批量删除 | `Result<List<BidWinningNotification>>` |
+| POST | `/tender-notice/add` | 创建 | `Result<TenderNotice>` |
+| GET | `/tender-notice/{id}` | 按主键查询 | `Result<TenderNotice>` |
+| PATCH | `/tender-notice/{id}` | 部分更新（17 字段） | `Result<Diff<TenderNotice>>` |
+| DELETE | `/tender-notice/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/tender-notice` | 列表查询（分页） | `Result<PageInfo<TenderNotice>>` |
+| POST | `/tender-notice/batch-delete` | 批量删除 | `Result<List<TenderNotice>>` |
 
-### 4.1 `POST /bid-winning-notification/add`
+### 4.1 `POST /tender-notice/add`
 
 **请求体**（`AddRequest`，17 字段：3 必填 + 14 可选）：
 
@@ -352,42 +352,42 @@ curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%2
 > `createdAt` 由 DB 默认 `CURRENT_TIMESTAMP` 自动维护。
 
 ```bash
-curl -X POST http://{host}:{port}/bid-winning-notification/add \
+curl -X POST http://{host}:{port}/tender-notice/add \
   -H "Content-Type: application/json" \
   -d '{"handlerId":1,"projectNo":"PRJ-001","purchaseTaskNo":"PT-001"}'
 ```
 
-### 4.2 `GET /bid-winning-notification/{id}`
+### 4.2 `GET /tender-notice/{id}`
 
 返回 200 + 实体 或 404 + null。
 
-### 4.3 `PATCH /bid-winning-notification/{id}`
+### 4.3 `PATCH /tender-notice/{id}`
 
 **请求体**（`UpdateRequest`，17 字段全可选，仅 `@Size` 校验）：
 
 17 字段结构同 §4.1，全部仅含 `@Size(max=...)` 校验（无 `@NotBlank` / `@NotNull`），PATCH 语义下 null = 不修改。
 
-> 排除：`notificationId`（由路径传入）、`createdAt`（DB 维护）。
+> 排除：`noticeId`（由路径传入）、`createdAt`（DB 维护）。
 
 ```bash
-curl -X PATCH http://{host}:{port}/bid-winning-notification/1 \
+curl -X PATCH http://{host}:{port}/tender-notice/1 \
   -H "Content-Type: application/json" \
   -d '{"biddingStatus":"已完成"}'
 ```
 
-### 4.4 `DELETE /bid-winning-notification/{id}`
+### 4.4 `DELETE /tender-notice/{id}`
 
-> ⚠️ **逻辑外键警告**：`supplier_detail.notification_id` 是逻辑外键（DB 无 FK 约束），删除本表后明细行可能变孤儿，应用层自行处理。
+> ⚠️ **逻辑外键警告**：`supplier_detail.notice_id` 是逻辑外键（DB 无 FK 约束），删除本表后明细行可能变孤儿，应用层自行处理。
 
-### 4.5 `GET /bid-winning-notification`
+### 4.5 `GET /tender-notice`
 
 | Query | 类型 | 默认 |
 |------|------|------|
 | `page` | Integer | 1 |
 | `pageSize` | Integer | 10 |
-| `sort` | String | `notification_id desc` |
+| `sort` | String | `notice_id desc` |
 
-### 4.6 `POST /bid-winning-notification/batch-delete`
+### 4.6 `POST /tender-notice/batch-delete`
 
 ```json
 { "ids": [1, 2, 3] }

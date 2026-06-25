@@ -33,7 +33,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 ├── dto/                                    # 按业务模块分包
 │   └── common/                             # Result / Diff
-├── entity/                                 # BidHandlerInfo / BidWinningNotification / SupplierDetail / RiskAnalysis
+├── entity/                                 # BidHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
 ├── mapper/                                 # @Mapper 接口，extends BaseMapper
 ├── service/                                # BaseService + 各业务模块
 │   ├── mail/                               # MailService
@@ -115,7 +115,7 @@ src/main/resources/
 | 模块 | 端点数 | 路径前缀 |
 |------|:---:|------|
 | 经办人 (BidHandlerInfo) | 6 | `/bid-handler-info/...` |
-| 定标通知 (BidWinningNotification) | 6 | `/bid-winning-notification/...` |
+| 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
 | 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
 | **AI 风险分析** | 2 | `/supplier-detail/{action}/{id}` |
 
@@ -234,7 +234,7 @@ src/main/resources/
 | 业务状态码 | 200=成功, 400=参数错误, 404=资源不存在 |
 | 注入方式 | `jakarta.annotation.Resource`（field 注入） |
 | 全局异常处理 | `GlobalExceptionHandler` 统一捕获，返回 `Result` 包装 |
-| 外键 | `handler_id` / `notification_id` 为**逻辑外键**，DB 层不强制 FK 约束 |
+| 外键 | `handler_id` / `notice_id` 为**逻辑外键**，DB 层不强制 FK 约束 |
 | Flyway | **未**启用，仅借用 V*.sql 命名 |
 | JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类**不可**叫 `MailSender`（会冲突） |

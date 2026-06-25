@@ -45,7 +45,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 │   ├── SupplierDetailController.java       # 供应商明细（6 端点 + 2 AI 风险分析）
 │   ├── BidHandlerInfoController.java       # 经办人（6 端点）
-│   ├── BidWinningNotificationController.java  # 定标通知（6 端点）
+│   ├── TenderNoticeController.java  # 定标通知（6 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── dto/                                    # 按业务模块分包
@@ -54,13 +54,13 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── bidwinningnotification/             # 同上
 │   ├── supplierdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 4 实体：BidHandlerInfo / BidWinningNotification / SupplierDetail / RiskAnalysis
+├── entity/                                 # 4 实体：BidHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
 ├── mapper/                                 # @Mapper 接口 extends BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
 │   ├── SupplierDetailService.java
 │   ├── BidHandlerInfoService.java
-│   ├── BidWinningNotificationService.java
+│   ├── TenderNoticeService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
 │   │   ├── SupplierDetailLoader.java
