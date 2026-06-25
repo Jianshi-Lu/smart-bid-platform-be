@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 /**
  * 供应商明细加载器。按 supplierId 查 supplier_detail 表拼成 Markdown。
  *
- * <p>V10 重构后 supplier_detail 与 bid_winning_notification 的关联已断开，
+ * <p>V10 重构后 supplier_detail 与 tender_notice 的关联已断开，
  * 当前仅加载供应商基本信息。</p>
  */
 @Service

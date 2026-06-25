@@ -14,17 +14,17 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
- * 定标通知 — 数据库实体。对应表 {@code bid_winning_notification}（V4 建表，19 字段）。
+ * 招标公告 — 数据库实体。对应表 {@code tender_notice}（V4 建表，V12 重命名，19 字段）。
  *
  * <p>{@code handlerId} 为逻辑外键，关联 {@code bid_handler_info.handler_id}，DB 层不强制 FK。</p>
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("bid_winning_notification")
-public class BidWinningNotification {
+@TableName("tender_notice")
+public class TenderNotice {
     @TableId(type = IdType.AUTO)
-    private Integer notificationId;
+    private Integer noticeId;
     @NotNull
     private Integer handlerId;
     @NotBlank

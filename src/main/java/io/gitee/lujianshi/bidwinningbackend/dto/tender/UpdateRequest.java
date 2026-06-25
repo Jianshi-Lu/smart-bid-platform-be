@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.bidwinningnotification;
+package io.gitee.lujianshi.bidwinningbackend.dto.tender;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;

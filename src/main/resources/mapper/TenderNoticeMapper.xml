@@ -3,12 +3,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
   ┌────────────────────────────────────────────────────────────────────┐
-  │  BidWinningNotificationMapper.xml — 定标通知主表 SQL 映射          │
+  │  TenderNoticeMapper.xml — 定标通知主表 SQL 映射          │
   │                                                                    │
   │  在整个开发链路中的位置：                                          │
   │   ① 数据库表（V4 建表）                                            │
-  │   ② Entity 层（BidWinningNotification）                            │
-  │   ③ Mapper 接口（BidWinningNotificationMapper，待实现）             │
+  │   ② Entity 层（TenderNotice）                            │
+  │   ③ Mapper 接口（TenderNoticeMapper，待实现）             │
   │   ④ Mapper XML（本文件，namespace 绑定接口）                       │
   │   ⑤ Service 层（注入 Mapper 接口调用）                            │
   │   ⑥ DTO 层                                                        │
@@ -24,15 +24,15 @@
   │  本次提交范围：仅 XML（保持最小实现，Mapper 接口待后续补全）      │
   └────────────────────────────────────────────────────────────────────┘
 -->
-<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidWinningNotificationMapper">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeMapper">
 
     <!--
       BaseResultMap：Java 字段 ↔ DB 列映射
       即使 application.yml 配了 map-underscore-to-camel-case=true，
       这里仍显式声明，避免魔法规则带来的隐式行为。
     -->
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">
-        <id     column="notification_id"        property="notificationId"/>
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
+        <id     column="notice_id"        property="noticeId"/>
         <result column="handler_id"             property="handlerId"/>
         <result column="project_no"             property="projectNo"/>
         <result column="purchase_task_no"       property="purchaseTaskNo"/>
@@ -56,15 +56,15 @@
 
     <!--
       插入：自增主键回填 + 依赖 DB 默认值
-      - notification_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.notificationId）
+      - notice_id 省略（AUTO_INCREMENT 自动生成，回填到 entity.noticeId）
       - created_at 省略（DB DEFAULT CURRENT_TIMESTAMP 自动填）
       - bidding_status 省略（DB DEFAULT '已完成' 自动填）
     -->
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice"
             useGeneratedKeys="true"
-            keyProperty="notificationId">
-        INSERT INTO bid_winning_notification
+            keyProperty="noticeId">
+        INSERT INTO tender_notice
             (handler_id, project_no, purchase_task_no, platform_category,
              bidding_process, bidding_method, purchase_method, is_fixed_price,
              target_cost, document_fee, deposit, credit_report_required,
@@ -80,7 +80,7 @@
 
     <!--
       按 ID 更新（PATCH 风格动态 SQL）：
-      - 传入 entity 必须携带 notificationId（WHERE 条件）
+      - 传入 entity 必须携带 noticeId（WHERE 条件）
       - 排除 created_at（DB 维护，不应被业务更新）
       - 使用 <set> + <if> 实现 PATCH 语义：
         * 字段为 null → 不更新（保留 DB 原值）
@@ -88,8 +88,8 @@
       - 配合 UpdateRequest 使用（PATCH 请求体）
     -->
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidWinningNotification">
-        UPDATE bid_winning_notification
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
+        UPDATE tender_notice
         <set>
             <if test="handlerId != null">handler_id = #{handlerId},</if>
             <if test="projectNo != null">project_no = #{projectNo},</if>
@@ -110,27 +110,27 @@
             <if test="notes != null">notes = #{notes},</if>
             <if test="targetEmail != null">target_email = #{targetEmail},</if>
         </set>
-        WHERE notification_id = #{notificationId}
+        WHERE notice_id = #{noticeId}
     </update>
 
     <!--
-      按 ID 删除：#{notificationId} 名称 = Mapper 接口方法参数名
+      按 ID 删除：#{noticeId} 名称 = Mapper 接口方法参数名
     -->
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM bid_winning_notification
-        WHERE notification_id = #{notificationId}
+        DELETE FROM tender_notice
+        WHERE notice_id = #{noticeId}
     </delete>
 
     <!--
       按 ID 查询：resultMap 引用上面定义的 BaseResultMap
     -->
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
-        FROM bid_winning_notification
-        WHERE notification_id = #{notificationId}
+        FROM tender_notice
+        WHERE notice_id = #{noticeId}
     </select>
 
     <!--
@@ -138,11 +138,11 @@
       数据量小时可直接用，数据量大时建议后续加分页
     -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
-        FROM bid_winning_notification
+        FROM tender_notice
     </select>
 
     <!--
@@ -151,12 +151,12 @@
       - 列表中不存在的 ID 不会报错（IN 不会匹配到任何行，影响行数相应减少）
       - 单条 SQL 一次完成，由 MySQL 自动事务保证原子性
       - 配合 BatchDeleteRequest 使用（最大 500 条由 DTO @Size 限制）
-      - 注意：本表 notification_id 在 bid_winning_supplier_detail 中是逻辑外键，
+      - 注意：本表 notice_id 在 bid_winning_supplier_detail 中是逻辑外键，
         删除本表后明细行会变孤儿（应用层不保证完整性，p3 最小实现）
     -->
     <delete id="deleteByIds" parameterType="java.util.List">
-        DELETE FROM bid_winning_notification
-        WHERE notification_id IN
+        DELETE FROM tender_notice
+        WHERE notice_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>
@@ -172,12 +172,12 @@
       - 19 字段全查（含 created_at），用 BaseResultMap 映射
     -->
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT notification_id, handler_id, project_no, purchase_task_no, platform_category,
+        SELECT notice_id, handler_id, project_no, purchase_task_no, platform_category,
                bidding_process, bidding_method, purchase_method, is_fixed_price, target_cost,
                document_fee, deposit, credit_report_required, registration_deadline,
                tech_bid_deadline, business_bid_deadline, bidding_status, notes, created_at, target_email
-        FROM bid_winning_notification
-        WHERE notification_id IN
+        FROM tender_notice
+        WHERE notice_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>
