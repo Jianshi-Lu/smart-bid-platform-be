@@ -10,8 +10,8 @@
 
 ```
 ┌──────────────────────────────┐
-│ bid_handler_info (V3)        │  经办人/招标负责人
-│  ├─ handler_id PK            │
+│ tender_handler_info (V3)        │  经办人/招标负责人
+│  ├─ tender_handler_id PK            │
 │  ├─ handler_name / company_name / department_name
 │  └─ target_email (V6)         │
 └──────────────────────────────┘
@@ -20,7 +20,7 @@
 ┌────────────────────────────────────────┐
 │ tender_notice (V4)          │  定标通知主表
 │  ├─ notice_id PK                │
-│  ├─ handler_id (FK)                    │
+│  ├─ tender_handler_id (FK)                    │
 │  ├─ project_no / purchase_task_no      │
 │  ├─ 招标规则（流程/方式/采购方式等）  │
 │  ├─ 时间线（报名/技术/商务截止）      │
@@ -58,26 +58,26 @@
 
 ## 2. 表详细结构
 
-### 2.1 `bid_handler_info`（经办人）
+### 2.1 `tender_handler_info`（经办人）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
-| `handler_id` | INT | ✅ | 主键，自增 |
+| `tender_handler_id` | INT | ✅ | 主键，自增 |
 | `handler_name` | VARCHAR(50) | ✅ | 经办人姓名 |
 | `company_name` | VARCHAR(100) | ✅ | 所属采购公司（V2+） |
 | `department_name` | VARCHAR(100) | ✅ | 所属采购部门（V2+） |
 | `target_email` | VARCHAR(255) | ❌ | 通知邮件收件人（V6+，已落库） |
 
-**索引**：PK（handler_id）
+**索引**：PK（tender_handler_id）
 
-**演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V6（加 `target_email`）
+**演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V13（重命名 `tender_handler_info`）→ V6（加 `target_email`）
 
 ### 2.2 `tender_notice`（定标通知）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
 | `notice_id` | INT | ✅ | 主键，自增 |
-| `handler_id` | INT | ✅ | 逻辑外键 → `bid_handler_info.handler_id` |
+| `tender_handler_id` | INT | ✅ | 逻辑外键 → `tender_handler_info.tender_handler_id` |
 | `project_no` | VARCHAR(50) | ✅ | 项目编号 |
 | `purchase_task_no` | VARCHAR(50) | ✅ | 采购任务编号 |
 | `platform_category` | VARCHAR(50) | ❌ | 平台采购类别 |
@@ -97,7 +97,7 @@
 | `created_at` | DATETIME | ✅ | 创建时间（默认 CURRENT_TIMESTAMP） |
 | `target_email` | VARCHAR(255) | ❌ | 通知邮件收件人（V6+，已落库） |
 
-**索引**：PK（notice_id） + `idx_staff_id`（handler_id）
+**索引**：PK（notice_id） + `idx_staff_id`（tender_handler_id）
 
 **演进**：V4（创建）→ V6（加 `target_email`）
 
@@ -155,6 +155,7 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 | V1 | `V1__create_handler_info.sql` | 创建 `handler_info` 表 |
 | V2 | `V2__update_handler_info_structure.sql` | 加 `company_name` / `department_name` |
 | V3 | `V3__update_handler_info_to_bid_handler_info.sql` | 重命名为 `bid_handler_info` |
+| V13 | `V13__rename_to_tender_handler_info.sql` | 重命名 `tender_handler_info` + `tender_handler_id` |
 | V4 | `V4__create_tender_notice.sql` | 创建 `tender_notice` |
 | V5 | `V5__create_bid_winning_supplier_detail.sql` | 创建 `bid_winning_supplier_detail` |
 | V6 | `V6__add_target_email.sql` | 三个业务表加 `target_email` |
@@ -173,7 +174,7 @@ SELECT COUNT(*) FROM risk_analysis WHERE NOT JSON_VALID(raw_response);
 
 | Java Entity | 数据库表 | 主键 | 主键 Java 字段 |
 |-------------|----------|------|----------------|
-| `BidHandlerInfo` | `bid_handler_info` | `handler_id` | `handlerId` |
+| `TenderHandlerInfo` | `tender_handler_info` | `tender_handler_id` | `tenderHandlerId` |
 | `TenderNotice` | `tender_notice` | `notice_id` | `noticeId` |
 | `SupplierDetail` | `supplier_detail` | `supplier_id` | `supplierId` |
 | `RiskAnalysis` | `risk_analysis` | `analysis_id` | `analysisId` |
@@ -189,7 +190,7 @@ DTO 字段命名（业务视角）与 Entity 字段命名（DB 视角）基本�
 | Entity 字段 | DTO 字段 | DB 字段 | 备注 |
 |------------|----------|---------|------|
 | `TenderNotice.projectNo` | `BidWinningMailRequest.projectCode` | `project_no` | DTO 跨实体复用（mail 模板） |
-| `TenderNotice.handlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念）| `handler_id` | mail 模板只需名字 |
+| `TenderNotice.tenderHandlerId` | `BidWinningMailRequest.handlerName`（无 ID 概念）| `tender_handler_id` | mail 模板只需名字 |
 | `SupplierDetail.supplierName` | `BidWinningListItem.supplierName` | `supplier_name` | 中标结果项 |
 | `SupplierDetail.quotePrice` | `BidWinningListItem.bidWinningAmount` | `quote_price` | 中标结果项 |
 

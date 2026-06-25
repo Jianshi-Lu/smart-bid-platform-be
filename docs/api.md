@@ -22,7 +22,7 @@
 | 模块 | 端点数 | 路径前缀 |
 |------|:---:|---------|
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
-| 经办人 (BidHandlerInfo) | 6 | `/bid-handler-info/...` |
+| 经办人 (TenderHandlerInfo) | 6 | `/tender-handler-info/...` |
 | 定标通知 (TenderNotice) | 6 | `/tender-notice/...` |
 | 供应商明细 (SupplierDetail) | 6 | `/supplier-detail/...` |
 | **AI 风险分析**（v0.1+） | 2 | `/supplier-detail/{action}/{id}` |
@@ -147,7 +147,7 @@
 
 | 端点 | 触发 | 收件人来源 |
 |------|------|----------|
-| `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库） |
+| `POST /tender-handler-info/add` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库） |
 | 其他 17 个端点 | — | 未发送 |
 
 `targetEmail` 为 null/空时跳过发邮件。详见 [architecture.md §8](architecture.md#8-邮件通知service-层-baseservicesendemail)。
@@ -223,20 +223,20 @@ curl -X POST http://{host}:{port}/send-notification \
 
 ---
 
-## 3. 经办人（BidHandlerInfo）
+## 3. 经办人（TenderHandlerInfo）
 
-对应表 `bid_handler_info`，主键 `handler_id`。
+对应表 `tender_handler_info`，主键 `tender_handler_id`。
 
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
-| POST | `/bid-handler-info/add` | 创建 | `Result<BidHandlerInfo>` |
-| GET | `/bid-handler-info/{id}` | 按主键查询 | `Result<BidHandlerInfo>` |
-| PATCH | `/bid-handler-info/{id}` | 按主键部分更新 | `Result<Diff<BidHandlerInfo>>` |
-| DELETE | `/bid-handler-info/{id}` | 按主键删除 | `Result<Void>` |
-| GET | `/bid-handler-info` | 列表查询（分页） | `Result<PageInfo<BidHandlerInfo>>` |
-| POST | `/bid-handler-info/batch-delete` | 批量删除 | `Result<List<BidHandlerInfo>>` |
+| POST | `/tender-handler-info/add` | 创建 | `Result<TenderHandlerInfo>` |
+| GET | `/tender-handler-info/{id}` | 按主键查询 | `Result<TenderHandlerInfo>` |
+| PATCH | `/tender-handler-info/{id}` | 按主键部分更新 | `Result<Diff<TenderHandlerInfo>>` |
+| DELETE | `/tender-handler-info/{id}` | 按主键删除 | `Result<Void>` |
+| GET | `/tender-handler-info` | 列表查询（分页） | `Result<PageInfo<TenderHandlerInfo>>` |
+| POST | `/tender-handler-info/batch-delete` | 批量删除 | `Result<List<TenderHandlerInfo>>` |
 
-### 3.1 `POST /bid-handler-info/add`
+### 3.1 `POST /tender-handler-info/add`
 
 **请求体**（`AddRequest`，3 字段必填 + 通知邮件收件人）：
 
@@ -248,12 +248,12 @@ curl -X POST http://{host}:{port}/send-notification \
 | `targetEmail` | String | @NotBlank, @Size(max=255) | 通知邮件收件人（已落库） |
 
 ```bash
-curl -X POST http://{host}:{port}/bid-handler-info/add \
+curl -X POST http://{host}:{port}/tender-handler-info/add \
   -H "Content-Type: application/json" \
   -d '{"handlerName":"张三","companyName":"测试公司","departmentName":"采购部","targetEmail":"zhang@example.com"}'
 ```
 
-### 3.2 `GET /bid-handler-info/{id}`
+### 3.2 `GET /tender-handler-info/{id}`
 
 | Path 参数 | 类型 | 必填 |
 |----------|------|:---:|
@@ -261,7 +261,7 @@ curl -X POST http://{host}:{port}/bid-handler-info/add \
 
 返回 200 + 实体 或 404 + null。
 
-### 3.3 `PATCH /bid-handler-info/{id}`
+### 3.3 `PATCH /tender-handler-info/{id}`
 
 **请求体**（`UpdateRequest`，PATCH 风格，全部可选）：
 
@@ -272,28 +272,28 @@ curl -X POST http://{host}:{port}/bid-handler-info/add \
 | `departmentName` | String | @Size(max=100) | 同上 |
 
 ```bash
-curl -X PATCH http://{host}:{port}/bid-handler-info/1 \
+curl -X PATCH http://{host}:{port}/tender-handler-info/1 \
   -H "Content-Type: application/json" \
   -d '{"handlerName":"李四"}'
 ```
 
-### 3.4 `DELETE /bid-handler-info/{id}`
+### 3.4 `DELETE /tender-handler-info/{id}`
 
 返回 200 + null 或 404 + null。
 
-### 3.5 `GET /bid-handler-info`
+### 3.5 `GET /tender-handler-info`
 
 | Query | 类型 | 默认 | 说明 |
 |------|------|------|------|
 | `page` | Integer | 1 | 页码 |
 | `pageSize` | Integer | 3 | 每页条数 |
-| `sort` | String | `handler_id desc` | 排序 |
+| `sort` | String | `tender_handler_id desc` | 排序 |
 
 ```bash
-curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%20desc"
+curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_handler_id%20desc"
 ```
 
-### 3.6 `POST /bid-handler-info/batch-delete`
+### 3.6 `POST /tender-handler-info/batch-delete`
 
 **请求体**（`DeleteRequest`）：
 
@@ -326,7 +326,7 @@ curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%2
 
 | 字段 | 类型 | 校验 |
 |------|------|------|
-| `handlerId` | Integer | @NotNull |
+| `tenderHandlerId` | Integer | @NotNull |
 | `projectNo` | String | @NotBlank, @Size(max=50) |
 | `purchaseTaskNo` | String | @NotBlank, @Size(max=50) |
 
@@ -354,7 +354,7 @@ curl "http://{host}:{port}/bid-handler-info?page=1&pageSize=10&sort=handler_id%2
 ```bash
 curl -X POST http://{host}:{port}/tender-notice/add \
   -H "Content-Type: application/json" \
-  -d '{"handlerId":1,"projectNo":"PRJ-001","purchaseTaskNo":"PT-001"}'
+  -d '{"tenderHandlerId":1,"projectNo":"PRJ-001","purchaseTaskNo":"PT-001"}'
 ```
 
 ### 4.2 `GET /tender-notice/{id}`

@@ -44,7 +44,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 │   ├── SupplierDetailController.java       # 供应商明细（6 端点 + 2 AI 风险分析）
-│   ├── BidHandlerInfoController.java       # 经办人（6 端点）
+│   ├── TenderHandlerInfoController.java       # 经办人（6 端点）
 │   ├── TenderNoticeController.java  # 定标通知（6 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
@@ -54,12 +54,12 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── bidwinningnotification/             # 同上
 │   ├── supplierdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 4 实体：BidHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
+├── entity/                                 # 4 实体：TenderHandlerInfo / TenderNotice / SupplierDetail / RiskAnalysis
 ├── mapper/                                 # @Mapper 接口 extends BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
 │   ├── SupplierDetailService.java
-│   ├── BidHandlerInfoService.java
+│   ├── TenderHandlerInfoService.java
 │   ├── TenderNoticeService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
@@ -103,7 +103,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 | JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类不可叫 `MailSender` |
 
-**复用样板**（新增业务表的最小集）：复制 BidHandlerInfo 7 层结构 → 改名 → 改 SQL/字段即可。
+**复用样板**（新增业务表的最小集）：复制 TenderHandlerInfo 7 层结构 → 改名 → 改 SQL/字段即可。
 
 ---
 
@@ -267,7 +267,7 @@ service.sendOperationEmail(entity);
 
 | Controller | 端点 | 触发方法 |
 |---|---|---|
-| `BidHandlerInfoController` | `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` |
+| `TenderHandlerInfoController` | `POST /tender-handler-info/add` | `service.sendOperationEmail(entity)` |
 | 其他 17 个端点 | — | 未发送 |
 
 ### 8.4 邮件模板
