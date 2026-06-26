@@ -62,14 +62,15 @@ public class RiskAnalysisService {
             throw new IllegalArgumentException("投标人不存在: " + tendererId);
         }
 
-        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
-                detail.getTendererName(), detail.getQuotePrice(), detail.getTendererContact());
+        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={} credentials={}",
+                detail.getTendererName(), detail.getQuotePrice(), detail.getTendererContact(), detail.getCredentials());
 
         String detailInfo = loader.loadDetail(tendererId);
         Map<String, String> vars = Map.of(
                 "tendererName", detail.getTendererName() != null ? detail.getTendererName() : "",
                 "quotePrice", detail.getQuotePrice() != null ? detail.getQuotePrice().toString() : "",
                 "tendererContact", detail.getTendererContact() != null ? detail.getTendererContact() : "",
+                "credentials", detail.getCredentials() != null ? detail.getCredentials() : "未提供",
                 "detail", detailInfo
         );
 

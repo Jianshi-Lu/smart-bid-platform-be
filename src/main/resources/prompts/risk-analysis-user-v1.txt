@@ -1,8 +1,9 @@
-请分析以下供应商的风险情况：
+请分析以下投标人的风险情况：
 
-## 供应商信息
+## 投标人信息
 - 投标人名称：{{tendererName}}
 - 报价：{{quotePrice}}元
 - 联系方式：{{tendererContact}}
+- 资信材料：{{credentials}}
 
 {{detail}}

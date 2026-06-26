@@ -30,6 +30,7 @@ public class TendererDetailLoader {
         sb.append("- 投标人名称：").append(detail.getTendererName() != null ? detail.getTendererName() : "未知").append("\n");
         sb.append("- 报价：").append(detail.getQuotePrice() != null ? detail.getQuotePrice() : "未知").append("元\n");
         sb.append("- 联系方式：").append(detail.getTendererContact() != null ? detail.getTendererContact() : "未知").append("\n");
+        sb.append("- 资信材料：").append(detail.getCredentials() != null ? detail.getCredentials() : "未提供").append("\n");
         return sb.toString();
     }
 }
