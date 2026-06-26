@@ -395,13 +395,19 @@ curl -X POST http://{host}:{port}/tender-notice/add \
 
 ### 4.7 `POST /tender-notice/{id}/status`
 
-变更招标公告状态（DRAFT → IN_PROGRESS → COMPLETED，不可逆向/跳跃）。
+变更招标公告状态。状态机由 `TenderNoticeStatus.canTransitionTo()` 校验：
+
+```
+DRAFT → PUBLISHED → CLOSED → AWARDED
+   │         │          │         │
+   └─────────┴──────────┴─────────┴──▶ CANCELLED（终态）
+```
 
 **请求体**（`StatusUpdateRequest`）：
 
 | 字段 | 类型 | 必填 | 校验 | 说明 |
 |------|------|:---:|------|------|
-| `status` | String | ✅ | @NotBlank, @Size(max=20) | 目标状态：IN_PROGRESS / COMPLETED |
+| `status` | `TenderNoticeStatus` enum | ✅ | @NotNull | 目标状态：PUBLISHED / CLOSED / AWARDED / CANCELLED |
 | `remark` | String | ❌ | @Size(max=255) | 变更备注 |
 
 **响应**：`Result<TenderNotice>`（变更后的实体，含最新 status）。
@@ -409,7 +415,7 @@ curl -X POST http://{host}:{port}/tender-notice/add \
 ```bash
 curl -X POST http://{host}:{port}/tender-notice/1/status \
   -H "Content-Type: application/json" \
-  -d '{"status":"IN_PROGRESS","remark":"收到第一个投标"}'
+  -d '{"status":"PUBLISHED","remark":"发布招标公告"}'
 ```
 
 ---

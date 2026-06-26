@@ -33,7 +33,8 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 ├── dto/                                    # 按业务模块分包
 │   └── common/                             # Result / Diff
-├── entity/                                 # TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
+├── entity/                                 # 5 数据库实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
+├── enums/                                  # 业务枚举：TenderNoticeStatus
 ├── mapper/                                 # @Mapper 接口，extends BaseMapper
 ├── service/                                # BaseService + 各业务模块
 │   ├── mail/                               # MailService

@@ -54,7 +54,8 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── tendernotice/                       # 同上
 │   ├── tendererdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 5 实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
+├── entity/                                 # 5 数据库实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
+├── enums/                                  # 业务枚举：TenderNoticeStatus
 ├── mapper/                                 # @Mapper 接口 extends BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知

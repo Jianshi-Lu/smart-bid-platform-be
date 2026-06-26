@@ -25,7 +25,7 @@
 │  ├─ 招标规则（流程/方式/采购方式等）  │
 │  ├─ 时间线（报名/技术/商务截止）      │
 │  ├─ 采购公司/部门/tendering_party     │
-│  ├─ status (DRAFT/IN_PROGRESS/COMPLETED)│
+│  ├─ status (DRAFT/PUBLISHED/CLOSED/AWARDED/CANCELLED)│
 │  └─ notes / created_at                 │
 └────────────────────────────────────────┘
            │ 1:N（逻辑外键）
@@ -108,7 +108,7 @@
 | `purchase_company` | VARCHAR(100) | ❌ | 采购公司 |
 | `purchase_department` | VARCHAR(100) | ❌ | 采购部门 |
 | `tendering_party` | VARCHAR(100) | ❌ | 招标主体 |
-| `status` | VARCHAR(20) | ✅ | 状态：DRAFT / IN_PROGRESS / COMPLETED（默认 DRAFT） |
+| `status` | VARCHAR(20) | ✅ | 状态：DRAFT / PUBLISHED / CLOSED / AWARDED / CANCELLED（默认 DRAFT） |
 
 **索引**：PK（notice_id） + `idx_staff_id`（tender_handler_id）
 
