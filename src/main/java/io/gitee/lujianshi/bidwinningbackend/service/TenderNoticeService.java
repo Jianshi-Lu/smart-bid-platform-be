@@ -40,6 +40,12 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
         return TenderNotice::getNoticeId;
     }
 
+    /**
+     * 创建招标公告。自动设创建时间和初始状态 DRAFT。
+     *
+     * @param entity 待创建的实体（不含 noticeId / createdAt / status）
+     * @return 影响行数
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int add(TenderNotice entity) {
@@ -48,6 +54,12 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
         return super.add(entity);
     }
 
+    /**
+     * 批量新增招标公告。单事务，每条自动设 status=DRAFT。
+     *
+     * @param items 批量新增请求列表（最多 100 条）
+     * @return 创建的实体列表（含自增 noticeId）
+     */
     @Transactional(rollbackFor = Exception.class)
     public List<TenderNotice> batchAdd(List<AddRequest> items) {
         List<TenderNotice> created = new ArrayList<>();

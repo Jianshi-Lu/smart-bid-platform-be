@@ -80,6 +80,7 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", systemPrompt, userPrompt);
 
         long startNs = System.nanoTime();
+        // 同步调用 DeepSeek，阻塞等待 AI 响应
         String raw = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
@@ -99,6 +100,16 @@ public class RiskAnalysisService {
         return saved;
     }
 
+    /**
+     * 解析 AI 原始 JSON 响应，构造 RiskAnalysis 实体。
+     * <p>JSON 解析失败时 riskLevel/summary/suggestions 保持 null，rawResponse 始终保留。</p>
+     *
+     * @param tendererId   投标人 ID
+     * @param tendererName 投标人名称
+     * @param raw          AI 原始响应文本
+     * @param analyzedAt   分析时间
+     * @return RiskAnalysis 实体（未落库）
+     */
     private RiskAnalysis parseAndBuild(Integer tendererId, String tendererName, String raw, LocalDateTime analyzedAt) {
         String riskLevel = null;
         String summary = null;

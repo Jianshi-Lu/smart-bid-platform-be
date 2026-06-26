@@ -51,6 +51,15 @@ public abstract class BaseService<T> {
     /** 端点描述（子类 override，如 "POST BidInfoController#create"）。 */
     protected String emailEndpoint = "ENDPOINT";
 
+    /**
+     * 发送 CRUD 操作通知邮件（异步）。
+     * <p>反射遍历 entity 字段构造邮件数据，排除 {@code targetEmail}。</p>
+     *
+     * @param entity      操作实体
+     * @param targetEmail 收件人
+     * @param endpoint    端点描述
+     * @param operation   操作类型
+     */
     protected void sendEmail(T entity, String targetEmail, String endpoint, String operation) {
         if (targetEmail == null || targetEmail.isBlank()) return;
 
@@ -159,29 +168,64 @@ public abstract class BaseService<T> {
         }, 0);
     }
 
+    /**
+     * 新增一条记录。
+     *
+     * @param entity 待新增的实体
+     * @return 影响行数
+     */
     @Transactional(rollbackFor = Exception.class)
     public int add(T entity) {
         return getMapper().insert(entity);
     }
 
+    /**
+     * 按 ID 更新记录（PATCH 语义，null 字段不修改）。
+     *
+     * @param entity 含 ID 的实体
+     * @return 影响行数
+     */
     @Transactional(rollbackFor = Exception.class)
     public int update(T entity) {
         return getMapper().updateById(entity);
     }
 
+    /**
+     * 按 ID 删除记录。
+     *
+     * @param id 主键
+     * @return 影响行数
+     */
     @Transactional(rollbackFor = Exception.class)
     public int delete(Integer id) {
         return getMapper().deleteById(id);
     }
 
+    /**
+     * 按 ID 查询记录。
+     *
+     * @param id 主键
+     * @return 实体，不存在时返回 null
+     */
     public T getById(Integer id) {
         return getMapper().selectById(id);
     }
 
+    /**
+     * 查询全部记录（无分页）。
+     *
+     * @return 全部实体列表
+     */
     public List<T> listAll() {
         return getMapper().selectAll();
     }
 
+    /**
+     * 批量删除。先查询存在的记录，再按存在的 ID 删除。
+     *
+     * @param ids 待删除的 ID 列表
+     * @return 实际删除的实体列表
+     */
     @Transactional(rollbackFor = Exception.class)
     public List<T> deleteByIds(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {

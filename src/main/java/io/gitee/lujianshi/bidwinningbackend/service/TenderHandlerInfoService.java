@@ -31,6 +31,12 @@ public class TenderHandlerInfoService extends BaseService<TenderHandlerInfo> {
         return TenderHandlerInfo::getTenderHandlerId;
     }
 
+    /**
+     * 批量新增经办人。单事务。
+     *
+     * @param items 批量新增请求列表
+     * @return 创建的实体列表（含自增 tenderHandlerId）
+     */
     @Transactional(rollbackFor = Exception.class)
     public List<TenderHandlerInfo> batchAdd(List<AddRequest> items) {
         List<TenderHandlerInfo> created = new ArrayList<>();
@@ -46,10 +52,21 @@ public class TenderHandlerInfoService extends BaseService<TenderHandlerInfo> {
         return created;
     }
 
+    /**
+     * 发送单条创建通知邮件。
+     *
+     * @param entity 已创建的经办人实体
+     */
     public void sendOperationEmail(TenderHandlerInfo entity) {
         this.sendEmail(entity, "tender-handler-info/add", "新增");
     }
 
+    /**
+     * 发送批量创建通知邮件。
+     *
+     * @param entities         已创建的经办人实体列表
+     * @param outerTargetEmail 收件人
+     */
     public void sendBatchAddEmail(List<TenderHandlerInfo> entities, String outerTargetEmail) {
         this.sendBatchEmail(entities, outerTargetEmail, "tender-handler-info/batch-add", "批量新增");
     }
