@@ -319,7 +319,7 @@ curl "http://{host}:{port}/tender-handler-info?page=1&pageSize=10&sort=tender_ha
 | DELETE | `/tender-notice/{id}` | 按主键删除 | `Result<Void>` |
 | GET | `/tender-notice` | 列表查询（分页） | `Result<PageInfo<TenderNotice>>` |
 | POST | `/tender-notice/batch-delete` | 批量删除 | `Result<List<TenderNotice>>` |
-| POST | `/tender-notice/{id}/status` | 状态变更 | `Result<TenderNotice>` |
+| POST | `/tender-notice/status-update` | 状态变更 | `Result<TenderNotice>` |
 
 ### 4.1 `POST /tender-notice/add`
 
@@ -393,9 +393,9 @@ curl -X POST http://{host}:{port}/tender-notice/add \
 { "ids": [1, 2, 3] }
 ```
 
-### 4.7 `POST /tender-notice/{id}/status`
+### 4.7 `POST /tender-notice/status-update`
 
-变更招标公告状态。状态机由 `TenderNoticeStatus.canTransitionTo()` 校验：
+变更招标公告状态。三个字段全部通过 RequestBody 传入。状态机由 `TenderNoticeStatus.canTransitionTo()` 校验：
 
 ```
 DRAFT → PUBLISHED → CLOSED → AWARDED
@@ -407,15 +407,16 @@ DRAFT → PUBLISHED → CLOSED → AWARDED
 
 | 字段 | 类型 | 必填 | 校验 | 说明 |
 |------|------|:---:|------|------|
+| `noticeId` | Integer | ✅ | @NotNull | 招标公告 ID |
 | `status` | `TenderNoticeStatus` enum | ✅ | @NotNull | 目标状态：PUBLISHED / CLOSED / AWARDED / CANCELLED |
 | `remark` | String | ❌ | @Size(max=255) | 变更备注 |
 
 **响应**：`Result<TenderNotice>`（变更后的实体，含最新 status）。
 
 ```bash
-curl -X POST http://{host}:{port}/tender-notice/1/status \
+curl -X POST http://{host}:{port}/tender-notice/status-update \
   -H "Content-Type: application/json" \
-  -d '{"status":"PUBLISHED","remark":"发布招标公告"}'
+  -d '{"noticeId":1,"status":"PUBLISHED","remark":"发布招标公告"}'
 ```
 
 ---

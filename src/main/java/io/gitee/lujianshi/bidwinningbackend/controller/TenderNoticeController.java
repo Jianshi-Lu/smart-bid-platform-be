@@ -134,12 +134,12 @@ public class TenderNoticeController {
         return Result.success(deleted, "批量删除完成");
     }
 
-    @PostMapping("/tender-notice/{id}/status")
+    @PostMapping("/tender-notice/status-update")
     public Result<TenderNotice> updateTenderNoticeStatus(
-            @PathVariable Integer id,
             @Valid @RequestBody StatusUpdateRequest request) {
         try {
-            TenderNotice updated = service.transitionStatus(id, request.getStatus(), request.getRemark());
+            TenderNotice updated = service.transitionStatus(
+                    request.getNoticeId(), request.getStatus(), request.getRemark());
             return Result.success(updated, "状态变更成功");
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());
