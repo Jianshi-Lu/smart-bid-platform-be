@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
 import io.gitee.lujianshi.bidwinningbackend.entity.TenderNoticeStatusHistory;
+import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeStatusHistoryMapper;
@@ -13,18 +14,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
 
 /**
  * 招标公告 Service。继承 {@link BaseService}，重写 add 设 createdAt/status，新增批量新增 + 状态变更。
+ *
+ * <p>状态机跳转合法性由 {@link TenderNoticeStatus#canTransitionTo} 判定。</p>
  */
 @Service
 public class TenderNoticeService extends BaseService<TenderNotice> {
-
-    private static final Set<String> VALID_TRANSITIONS = Set.of(
-            "DRAFT->IN_PROGRESS", "IN_PROGRESS->COMPLETED"
-    );
 
     @Resource
     private TenderNoticeMapper mapper;
@@ -46,7 +44,7 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
     @Transactional(rollbackFor = Exception.class)
     public int add(TenderNotice entity) {
         entity.setCreatedAt(LocalDateTime.now());
-        entity.setStatus("DRAFT");
+        entity.setStatus(TenderNoticeStatus.DRAFT);
         return super.add(entity);
     }
 
@@ -73,23 +71,32 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
             entity.setPurchaseCompany(item.getPurchaseCompany());
             entity.setPurchaseDepartment(item.getPurchaseDepartment());
             entity.setTenderingParty(item.getTenderingParty());
-            entity.setStatus("DRAFT");
+            entity.setStatus(TenderNoticeStatus.DRAFT);
             mapper.insert(entity);
             created.add(entity);
         }
         return created;
     }
 
+    /**
+     * 变更招标公告状态。合法性由 {@link TenderNoticeStatus#canTransitionTo} 判定。
+     *
+     * @param noticeId 公告 ID
+     * @param toStatus 目标状态
+     * @param remark 变更备注
+     * @return 变更后的实体
+     * @throws IllegalArgumentException 记录不存在或状态跳转非法
+     */
     @Transactional(rollbackFor = Exception.class)
-    public TenderNotice transitionStatus(Integer noticeId, String toStatus, String remark) {
+    public TenderNotice transitionStatus(Integer noticeId, TenderNoticeStatus toStatus, String remark) {
         TenderNotice entity = mapper.selectById(noticeId);
         if (entity == null) {
             throw new IllegalArgumentException("记录不存在: " + noticeId);
         }
-        String fromStatus = entity.getStatus();
-        String transition = fromStatus + "->" + toStatus;
-        if (!VALID_TRANSITIONS.contains(transition)) {
-            throw new IllegalArgumentException("非法状态变更: " + transition);
+        TenderNoticeStatus fromStatus = entity.getStatus();
+        if (!fromStatus.canTransitionTo(toStatus)) {
+            throw new IllegalArgumentException(
+                    "非法状态变更: " + fromStatus + " -> " + toStatus);
         }
         entity.setStatus(toStatus);
         mapper.updateById(entity);

@@ -11,6 +11,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
+
 /**
  * 招标公告 — 数据库实体。对应表 {@code tender_notice}（V4 建表，V14 重构，V15 加 status，17 字段）。
  *
@@ -42,5 +44,5 @@ public class TenderNotice {
     private String purchaseCompany;
     private String purchaseDepartment;
     private String tenderingParty;
-    private String status;
+    private TenderNoticeStatus status;
 }

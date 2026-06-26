@@ -10,6 +10,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
+
 /**
  * 招标公告状态变更历史 — 数据库实体。对应表 {@code tender_notice_status_history}（V15 建表）。
  */
@@ -21,8 +23,8 @@ public class TenderNoticeStatusHistory {
     @TableId(type = IdType.AUTO)
     private Integer historyId;
     private Integer noticeId;
-    private String fromStatus;
-    private String toStatus;
+    private TenderNoticeStatus fromStatus;
+    private TenderNoticeStatus toStatus;
     private String remark;
     private LocalDateTime createdAt;
 }

@@ -5,7 +5,7 @@
 -- 2. 新建 tender_notice_status_history 表（状态变更审计）
 
 ALTER TABLE tender_notice
-    ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT '状态：DRAFT/IN_PROGRESS/COMPLETED';
+    ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT '状态：DRAFT/PUBLISHED/CLOSED/AWARDED/CANCELLED';
 
 CREATE TABLE tender_notice_status_history (
     history_id INT NOT NULL AUTO_INCREMENT COMMENT '历史记录ID（主键）',
