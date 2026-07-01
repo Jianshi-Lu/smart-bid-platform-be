@@ -129,7 +129,7 @@ font-size:14px; line-height:1.5; color:#333333;">
 
                     <tr th:each="item, stat : ${bidWinningList}">
                         <td th:text="${stat.count}">序号</td>
-                        <td th:text="${item.tendererName}">投标人名称</td>
+                        <td th:text="${item.bidderName}">投标人名称</td>
                         <td th:text="${item.bidWinningAmount}" style="color:red;">中标价</td>
                     </tr>
                     <tr th:if="${bidWinningList.isEmpty()}">

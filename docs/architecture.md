@@ -43,29 +43,29 @@
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
-│   ├── TendererDetailController.java       # 投标人明细（6 端点 + 2 AI 风险分析）
-│   ├── TenderHandlerInfoController.java       # 经办人（7 端点：6 标准 CRUD + 1 批量新增）
-│   ├── TenderNoticeController.java  # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
+│   ├── BidRecordController.java            # 投标记录（9 端点：6 标准 CRUD + 1 批量删除 + 1 按公告查询 + 2 AI 风险分析）
+│   ├── BidHandlerInfoController.java       # 招标经办人（7 端点：6 标准 CRUD + 1 批量新增）
+│   ├── InvitationForBidController.java     # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── dto/                                    # 按业务模块分包
 │   ├── common/                             # Result / Diff
-│   ├── tenderhandler/                      # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
-│   ├── tendernotice/                       # 同上
-│   ├── tendererdetail/                     # AddRequest / UpdateRequest / BatchDeleteRequest
+│   ├── bidhandler/                         # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
+│   ├── invitationforbid/                   # 同上 + StatusUpdateRequest / BatchDeleteRequest
+│   ├── bidrecord/                          # AddRequest / UpdateRequest / BatchDeleteRequest
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 5 数据库实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
-├── enums/                                  # 业务枚举：TenderNoticeStatus
+├── entity/                                 # 5 数据库实体：BidHandlerInfo / InvitationForBid / BidRecord / RiskAnalysis / InvitationForBidStatusHistory
+├── enums/                                  # 业务枚举：BidNoticeStatus
 ├── mapper/                                 # @Mapper 接口 extends BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
-│   ├── TendererDetailService.java
-│   ├── TenderHandlerInfoService.java
-│   ├── TenderNoticeService.java
+│   ├── BidRecordService.java               # add 方法含 3 次重试逻辑 + listByInvitationId
+│   ├── BidHandlerInfoService.java
+│   ├── InvitationForBidService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
-│   │   ├── TendererDetailLoader.java
-│   │   └── RiskAnalysisService.java        # 构造器注入 ChatClient.Builder
+│   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
+│   │   └── RiskAnalysisService.java        # 构造器注入 ChatClient.Builder，调用 DeepSeek
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 ```
@@ -96,7 +96,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 |------|------|
 | Mapper 接口 | 继承 `BaseMapper<T>`（7 标准方法），手写 XML |
 | Service | 继承 `BaseService<T>`，写方法统一 `@Transactional(rollbackFor = Exception.class)` |
-| DTO 命名 | `<Entity>AddRequest` / `<Entity>UpdateRequest`（PATCH 风格，仅 @Size）/ `<Entity>BatchDeleteRequest` / `<Entity>BatchAddRequest`（含 @Valid 内嵌） |
+| DTO 命名 | `AddRequest` / `UpdateRequest`（PATCH 风格，仅 @Size）/ `BatchDeleteRequest` / `BatchAddRequest`（含 @Valid 内嵌）/ `StatusUpdateRequest` / `DeleteRequest` |
 | Controller 响应 | `Result<T>`；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>` |
 | 业务状态码 | 200 成功 / 400 参数错误 / 404 资源不存在 / 500 服务器错误（GlobalExceptionHandler 统一处理） |
 | 注入方式 | `jakarta.annotation.Resource`（field 注入） |
@@ -104,7 +104,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 | JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类不可叫 `MailSender` |
 
-**复用样板**（新增业务表的最小集）：复制 TenderHandlerInfo 7 层结构 → 改名 → 改 SQL/字段即可。
+**复用样板**（新增业务表的最小集）：复制 BidHandlerInfo 7 层结构 → 改名 → 改 SQL/字段即可。
 
 ---
 
@@ -157,7 +157,11 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段。`analyzeRisk(Integer tendererId)` 同步调 DeepSeek、解析 JSON、落库。
+构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 DeepSeek、解析 JSON、落库（V18 已改字段引用：`tendererId` → `bidRecordId`）。
+
+### 5.9 `BidRecordService`（重试逻辑）
+
+`add(entity)` 必须在事务内做 3 次重试，每次重试前先查 `(invitation_id, bidder_name)` 下的 `MAX(bid_no)` 计算 `bidNo = max + 1`（null 时为 1），再 INSERT。捕获 `DuplicateKeyException`（并发同号）后重试。3 次后仍冲突抛 `IllegalStateException`。
 
 ---
 
@@ -268,8 +272,8 @@ service.sendOperationEmail(entity);
 
 | Controller | 端点 | 触发方法 |
 |---|---|---|
-| `TenderHandlerInfoController` | `POST /tender-handler-info/add` | `service.sendOperationEmail(entity)` |
-| 其他 17 个端点 | — | 未发送 |
+| `BidHandlerInfoController` | `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` |
+| 其他 26 个端点 | — | 未发送 |
 
 ### 8.4 邮件模板
 
@@ -305,6 +309,8 @@ service.sendOperationEmail(entity);
 | **fastjson2 而非 Jackson** | 项目已引入复用，避免新增依赖 |
 | **MailService 而非 MailSender** | 避免与 Spring Boot 自动配置的 `JavaMailSender`（Bean 名 mailSender）同名冲突 |
 | **AI ChatClient 构造器注入** | 符合 Spring AI 2.0 官方推荐；构造器里 `build()` 一次缓存 |
+| **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
+| **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
 
 ---
 

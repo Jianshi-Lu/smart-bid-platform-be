@@ -33,8 +33,8 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── controller/                             # 4 Controller + GlobalExceptionHandler
 ├── dto/                                    # 按业务模块分包
 │   └── common/                             # Result / Diff
-├── entity/                                 # 5 数据库实体：TenderHandlerInfo / TenderNotice / TendererDetail / RiskAnalysis / TenderNoticeStatusHistory
-├── enums/                                  # 业务枚举：TenderNoticeStatus
+├── entity/                                 # 5 数据库实体：BidHandlerInfo / InvitationForBid / BidRecord / RiskAnalysis / InvitationForBidStatusHistory
+├── enums/                                  # 业务枚举：BidNoticeStatus
 ├── mapper/                                 # @Mapper 接口，extends BaseMapper
 ├── service/                                # BaseService + 各业务模块
 │   ├── mail/                               # MailService
@@ -45,7 +45,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 src/main/resources/
 ├── mapper/                                 # MyBatis XML
 ├── prompts/                                # AI prompt 模板（*.txt）
-├── sql/ddl/                                # Flyway 兼容 V1-V11，**未启用 Flyway**
+├── sql/ddl/                                # Flyway 兼容 V1-V18，**未启用 Flyway**
 ├── templates/                              # Thymeleaf 邮件模板
 └── application*.yml                        # dev / test / prod 三套配置
 ```
@@ -115,10 +115,10 @@ src/main/resources/
 
 | 模块 | 端点数 | 路径前缀 |
 |------|:---:|------|
-| 经办人 (TenderHandlerInfo) | 7 | `/tender-handler-info/...` |
-| 招标公告 (TenderNotice) | 8 | `/tender-notice/...` |
-| 投标人明细 (TendererDetail) | 6 | `/tenderer-detail/...` |
-| **AI 风险分析** | 2 | `/tenderer-detail/{action}/{id}` |
+| 经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
+| 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
+| 投标记录 (BidRecord) | 9 | `/bid-record/...` |
+| **AI 风险分析** | 2 | `/bid-record/{action}/{id}` |
 
 ### 服务状态 + 邮件测试
 
@@ -132,8 +132,8 @@ src/main/resources/
 
 | Method | Path | 说明 |
 |-------|------|------|
-| POST | `/tenderer-detail/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
-| GET | `/tenderer-detail/risk-history/{id}` | 历史分析记录（按时间倒序） |
+| POST | `/bid-record/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
+| GET | `/bid-record/risk-history/{id}` | 历史分析记录（按时间倒序） |
 
 ## Async Task（`AsyncTaskManager`）
 
@@ -230,12 +230,12 @@ src/main/resources/
 | Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口），手写 XML SQL |
 | Service | 继承 `BaseService<T>`（项目自建泛型基类），子类实现 `getMapper()` + `getIdExtractor()` |
 | 写方法事务 | `@Transactional(rollbackFor = Exception.class)`（由 `BaseService` 统一加） |
-| DTO 命名 | `<Entity>AddRequest` / `<Entity>UpdateRequest`（PATCH 风格，**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest` |
+| DTO 命名 | `<Entity>AddRequest`（创建入参：必填字段带 `@NotBlank` / `@NotNull` + `@Size`）/ `<Entity>UpdateRequest`（PATCH 风格：**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest` / `<Entity>BatchAddRequest`（含 `@Valid` 内嵌）/ `<Entity>DeleteRequest` / `<Entity>StatusUpdateRequest` |
 | Controller 响应 | `Result<T>` 包装；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>` |
 | 业务状态码 | 200=成功, 400=参数错误, 404=资源不存在 |
 | 注入方式 | `jakarta.annotation.Resource`（field 注入） |
 | 全局异常处理 | `GlobalExceptionHandler` 统一捕获，返回 `Result` 包装 |
-| 外键 | `tender_handler_id` / `notice_id` 为**逻辑外键**，DB 层不强制 FK 约束 |
+| 外键 | `bid_handler_id` / `invitation_id` / `bid_record_id` 为**逻辑外键**，DB 层不强制 FK 约束 |
 | Flyway | **未**启用，仅借用 V*.sql 命名 |
 | JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类**不可**叫 `MailSender`（会冲突） |
@@ -244,7 +244,7 @@ src/main/resources/
 
 ## 端到端开发流程（7 层链路）
 
-> 详见 `docs/development-flow.md`（以 TenderHandlerInfo 为完整示例）
+> 详见 `docs/architecture.md §4 7 层开发链路`（以 BidHandlerInfo 为完整示例）
 
 ```
 ① DB 脚本（V*.sql，Flyway 兼容命名，当前未启用 Flyway）
