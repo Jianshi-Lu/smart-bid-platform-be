@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
+        <id     column="bid_handler_id"      property="bidHandlerId"/>
+        <result column="handler_name"    property="handlerName"/>
+        <result column="company_name"    property="companyName"/>
+        <result column="department_name" property="departmentName"/>
+        <result column="target_email" property="targetEmail"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
+            useGeneratedKeys="true"
+            keyProperty="bidHandlerId">
+        INSERT INTO bid_handler_info (handler_name, company_name, department_name, target_email)
+        VALUES (#{handlerName}, #{companyName}, #{departmentName}, #{targetEmail})
+    </insert>
+
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
+        UPDATE bid_handler_info
+        <set>
+            <if test="handlerName != null">handler_name = #{handlerName},</if>
+            <if test="companyName != null">company_name = #{companyName},</if>
+            <if test="departmentName != null">department_name = #{departmentName},</if>
+            <if test="targetEmail != null">target_email = #{targetEmail},</if>
+        </set>
+        WHERE bid_handler_id = #{bidHandlerId}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM bid_handler_info
+        WHERE bid_handler_id = #{bidHandlerId}
+    </delete>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT bid_handler_id, handler_name, company_name, department_name, target_email
+        FROM bid_handler_info
+        WHERE bid_handler_id = #{bidHandlerId}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT bid_handler_id, handler_name, company_name, department_name, target_email
+        FROM bid_handler_info
+    </select>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM bid_handler_info
+        WHERE bid_handler_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT bid_handler_id, handler_name, company_name, department_name, target_email
+        FROM bid_handler_info
+        WHERE bid_handler_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

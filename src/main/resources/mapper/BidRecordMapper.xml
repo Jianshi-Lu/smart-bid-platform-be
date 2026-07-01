@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord">
+        <id     column="bid_record_id"   property="bidRecordId"/>
+        <result column="invitation_id"   property="invitationId"/>
+        <result column="bid_no"          property="bidNo"/>
+        <result column="bid_at"          property="bidAt"/>
+        <result column="bidder_name"     property="bidderName"/>
+        <result column="quote_price"     property="quotePrice"/>
+        <result column="bidder_contact"  property="bidderContact"/>
+        <result column="credentials"     property="credentials"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord"
+            useGeneratedKeys="true"
+            keyProperty="bidRecordId">
+        INSERT INTO bid_record
+            (invitation_id, bid_no, bid_at, bidder_name, quote_price, bidder_contact, credentials)
+        VALUES
+            (#{invitationId}, #{bidNo}, #{bidAt}, #{bidderName}, #{quotePrice}, #{bidderContact}, #{credentials})
+    </insert>
+
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord">
+        UPDATE bid_record
+        <set>
+            <if test="invitationId != null">invitation_id = #{invitationId},</if>
+            <if test="bidNo != null">bid_no = #{bidNo},</if>
+            <if test="bidAt != null">bid_at = #{bidAt},</if>
+            <if test="bidderName != null">bidder_name = #{bidderName},</if>
+            <if test="quotePrice != null">quote_price = #{quotePrice},</if>
+            <if test="bidderContact != null">bidder_contact = #{bidderContact},</if>
+            <if test="credentials != null">credentials = #{credentials},</if>
+        </set>
+        WHERE bid_record_id = #{bidRecordId}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM bid_record
+        WHERE bid_record_id = #{bidRecordId}
+    </delete>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, quote_price, bidder_contact, credentials
+        FROM bid_record
+        WHERE bid_record_id = #{bidRecordId}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, quote_price, bidder_contact, credentials
+        FROM bid_record
+    </select>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM bid_record
+        WHERE bid_record_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, quote_price, bidder_contact, credentials
+        FROM bid_record
+        WHERE bid_record_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <!--
+      V18 新增：计算 (公告, 投标人) 组合的当前最大 bidNo
+      - 若无记录，MAX 返 NULL
+      - Service 负责把 NULL 视作 0，从而首次投标 bidNo = 1
+    -->
+    <select id="selectMaxBidNo" resultType="java.lang.Integer">
+        SELECT MAX(bid_no)
+        FROM bid_record
+        WHERE invitation_id = #{invitationId}
+          AND bidder_name   = #{bidderName}
+    </select>
+
+    <!--
+      V18 新增：按公告 ID 查询所有投标记录（前端"查看投标人"场景）
+      - 按 bid_at 升序，模拟时间线
+      - 同一投标人多次投标（不同 bidNo）一起返回
+    -->
+    <select id="selectByInvitationId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, quote_price, bidder_contact, credentials
+        FROM bid_record
+        WHERE invitation_id = #{invitationId}
+        ORDER BY bid_at ASC
+    </select>
+
+</mapper>

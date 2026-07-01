@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeMapper">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper">
 
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
-        <id     column="notice_id"                property="noticeId"/>
-        <result column="tender_handler_id"        property="tenderHandlerId"/>
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid">
+        <id     column="invitation_id"            property="invitationId"/>
+        <result column="bid_handler_id"           property="bidHandlerId"/>
         <result column="project_no"               property="projectNo"/>
         <result column="purchase_task_no"         property="purchaseTaskNo"/>
         <result column="platform_category"        property="platformCategory"/>
@@ -28,17 +28,17 @@
     </resultMap>
 
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid"
             useGeneratedKeys="true"
-            keyProperty="noticeId">
-        INSERT INTO tender_notice
-            (tender_handler_id, project_no, purchase_task_no, platform_category,
+            keyProperty="invitationId">
+        INSERT INTO invitation_for_bid
+            (bid_handler_id, project_no, purchase_task_no, platform_category,
              tender_process, tender_method, purchase_method, is_fixed_price,
              has_document_fee, deposit, credit_report_required,
              registration_deadline, technical_tender_deadline, business_tender_deadline,
              notes, purchase_company, purchase_department, tendering_party, status)
         VALUES
-            (#{tenderHandlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
+            (#{bidHandlerId}, #{projectNo}, #{purchaseTaskNo}, #{platformCategory},
              #{tenderProcess}, #{tenderMethod}, #{purchaseMethod}, #{isFixedPrice},
              #{hasDocumentFee}, #{deposit}, #{creditReportRequired},
              #{registrationDeadline}, #{technicalTenderDeadline}, #{businessTenderDeadline},
@@ -46,10 +46,10 @@
     </insert>
 
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice">
-        UPDATE tender_notice
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid">
+        UPDATE invitation_for_bid
         <set>
-            <if test="tenderHandlerId != null">tender_handler_id = #{tenderHandlerId},</if>
+            <if test="bidHandlerId != null">bid_handler_id = #{bidHandlerId},</if>
             <if test="projectNo != null">project_no = #{projectNo},</if>
             <if test="purchaseTaskNo != null">purchase_task_no = #{purchaseTaskNo},</if>
             <if test="platformCategory != null">platform_category = #{platformCategory},</if>
@@ -69,48 +69,48 @@
             <if test="tenderingParty != null">tendering_party = #{tenderingParty},</if>
             <if test="status != null">status = #{status},</if>
         </set>
-        WHERE notice_id = #{noticeId}
+        WHERE invitation_id = #{invitationId}
     </update>
 
     <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM tender_notice WHERE notice_id = #{noticeId}
+        DELETE FROM invitation_for_bid WHERE invitation_id = #{invitationId}
     </delete>
 
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
+        SELECT invitation_id, bid_handler_id, project_no, purchase_task_no, platform_category,
                tender_process, tender_method, purchase_method, is_fixed_price,
                has_document_fee, deposit, credit_report_required, registration_deadline,
                technical_tender_deadline, business_tender_deadline, notes, created_at,
                purchase_company, purchase_department, tendering_party, status
-        FROM tender_notice
-        WHERE notice_id = #{noticeId}
+        FROM invitation_for_bid
+        WHERE invitation_id = #{invitationId}
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
+        SELECT invitation_id, bid_handler_id, project_no, purchase_task_no, platform_category,
                tender_process, tender_method, purchase_method, is_fixed_price,
                has_document_fee, deposit, credit_report_required, registration_deadline,
                technical_tender_deadline, business_tender_deadline, notes, created_at,
                purchase_company, purchase_department, tendering_party, status
-        FROM tender_notice
+        FROM invitation_for_bid
     </select>
 
     <delete id="deleteByIds" parameterType="java.util.List">
-        DELETE FROM tender_notice
-        WHERE notice_id IN
+        DELETE FROM invitation_for_bid
+        WHERE invitation_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>
     </delete>
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT notice_id, tender_handler_id, project_no, purchase_task_no, platform_category,
+        SELECT invitation_id, bid_handler_id, project_no, purchase_task_no, platform_category,
                tender_process, tender_method, purchase_method, is_fixed_price,
                has_document_fee, deposit, credit_report_required, registration_deadline,
                technical_tender_deadline, business_tender_deadline, notes, created_at,
                purchase_company, purchase_department, tendering_party, status
-        FROM tender_notice
-        WHERE notice_id IN
+        FROM invitation_for_bid
+        WHERE invitation_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
             #{id}
         </foreach>

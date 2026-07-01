@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidStatusHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBidStatusHistory">
+        <id     column="history_id"    property="historyId"/>
+        <result column="invitation_id" property="invitationId"/>
+        <result column="from_status"   property="fromStatus"/>
+        <result column="to_status"     property="toStatus"/>
+        <result column="remark"        property="remark"/>
+        <result column="created_at"    property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBidStatusHistory"
+            useGeneratedKeys="true"
+            keyProperty="historyId">
+        INSERT INTO invitation_for_bid_status_history
+            (invitation_id, from_status, to_status, remark)
+        VALUES
+            (#{invitationId}, #{fromStatus}, #{toStatus}, #{remark})
+    </insert>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT history_id, invitation_id, from_status, to_status, remark, created_at
+        FROM invitation_for_bid_status_history
+        WHERE history_id = #{historyId}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT history_id, invitation_id, from_status, to_status, remark, created_at
+        FROM invitation_for_bid_status_history
+    </select>
+
+</mapper>
