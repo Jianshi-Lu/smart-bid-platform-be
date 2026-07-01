@@ -10,7 +10,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 风险分析结果 — 数据库实体。对应表 {@code risk_analysis}（V7 建表，V8 重命名，V9 精简，V16 列重命名）。
+ * 风险分析结果 — 数据库实体。对应表 {@code risk_analysis}（V7 建表，V8 重命名，V9 精简，V16 列重命名，V18 列再重命名）。
+ *
+ * <p>V18 字段变化：</p>
+ * <ul>
+ *   <li>{@code tendererId} → {@code bidRecordId}（逻辑外键 → {@code bid_record.bid_record_id}）</li>
+ *   <li>{@code tendererName} → {@code bidderName}</li>
+ * </ul>
  */
 @Data
 @NoArgsConstructor
@@ -21,9 +27,9 @@ public class RiskAnalysis {
     @TableId(type = IdType.AUTO)
     private Integer analysisId;
 
-    private Integer tendererId;
+    private Integer bidRecordId;
 
-    private String tendererName;
+    private String bidderName;
 
     private String riskLevel;
 

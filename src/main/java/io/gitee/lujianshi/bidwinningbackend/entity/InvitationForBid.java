@@ -11,21 +11,28 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
 
 /**
- * 招标公告 — 数据库实体。对应表 {@code tender_notice}（V4 建表，V14 重构，V15 加 status，17 字段）。
+ * 招标公告 — 数据库实体。对应表 {@code invitation_for_bid}（V18 重命名自 tender_notice）。
  *
- * <p>{@code tenderHandlerId} 为逻辑外键，关联 {@code tender_handler_info.tender_handler_id}，DB 层不强制 FK。</p>
+ * <p>命名遵循 World Bank 术语规范："Invitation for Bids"。</p>
+ *
+ * <p>{@code bidHandlerId} 为逻辑外键，关联 {@code bid_handler_info.bid_handler_id}，DB 层不强制 FK。</p>
+ *
+ * <p>{@code invitationId} 为 PK；命名采用短 ID 形式（项目约定，去掉表名后缀）。</p>
+ *
+ * @see BidNoticeStatus
+ * @since V18
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("tender_notice")
-public class TenderNotice {
+@TableName("invitation_for_bid")
+public class InvitationForBid {
     @TableId(type = IdType.AUTO)
-    private Integer noticeId;
-    private Integer tenderHandlerId;
+    private Integer invitationId;
+    private Integer bidHandlerId;
     private String projectNo;
     private String purchaseTaskNo;
     private String platformCategory;
@@ -44,5 +51,5 @@ public class TenderNotice {
     private String purchaseCompany;
     private String purchaseDepartment;
     private String tenderingParty;
-    private TenderNoticeStatus status;
+    private BidNoticeStatus status;
 }

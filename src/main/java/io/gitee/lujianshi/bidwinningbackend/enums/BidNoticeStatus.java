@@ -1,9 +1,9 @@
 package io.gitee.lujianshi.bidwinningbackend.enums;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
+import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
 
 /**
- * 招标公告状态枚举。
+ * 招标公告状态枚举（V18 重命名自 TenderNoticeStatus）。
  *
  * <p>状态机（线性单向 + 任意态可终止于 {@link #CANCELLED}）：
  * <pre>
@@ -22,10 +22,10 @@ import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
  * </ul>
  * </p>
  *
- * @see TenderNotice
- * @since 1.0
+ * @see InvitationForBid
+ * @since V18
  */
-public enum TenderNoticeStatus {
+public enum BidNoticeStatus {
 
     /** 草案 */
     DRAFT,
@@ -48,7 +48,7 @@ public enum TenderNoticeStatus {
      * @param to 目标状态
      * @return true = 合法，false = 非法
      */
-    public boolean canTransitionTo(TenderNoticeStatus to) {
+    public boolean canTransitionTo(BidNoticeStatus to) {
         if (to == null || to == this) {
             return false;
         }
