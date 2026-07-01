@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>io.gitee.lujianshi</groupId>
-    <artifactId>bid-winning-backend</artifactId>
+    <artifactId>smart-bid-platform-be</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>bid-winning-backend</name>
     <description>bid-winning-backend</description>
