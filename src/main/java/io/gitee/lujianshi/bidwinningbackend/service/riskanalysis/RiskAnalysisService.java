@@ -3,10 +3,10 @@ package io.gitee.lujianshi.bidwinningbackend.service.riskanalysis;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
+import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
-import io.gitee.lujianshi.bidwinningbackend.entity.TendererDetail;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
-import io.gitee.lujianshi.bidwinningbackend.mapper.TendererDetailMapper;
 import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 风险分析业务服务。同步调用 DeepSeek，落库风险分析结果。
+ * 风险分析业务服务。同步调用 DeepSeek，落库风险分析结果（V18 字段引用更新：tendererId → bidRecordId；tendererName → bidderName）。
  */
 @Service
 public class RiskAnalysisService {
@@ -31,13 +31,13 @@ public class RiskAnalysisService {
     private final ChatClient chatClient;
 
     @Resource
-    private TendererDetailLoader loader;
+    private BidRecordLoader loader;
 
     @Resource
     private RiskAnalysisMapper mapper;
 
     @Resource
-    private TendererDetailMapper tendererDetailMapper;
+    private BidRecordMapper bidRecordMapper;
 
     @Resource
     private PromptFiller promptFiller;
@@ -49,28 +49,28 @@ public class RiskAnalysisService {
     /**
      * 触发一次风险分析。同步调用 DeepSeek API，解析 JSON 填字段，落库并返全字段实体。
      *
-     * @param tendererId 投标人 ID
+     * @param bidRecordId 投标记录 ID
      * @return 含 analysisId 的完整 RiskAnalysis
-     * @throws IllegalArgumentException 投标人不存在
+     * @throws IllegalArgumentException 投标记录不存在
      */
-    public RiskAnalysis analyzeRisk(Integer tendererId) {
-        log.info(">>> [风险分析] 开始 tendererId={}", tendererId);
+    public RiskAnalysis analyzeRisk(Integer bidRecordId) {
+        log.info(">>> [风险分析] 开始 bidRecordId={}", bidRecordId);
 
-        TendererDetail detail = tendererDetailMapper.selectById(tendererId);
-        if (detail == null) {
-            log.warn("<<< [风险分析] 投标人不存在 tendererId={}", tendererId);
-            throw new IllegalArgumentException("投标人不存在: " + tendererId);
+        BidRecord record = bidRecordMapper.selectById(bidRecordId);
+        if (record == null) {
+            log.warn("<<< [风险分析] 投标记录不存在 bidRecordId={}", bidRecordId);
+            throw new IllegalArgumentException("投标记录不存在: " + bidRecordId);
         }
 
         log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={} credentials={}",
-                detail.getTendererName(), detail.getQuotePrice(), detail.getTendererContact(), detail.getCredentials());
+                record.getBidderName(), record.getQuotePrice(), record.getBidderContact(), record.getCredentials());
 
-        String detailInfo = loader.loadDetail(tendererId);
+        String detailInfo = loader.loadDetail(bidRecordId);
         Map<String, String> vars = Map.of(
-                "tendererName", detail.getTendererName() != null ? detail.getTendererName() : "",
-                "quotePrice", detail.getQuotePrice() != null ? detail.getQuotePrice().toString() : "",
-                "tendererContact", detail.getTendererContact() != null ? detail.getTendererContact() : "",
-                "credentials", detail.getCredentials() != null ? detail.getCredentials() : "未提供",
+                "bidderName", record.getBidderName() != null ? record.getBidderName() : "",
+                "quotePrice", record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
+                "bidderContact", record.getBidderContact() != null ? record.getBidderContact() : "",
+                "credentials", record.getCredentials() != null ? record.getCredentials() : "未提供",
                 "detail", detailInfo
         );
 
@@ -80,7 +80,6 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", systemPrompt, userPrompt);
 
         long startNs = System.nanoTime();
-        // 同步调用 DeepSeek，阻塞等待 AI 响应
         String raw = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
@@ -93,7 +92,7 @@ public class RiskAnalysisService {
         log.info("<<< [风险分析] AI 响应 (length={}, elapsed={}ms, analyzedAt={}):\n{}",
                 raw != null ? raw.length() : 0, elapsedMs, analyzedAt, raw);
 
-        RiskAnalysis analysis = parseAndBuild(tendererId, detail.getTendererName(), raw, analyzedAt);
+        RiskAnalysis analysis = parseAndBuild(bidRecordId, record.getBidderName(), raw, analyzedAt);
 
         RiskAnalysis saved = persist(analysis);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
@@ -104,13 +103,13 @@ public class RiskAnalysisService {
      * 解析 AI 原始 JSON 响应，构造 RiskAnalysis 实体。
      * <p>JSON 解析失败时 riskLevel/summary/suggestions 保持 null，rawResponse 始终保留。</p>
      *
-     * @param tendererId   投标人 ID
-     * @param tendererName 投标人名称
-     * @param raw          AI 原始响应文本
-     * @param analyzedAt   分析时间
+     * @param bidRecordId 投标记录 ID
+     * @param bidderName  投标人名称
+     * @param raw         AI 原始响应文本
+     * @param analyzedAt  分析时间
      * @return RiskAnalysis 实体（未落库）
      */
-    private RiskAnalysis parseAndBuild(Integer tendererId, String tendererName, String raw, LocalDateTime analyzedAt) {
+    private RiskAnalysis parseAndBuild(Integer bidRecordId, String bidderName, String raw, LocalDateTime analyzedAt) {
         String riskLevel = null;
         String summary = null;
         String suggestions = null;
@@ -128,8 +127,8 @@ public class RiskAnalysisService {
         }
 
         RiskAnalysis a = new RiskAnalysis();
-        a.setTendererId(tendererId);
-        a.setTendererName(tendererName);
+        a.setBidRecordId(bidRecordId);
+        a.setBidderName(bidderName);
         a.setRiskLevel(riskLevel);
         a.setSummary(summary);
         a.setSuggestions(suggestions);
@@ -149,9 +148,9 @@ public class RiskAnalysisService {
     }
 
     /**
-     * 查询指定投标人的历史分析记录（按时间倒序）。
+     * 查询指定投标记录的历史分析记录（按时间倒序）。
      */
-    public List<RiskAnalysis> getHistory(Integer tendererId) {
-        return mapper.selectByTendererId(tendererId);
+    public List<RiskAnalysis> getHistory(Integer bidRecordId) {
+        return mapper.selectByBidRecordId(bidRecordId);
     }
 }

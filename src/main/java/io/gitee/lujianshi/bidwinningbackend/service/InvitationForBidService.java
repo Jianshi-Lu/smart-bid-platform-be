@@ -1,12 +1,12 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.AddRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
-import io.gitee.lujianshi.bidwinningbackend.entity.TenderNoticeStatusHistory;
-import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBidStatusHistory;
+import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
-import io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeMapper;
-import io.gitee.lujianshi.bidwinningbackend.mapper.TenderNoticeStatusHistoryMapper;
+import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper;
+import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidStatusHistoryMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,40 +17,40 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * 招标公告 Service。继承 {@link BaseService}，重写 add 设 createdAt/status，新增批量新增 + 状态变更。
+ * 招标公告 Service。继承 {@link BaseService}，重写 add 设 createdAt/status，新增批量新增 + 状态变更（V18 重命名自 TenderNoticeService）。
  *
- * <p>状态机跳转合法性由 {@link TenderNoticeStatus#canTransitionTo} 判定。</p>
+ * <p>状态机跳转合法性由 {@link BidNoticeStatus#canTransitionTo} 判定。</p>
  */
 @Service
-public class TenderNoticeService extends BaseService<TenderNotice> {
+public class InvitationForBidService extends BaseService<InvitationForBid> {
 
     @Resource
-    private TenderNoticeMapper mapper;
+    private InvitationForBidMapper mapper;
 
     @Resource
-    private TenderNoticeStatusHistoryMapper historyMapper;
+    private InvitationForBidStatusHistoryMapper historyMapper;
 
     @Override
-    protected BaseMapper<TenderNotice> getMapper() {
+    protected BaseMapper<InvitationForBid> getMapper() {
         return mapper;
     }
 
     @Override
-    protected Function<TenderNotice, Integer> getIdExtractor() {
-        return TenderNotice::getNoticeId;
+    protected Function<InvitationForBid, Integer> getIdExtractor() {
+        return InvitationForBid::getInvitationId;
     }
 
     /**
      * 创建招标公告。自动设创建时间和初始状态 DRAFT。
      *
-     * @param entity 待创建的实体（不含 noticeId / createdAt / status）
+     * @param entity 待创建的实体（不含 invitationId / createdAt / status）
      * @return 影响行数
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int add(TenderNotice entity) {
+    public int add(InvitationForBid entity) {
         entity.setCreatedAt(LocalDateTime.now());
-        entity.setStatus(TenderNoticeStatus.DRAFT);
+        entity.setStatus(BidNoticeStatus.DRAFT);
         return super.add(entity);
     }
 
@@ -58,14 +58,14 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
      * 批量新增招标公告。单事务，每条自动设 status=DRAFT。
      *
      * @param items 批量新增请求列表（最多 100 条）
-     * @return 创建的实体列表（含自增 noticeId）
+     * @return 创建的实体列表（含自增 invitationId）
      */
     @Transactional(rollbackFor = Exception.class)
-    public List<TenderNotice> batchAdd(List<AddRequest> items) {
-        List<TenderNotice> created = new ArrayList<>();
+    public List<InvitationForBid> batchAdd(List<AddRequest> items) {
+        List<InvitationForBid> created = new ArrayList<>();
         for (AddRequest item : items) {
-            TenderNotice entity = new TenderNotice();
-            entity.setTenderHandlerId(item.getTenderHandlerId());
+            InvitationForBid entity = new InvitationForBid();
+            entity.setBidHandlerId(item.getBidHandlerId());
             entity.setProjectNo(item.getProjectNo());
             entity.setPurchaseTaskNo(item.getPurchaseTaskNo());
             entity.setPlatformCategory(item.getPlatformCategory());
@@ -83,7 +83,7 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
             entity.setPurchaseCompany(item.getPurchaseCompany());
             entity.setPurchaseDepartment(item.getPurchaseDepartment());
             entity.setTenderingParty(item.getTenderingParty());
-            entity.setStatus(TenderNoticeStatus.DRAFT);
+            entity.setStatus(BidNoticeStatus.DRAFT);
             mapper.insert(entity);
             created.add(entity);
         }
@@ -91,21 +91,21 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
     }
 
     /**
-     * 变更招标公告状态。合法性由 {@link TenderNoticeStatus#canTransitionTo} 判定。
+     * 变更招标公告状态。合法性由 {@link BidNoticeStatus#canTransitionTo} 判定。
      *
-     * @param noticeId 公告 ID
-     * @param toStatus 目标状态
-     * @param remark 变更备注
+     * @param invitationId 公告 ID
+     * @param toStatus     目标状态
+     * @param remark       变更备注
      * @return 变更后的实体
      * @throws IllegalArgumentException 记录不存在或状态跳转非法
      */
     @Transactional(rollbackFor = Exception.class)
-    public TenderNotice transitionStatus(Integer noticeId, TenderNoticeStatus toStatus, String remark) {
-        TenderNotice entity = mapper.selectById(noticeId);
+    public InvitationForBid transitionStatus(Integer invitationId, BidNoticeStatus toStatus, String remark) {
+        InvitationForBid entity = mapper.selectById(invitationId);
         if (entity == null) {
-            throw new IllegalArgumentException("记录不存在: " + noticeId);
+            throw new IllegalArgumentException("记录不存在: " + invitationId);
         }
-        TenderNoticeStatus fromStatus = entity.getStatus();
+        BidNoticeStatus fromStatus = entity.getStatus();
         if (!fromStatus.canTransitionTo(toStatus)) {
             throw new IllegalArgumentException(
                     "非法状态变更: " + fromStatus + " -> " + toStatus);
@@ -113,8 +113,8 @@ public class TenderNoticeService extends BaseService<TenderNotice> {
         entity.setStatus(toStatus);
         mapper.updateById(entity);
 
-        TenderNoticeStatusHistory history = new TenderNoticeStatusHistory();
-        history.setNoticeId(noticeId);
+        InvitationForBidStatusHistory history = new InvitationForBidStatusHistory();
+        history.setInvitationId(invitationId);
         history.setFromStatus(fromStatus);
         history.setToStatus(toStatus);
         history.setRemark(remark);
