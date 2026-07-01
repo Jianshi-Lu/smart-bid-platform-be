@@ -1,10 +1,10 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tenderhandler;
+package io.gitee.lujianshi.bidwinningbackend.dto.bidhandler;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 更新经办人请求 DTO（PATCH 语义，null 字段表示"不修改"）。
+ * 更新招标经办人请求 DTO（PATCH 语义，null 字段表示"不修改"）。
  */
 @Data
 public class UpdateRequest {

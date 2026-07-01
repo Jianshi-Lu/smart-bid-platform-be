@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tendernotice;
+package io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -7,12 +7,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 更新招标公告请求 DTO（PATCH 语义，16 字段全可选，null 字段表示"不修改"）。
+ * 更新招标公告（Invitation for Bid）请求 DTO（PATCH 语义，16 字段全可选，null 字段表示"不修改"）。
  */
 @Data
 public class UpdateRequest {
 
-    private Integer tenderHandlerId;
+    private Integer bidHandlerId;
 
     @Size(max = 50, message = "项目编号长度不能超过50")
     private String projectNo;

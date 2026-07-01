@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tenderhandler;
+package io.gitee.lujianshi.bidwinningbackend.dto.bidhandler;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 批量新增经办人请求 DTO。
+ * 批量新增招标经办人请求 DTO。
  *
  * <p>外层 {@code targetEmail} 指定汇总邮件收件人（非空时所有记录汇总到 1 封邮件）；
  * 为空/blank 时不发送汇总邮件。内层 items 复用 {@link AddRequest}，

@@ -1,11 +1,11 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tenderhandler;
+package io.gitee.lujianshi.bidwinningbackend.dto.bidhandler;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * 创建经办人请求 DTO。3 个业务字段 + 通知邮件收件人均必填。
+ * 创建招标经办人请求 DTO。3 个业务字段 + 通知邮件收件人均必填。
  */
 @Data
 public class AddRequest {

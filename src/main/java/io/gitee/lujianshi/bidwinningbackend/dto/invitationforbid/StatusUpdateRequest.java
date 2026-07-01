@@ -1,6 +1,6 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tendernotice;
+package io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid;
 
-import io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -12,10 +12,10 @@ import lombok.Data;
 public class StatusUpdateRequest {
 
     @NotNull(message = "公告ID不能为空")
-    private Integer noticeId;
+    private Integer invitationId;
 
     @NotNull(message = "状态不能为空")
-    private TenderNoticeStatus status;
+    private BidNoticeStatus status;
 
     @Size(max = 255, message = "备注长度不能超过255")
     private String remark;

@@ -4,13 +4,13 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.AddRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.BatchAddRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.BatchDeleteRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.StatusUpdateRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.tendernotice.UpdateRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.TenderNotice;
-import io.gitee.lujianshi.bidwinningbackend.service.TenderNoticeService;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.AddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.BatchAddRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.BatchDeleteRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.StatusUpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.UpdateRequest;
+import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -18,25 +18,25 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 招标公告 Controller。8 端点（6 标准 CRUD + 1 批量新增 + 1 状态变更）。端点详情见 {@code docs/api.md}。
+ * 招标公告 Controller。8 端点（6 标准 CRUD + 1 批量新增 + 1 状态变更）。端点详情见 {@code docs/api.md}（V18 重命名自 TenderNoticeController）。
  */
 @RestController
-public class TenderNoticeController {
+public class InvitationForBidController {
 
     @Resource
-    private TenderNoticeService service;
+    private InvitationForBidService service;
 
     /**
      * 创建招标公告。Service 自动设 {@code createdAt} 和 {@code status=DRAFT}。
      *
-     * @param request 创建请求（tenderHandlerId / projectNo / purchaseTaskNo 必填）
-     * @return 创建的实体（含自增 noticeId）
+     * @param request 创建请求（bidHandlerId / projectNo / purchaseTaskNo 必填）
+     * @return 创建的实体（含自增 invitationId）
      */
-    @PostMapping("/tender-notice/add")
-    public Result<TenderNotice> createTenderNotice(
+    @PostMapping("/invitation-for-bid/add")
+    public Result<InvitationForBid> createInvitationForBid(
             @Valid @RequestBody AddRequest request) {
-        TenderNotice entity = new TenderNotice();
-        entity.setTenderHandlerId(request.getTenderHandlerId());
+        InvitationForBid entity = new InvitationForBid();
+        entity.setBidHandlerId(request.getBidHandlerId());
         entity.setProjectNo(request.getProjectNo());
         entity.setPurchaseTaskNo(request.getPurchaseTaskNo());
         entity.setPlatformCategory(request.getPlatformCategory());
@@ -62,12 +62,12 @@ public class TenderNoticeController {
      * 批量新增招标公告。单事务，最多 100 条。
      *
      * @param request 批量新增请求（items 非空，最多 100 条）
-     * @return 创建的实体列表（含自增 noticeId）
+     * @return 创建的实体列表（含自增 invitationId）
      */
-    @PostMapping("/tender-notice/batch-add")
-    public Result<List<TenderNotice>> batchAddTenderNotice(
+    @PostMapping("/invitation-for-bid/batch-add")
+    public Result<List<InvitationForBid>> batchAddInvitationForBid(
             @Valid @RequestBody BatchAddRequest request) {
-        List<TenderNotice> created = service.batchAdd(request.getItems());
+        List<InvitationForBid> created = service.batchAdd(request.getItems());
         return Result.success(created, "批量新增成功");
     }
 
@@ -77,9 +77,9 @@ public class TenderNoticeController {
      * @param id 公告 ID
      * @return 实体（200）或 null（404）
      */
-    @GetMapping("/tender-notice/{id}")
-    public Result<TenderNotice> getByIdTenderNotice(@PathVariable Integer id) {
-        TenderNotice entity = service.getById(id);
+    @GetMapping("/invitation-for-bid/{id}")
+    public Result<InvitationForBid> getByIdInvitationForBid(@PathVariable Integer id) {
+        InvitationForBid entity = service.getById(id);
         return entity != null
                 ? Result.success(entity, "查询成功")
                 : Result.error(404, "记录不存在");
@@ -87,23 +87,23 @@ public class TenderNoticeController {
 
     /**
      * 部分更新招标公告（PATCH 语义，null 字段不修改）。
-     * <p>不支持修改 {@code status}，请使用 {@code POST /tender-notice/status-update}。</p>
+     * <p>不支持修改 {@code status}，请使用 {@code POST /invitation-for-bid/status-update}。</p>
      *
      * @param id      公告 ID
      * @param request 更新请求（16 字段全可选）
      * @return Diff（更新前后对比）
      */
-    @PatchMapping("/tender-notice/{id}")
-    public Result<Diff<TenderNotice>> patchTenderNotice(
+    @PatchMapping("/invitation-for-bid/{id}")
+    public Result<Diff<InvitationForBid>> patchInvitationForBid(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateRequest request) {
-        TenderNotice before = service.getById(id);
+        InvitationForBid before = service.getById(id);
         if (before == null) {
             return Result.error(404, "记录不存在");
         }
-        TenderNotice after = new TenderNotice();
-        after.setNoticeId(id);
-        after.setTenderHandlerId(request.getTenderHandlerId());
+        InvitationForBid after = new InvitationForBid();
+        after.setInvitationId(id);
+        after.setBidHandlerId(request.getBidHandlerId());
         after.setProjectNo(request.getProjectNo());
         after.setPurchaseTaskNo(request.getPurchaseTaskNo());
         after.setPlatformCategory(request.getPlatformCategory());
@@ -134,8 +134,8 @@ public class TenderNoticeController {
      * @param id 公告 ID
      * @return 200（成功）或 404（不存在）
      */
-    @DeleteMapping("/tender-notice/{id}")
-    public Result<Void> deleteTenderNotice(@PathVariable Integer id) {
+    @DeleteMapping("/invitation-for-bid/{id}")
+    public Result<Void> deleteInvitationForBid(@PathVariable Integer id) {
         int rows = service.delete(id);
         return rows > 0
                 ? Result.success(null, "删除成功")
@@ -147,19 +147,19 @@ public class TenderNoticeController {
      *
      * @param page     页码（默认 1）
      * @param pageSize 每页条数（默认 10）
-     * @param sort     排序字段（默认 notice_id desc）
+     * @param sort     排序字段（默认 invitation_id desc）
      * @return 分页结果（PageHelper ThreadLocal 模式，finally 确保清理）
      */
-    @GetMapping("/tender-notice")
-    public Result<PageInfo<TenderNotice>> listTenderNotice(
+    @GetMapping("/invitation-for-bid")
+    public Result<PageInfo<InvitationForBid>> listInvitationForBid(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
-            @RequestParam(defaultValue = "notice_id desc") String sort) {
+            @RequestParam(defaultValue = "invitation_id desc") String sort) {
         try {
             //noinspection try
             PageHelper.startPage(page, pageSize, sort);
-            List<TenderNotice> list = service.listAll();
-            PageInfo<TenderNotice> pageInfo = new PageInfo<>(list);
+            List<InvitationForBid> list = service.listAll();
+            PageInfo<InvitationForBid> pageInfo = new PageInfo<>(list);
             return Result.success(pageInfo, "查询成功");
         } catch (Exception e) {
             return Result.error(400, "分页查询参数错误");
@@ -174,24 +174,24 @@ public class TenderNoticeController {
      * @param request 批量删除请求（ids 最多 500 条）
      * @return 实际删除的实体列表
      */
-    @PostMapping("/tender-notice/batch-delete")
-    public Result<List<TenderNotice>> batchDeleteTenderNotice(@Valid @RequestBody BatchDeleteRequest request) {
-        List<TenderNotice> deleted = service.deleteByIds(request.getIds());
+    @PostMapping("/invitation-for-bid/batch-delete")
+    public Result<List<InvitationForBid>> batchDeleteInvitationForBid(@Valid @RequestBody BatchDeleteRequest request) {
+        List<InvitationForBid> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
     }
 
     /**
-     * 变更招标公告状态。状态机由 {@link io.gitee.lujianshi.bidwinningbackend.enums.TenderNoticeStatus#canTransitionTo} 校验。
+     * 变更招标公告状态。状态机由 {@link io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus#canTransitionTo} 校验。
      *
-     * @param request 状态变更请求（noticeId / status / remark）
+     * @param request 状态变更请求（invitationId / status / remark）
      * @return 变更后的实体（含最新 status）
      */
-    @PostMapping("/tender-notice/status-update")
-    public Result<TenderNotice> updateTenderNoticeStatus(
+    @PostMapping("/invitation-for-bid/status-update")
+    public Result<InvitationForBid> updateInvitationForBidStatus(
             @Valid @RequestBody StatusUpdateRequest request) {
         try {
-            TenderNotice updated = service.transitionStatus(
-                    request.getNoticeId(), request.getStatus(), request.getRemark());
+            InvitationForBid updated = service.transitionStatus(
+                    request.getInvitationId(), request.getStatus(), request.getRemark());
             return Result.success(updated, "状态变更成功");
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());

@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tendernotice;
+package io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,13 +9,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 创建招标公告请求 DTO。3 字段必填（tenderHandlerId / projectNo / purchaseTaskNo），其余 13 字段可选。
+ * 创建招标公告（Invitation for Bid）请求 DTO。
+ *
+ * <p>3 字段必填（bidHandlerId / projectNo / purchaseTaskNo），其余字段可选。</p>
  */
 @Data
 public class AddRequest {
 
     @NotNull(message = "经办人ID不能为空")
-    private Integer tenderHandlerId;
+    private Integer bidHandlerId;
 
     @NotBlank(message = "项目编号不能为空")
     @Size(max = 50, message = "项目编号长度不能超过50")

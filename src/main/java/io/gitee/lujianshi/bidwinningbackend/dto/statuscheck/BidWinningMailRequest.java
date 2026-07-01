@@ -25,7 +25,7 @@ public class BidWinningMailRequest extends PlainTextMailRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class BidWinningListItem {
-        private String tendererName;
+        private String bidderName;
         private String bidWinningAmount;
     }
 }

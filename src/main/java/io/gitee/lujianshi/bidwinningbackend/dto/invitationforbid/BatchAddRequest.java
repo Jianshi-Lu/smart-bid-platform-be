@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.dto.tendernotice;
+package io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 批量新增招标公告请求 DTO。
+ * 批量新增招标公告（Invitation for Bid）请求 DTO。
  *
  * <p>内层 items 复用 {@link AddRequest}。</p>
  */
