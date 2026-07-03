@@ -1,6 +1,6 @@
 # 数据库结构（bid-winning-backend）
 
-> 5 张表的最终结构（V1-V18）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
+> 5 张表的最终结构（V1-V19）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
 >
 > API 契约：[`docs/api.md`](api.md) · 项目架构：[`docs/architecture.md`](architecture.md)
 
@@ -10,7 +10,7 @@
 
 ```
 ┌──────────────────────────────┐
-│ bid_handler_info (V3→V13→V18) │  招标经办人
+│ bid_handler_info (V3→V13→V18→V19) │  招标经办人
 │  ├─ bid_handler_id PK            │
 │  ├─ handler_name / company_name / department_name
 │  └─ target_email (V6)         │
@@ -94,7 +94,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
-| `bid_handler_id` | INT | ✅ | 主键，自增（V18 重命名自 `tender_handler_id`） |
+| `bid_handler_id` | INT | ✅ | 主键，自增（V19 重命名自 `tender_handler_id`） |
 | `handler_name` | VARCHAR(50) | ✅ | 经办人姓名 |
 | `company_name` | VARCHAR(100) | ✅ | 所属采购公司（V2+） |
 | `department_name` | VARCHAR(100) | ✅ | 所属采购部门（V2+） |
@@ -102,7 +102,7 @@
 
 **索引**：PK（bid_handler_id）
 
-**演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V6（加 `target_email`）→ V13（重命名 `tender_handler_info`）→ **V18**（重命名 `bid_handler_info`）
+**演进**：V1（创建 `handler_info`）→ V2（加 company/department）→ V3（重命名 `bid_handler_info`）→ V6（加 `target_email`）→ V13（重命名 `tender_handler_info`）→ **V18**（重命名 `bid_handler_info`）→ **V19**（PK 列 `tender_handler_id` → `bid_handler_id`）
 
 ### 2.2 `invitation_for_bid`（招标公告，World Bank 术语）
 
@@ -236,8 +236,9 @@ TRUNCATE TABLE tenderer_detail;
 | V16 | `V16__rename_supplier_to_tenderer.sql` | 重命名 `tenderer_detail` + `credentials` + `risk_analysis` 列同步 |
 | V17 | `V17__rename_idx_supplier_to_idx_tenderer.sql` | `risk_analysis` 索引名 `idx_supplier` → `idx_tenderer`（V16 漏改） |
 | **V18** | `V18__rename_to_bid_convention.sql` | **全面 bid 化重命名 + bid_record 合并 + 3 列新增** |
+| **V19** | `V19__rename_primary_key_of_bid_handler_info.sql` | **`bid_handler_info` PK 列 `tender_handler_id` → `bid_handler_id`** |
 
-**执行顺序**：V1 → V2 → ... → V18
+**执行顺序**：V1 → V2 → ... → V19
 
 **V18 前置**：先 TRUNCATE `risk_analysis` 和 `tenderer_detail`（旧数据无迁移）。
 

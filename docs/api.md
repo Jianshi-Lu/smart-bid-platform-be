@@ -562,7 +562,7 @@ curl "http://{host}:{port}/bid-record/risk-history/1"
 | 表 | `tender_notice` | `invitation_for_bid` |
 | 表 | `tender_notice_status_history` | `invitation_for_bid_status_history` |
 | 表 | `tenderer_detail` | `bid_record` |
-| PK | `tender_handler_id` | `bid_handler_id` |
+| PK | `tender_handler_id` | `bid_handler_id` ^[PK 列重命名实际在 V19 完成，V18 仅重命名了表名] |
 | PK | `notice_id` | `invitation_id` |
 | PK | `tenderer_id` | `bid_record_id` |
 | 业务字段 | `tenderer_name` | `bidder_name` |
