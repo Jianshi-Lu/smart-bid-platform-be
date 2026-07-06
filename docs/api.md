@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 27 端点（含 2 AI 风险分析端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 28 端点（含 2 AI 风险分析端点 + 1 风险记录查询端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -26,6 +26,7 @@
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
 | 投标记录 (BidRecord) | 9 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+，含在 BidRecord 内） | 2 | `/bid-record/{action}/{id}` |
+| **风险记录查询**（v0.2+，敏感数据只读） | 1 | `/risk-analysis` |
 
 > **v18 命名变更**：招标方相关表统一使用 World Bank 术语"Invitation for Bids"；经办人使用"bid handler"。详见 [database.md §1](database.md#1-表结构总览)。
 
@@ -540,6 +541,97 @@ curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 ```bash
 curl "http://{host}:{port}/bid-record/risk-history/1"
 ```
+
+---
+
+## 6. 风险分析记录查询（RiskAnalysis）
+
+对应表 `risk_analysis`，主键 `analysis_id`。**敏感数据，只读入口**：不暴露 DELETE / PATCH / POST 写端点，新增与删除仅在数据库手工操作。
+
+> **写操作权限边界**：
+> - 新增路径：`BidRecordController.analyzeRisk`（AI 触发）→ `RiskAnalysisService.persist` → `risk_analysis` 表
+> - 删除路径：禁止通过本系统，改走数据库手工操作
+> - 修改路径：禁止通过本系统（同上）
+
+| Method | Path | 用途 | 返回 |
+|--------|------|------|------|
+| GET | `/risk-analysis` | 分页查询全部历史风险分析记录 | `Result<PageInfo<RiskAnalysis>>` |
+
+### 6.1 `GET /risk-analysis`
+
+| Query | 类型 | 默认 | 说明 |
+|-------|------|------|------|
+| `page` | Integer | 1 | 页码 |
+| `pageSize` | Integer | 10 | 每页条数 |
+| `sort` | String | `analysis_id desc` | 排序字段（如 `analyzed_at desc`） |
+
+**排序建议值**：
+
+| sort 值 | 含义 |
+|--------|------|
+| `analysis_id desc` | 按主键倒序（推荐默认，自增主键索引利用最高） |
+| `analysis_id asc` | 按主键升序 |
+| `analyzed_at desc` | 按分析时间倒序（最新在前） |
+| `analyzed_at asc` | 按分析时间升序 |
+| `risk_level asc, analysis_id desc` | 多字段联合（按风险等级排序后再按主键去重稳定排序） |
+
+**PageInfo 主要字段**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `pageNum` | Integer | 当前页 |
+| `pageSize` | Integer | 每页大小 |
+| `size` | Integer | 当前页实际条数 |
+| `total` | Integer | 总记录数 |
+| `pages` | Integer | 总页数 |
+| `list` | List<RiskAnalysis> | 当前页数据 |
+
+**响应数据字段（每条 `RiskAnalysis`）**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `analysisId` | Integer | 主键 |
+| `bidRecordId` | Integer | 关联的投标记录 ID（逻辑外键） |
+| `bidderName` | String | 投标人名称（冗余字段，避免连表） |
+| `riskLevel` | String | 风险等级：`LOW` / `MEDIUM` / `HIGH` / `CRITICAL` |
+| `summary` | String | 风险摘要（200 字以内） |
+| `suggestions` | String | 建议措施（100 字以内） |
+| `rawResponse` | String | 大模型原始响应（解析失败时供排查） |
+| `promptVersion` | String | 使用的 prompt 版本号 |
+| `analyzedAt` | LocalDateTime | 分析时间 |
+
+```bash
+curl "http://{host}:{port}/risk-analysis?page=1&pageSize=10&sort=analysis_id%20desc"
+```
+
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": {
+    "pageNum": 1,
+    "pageSize": 10,
+    "size": 10,
+    "total": 47,
+    "pages": 5,
+    "list": [
+      {
+        "analysisId": 47,
+        "bidRecordId": 2,
+        "bidderName": "示例公司",
+        "riskLevel": "HIGH",
+        "summary": "...",
+        "suggestions": "...",
+        "rawResponse": "{...}",
+        "promptVersion": "v1",
+        "analyzedAt": "2026-07-06T09:53:22"
+      }
+    ]
+  }
+}
+```
+
+
 
 ---
 

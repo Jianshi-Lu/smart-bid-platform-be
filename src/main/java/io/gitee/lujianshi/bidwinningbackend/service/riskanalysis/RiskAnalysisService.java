@@ -3,12 +3,17 @@ package io.gitee.lujianshi.bidwinningbackend.service.riskanalysis;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
+
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
+
 import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
+
 import jakarta.annotation.Resource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +43,7 @@ public class RiskAnalysisService {
      * 通过 {@link OpenAiChatOptions#responseFormat} 传给下游 OpenAI 兼容服务(LM Studio 本地)。
      * 字段定义与 {@link RiskAnalysis} 实体保持一致,riskLevel 限定 4 档枚举。
      */
-    private static final String RISK_SCHEMA = """
+    private static final String OUTPUT_SCHEMA = """
             {
               "type": "object",
               "properties": {
@@ -65,10 +70,11 @@ public class RiskAnalysisService {
     @Resource
     private PromptFiller promptFiller;
 
+    // 限定输出格式并事实上创建chatClient(SpringAI)实例
     public RiskAnalysisService(OpenAiChatModel openAiChatModel) {
         ResponseFormat responseFormat = ResponseFormat.builder()
                 .type(ResponseFormat.Type.JSON_SCHEMA)
-                .jsonSchema(RISK_SCHEMA)
+                .jsonSchema(OUTPUT_SCHEMA)
                 .build();
         OpenAiChatOptions.Builder defaults = OpenAiChatOptions.builder()
                 .responseFormat(responseFormat);
@@ -111,6 +117,8 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", systemPrompt, userPrompt);
 
         long startNs = System.nanoTime();
+
+        // 调用模型，获取原始输出
         String raw = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
@@ -183,5 +191,14 @@ public class RiskAnalysisService {
      */
     public List<RiskAnalysis> getHistory(Integer bidRecordId) {
         return mapper.selectByBidRecordId(bidRecordId);
+    }
+
+    /**
+     * 查询全部风险分析记录。配合 PageHelper 使用（ThreadLocal 注入分页参数）。
+     *
+     * @return 全部记录列表
+     */
+    public List<RiskAnalysis> listAll() {
+        return mapper.selectAll();
     }
 }
