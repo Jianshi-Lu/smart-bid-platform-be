@@ -12,6 +12,12 @@ spring:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY}
 
+    openai:
+      base-url: http://localhost:1234/v1
+      api-key: ${LM_STUDIO_QWEN3.6-27B}
+      read-timeout: 120s
+
+
   mail:
     host: smtp.qq.com
     port: 587

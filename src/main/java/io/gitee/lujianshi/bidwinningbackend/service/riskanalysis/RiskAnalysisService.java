@@ -11,7 +11,12 @@ import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel.ResponseFormat;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +33,24 @@ public class RiskAnalysisService {
     private static final Logger log = LoggerFactory.getLogger(RiskAnalysisService.class);
     private static final String PROMPT_VERSION = "v1";
 
+    /**
+     * Structured Output JSON Schema,约束 LLM 仅输出符合此结构的 JSON 对象。
+     * 通过 {@link OpenAiChatOptions#responseFormat} 传给下游 OpenAI 兼容服务(LM Studio 本地)。
+     * 字段定义与 {@link RiskAnalysis} 实体保持一致,riskLevel 限定 4 档枚举。
+     */
+    private static final String RISK_SCHEMA = """
+            {
+              "type": "object",
+              "properties": {
+                "riskLevel":   {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+                "summary":     {"type": "string"},
+                "suggestions": {"type": "string"}
+              },
+              "required": ["riskLevel", "summary", "suggestions"],
+              "additionalProperties": false
+            }
+            """;
+
     private final ChatClient chatClient;
 
     @Resource
@@ -42,8 +65,16 @@ public class RiskAnalysisService {
     @Resource
     private PromptFiller promptFiller;
 
-    public RiskAnalysisService(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public RiskAnalysisService(OpenAiChatModel openAiChatModel) {
+        ResponseFormat responseFormat = ResponseFormat.builder()
+                .type(ResponseFormat.Type.JSON_SCHEMA)
+                .jsonSchema(RISK_SCHEMA)
+                .build();
+        OpenAiChatOptions.Builder defaults = OpenAiChatOptions.builder()
+                .responseFormat(responseFormat);
+        this.chatClient = ChatClient.builder(openAiChatModel)
+                .defaultOptions(defaults)
+                .build();
     }
 
     /**

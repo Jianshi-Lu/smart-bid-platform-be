@@ -351,3 +351,9 @@ export PROD_MAIL_USERNAME=... PROD_MAIL_PASSWORD=...
 ```
 
 详细配置见 AGENTS.md "环境变量配置" 章节。
+
+---
+
+## 12. 关联文档
+
+- AI Structured Output 链路说明:[`docs/structured-output.md`](structured-output.md) — Spring AI + LM Studio + 本地模型 Structured Output 端到端链路、GBNF grammar 原理、调优手段
