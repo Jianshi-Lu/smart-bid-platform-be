@@ -34,7 +34,7 @@
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/bid-record/analyze-risk/{id}` | 同步调 DeepSeek，解析 JSON，落库，返全字段 `RiskAnalysis` |
+| POST | `/bid-record/analyze-risk/{id}` | 同步调 OpenAI 兼容 LM Studio，Structured Output 约束 schema，解析 JSON，落库，返全字段 `RiskAnalysis` |
 | GET | `/bid-record/risk-history/{id}` | 历史分析记录（按 `analyzedAt` 倒序） |
 
 ---
@@ -524,7 +524,7 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 
 ### 5.8 `POST /bid-record/analyze-risk/{id}`
 
-**同步调用 DeepSeek**，解析 JSON，落库 risk_analysis 表。
+**同步调用 OpenAI 兼容 LM Studio**，Structured Output 约束 schema，解析 JSON，落库 risk_analysis 表。
 
 **响应**：`Result<RiskAnalysis>`（含 9 字段：analysisId / bidRecordId / bidderName / riskLevel / summary / suggestions / rawResponse / promptVersion / analyzedAt）。
 

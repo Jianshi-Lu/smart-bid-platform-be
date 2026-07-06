@@ -154,7 +154,7 @@ public class BidRecordController {
     }
 
     /**
-     * 触发 AI 风险分析。同步调用 DeepSeek，解析 JSON 后落库。
+     * 触发 AI 风险分析。同步调用 OpenAI 兼容 LM Studio，Structured Output 约束 schema 后解析 JSON 落库。
      *
      * @param id 投标记录 ID
      * @return 含 analysisId 的完整 RiskAnalysis

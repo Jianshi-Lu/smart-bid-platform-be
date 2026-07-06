@@ -12,7 +12,7 @@
 | 分页 | PageHelper | 4.1.0（`pagehelper-spring-boot-starter`） |
 | 邮件 | Spring Boot Starter Mail | — |
 | 模板引擎 | Thymeleaf | 3.1.5 |
-| AI | Spring AI + DeepSeek | 2.0.0（`spring-ai-starter-model-deepseek`） |
+| AI | Spring AI + OpenAI 兼容 | 2.0.0（`spring-ai-starter-model-openai`，接 LM Studio 本地小模型） |
 | JSON | fastjson2 | 2.0.52 |
 | 工具 | Lombok | 1.18.46 |
 | 开发 | DevTools | — |
@@ -65,7 +65,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析
 │   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
-│   │   └── RiskAnalysisService.java        # 构造器注入 ChatClient.Builder，调用 DeepSeek
+│   │   └── RiskAnalysisService.java        # 构造器注入 OpenAiChatModel + ChatClient.defaultOptions（Structured Output），调用 LM Studio
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 ```
@@ -157,7 +157,7 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 DeepSeek、解析 JSON、落库（V18 已改字段引用：`tendererId` → `bidRecordId`）。
+构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 LM Studio、Schema 约束后 JSON 解析、落库（V18 已改字段引用：`tendererId` → `bidRecordId`）。
 
 ### 5.9 `BidRecordService`（重试逻辑）
 
@@ -308,7 +308,7 @@ service.sendOperationEmail(entity);
 | **Page<Object> 不用 try-with-resources** | PageHelper 的 Page 不实现 AutoCloseable，用 `//noinspection try` |
 | **fastjson2 而非 Jackson** | 项目已引入复用，避免新增依赖 |
 | **MailService 而非 MailSender** | 避免与 Spring Boot 自动配置的 `JavaMailSender`（Bean 名 mailSender）同名冲突 |
-| **AI ChatClient 构造器注入** | 符合 Spring AI 2.0 官方推荐；构造器里 `build()` 一次缓存 |
+| **AI OpenAiChatModel 注入 + ChatClient.defaultOptions** | 符合 Spring AI 2.0 官方推荐；注入 `OpenAiChatModel`，在 `ChatClient.builder(...).defaultOptions(opts).build()` 中装载 Structured Output JSON Schema 约束，缓存为 final 字段 |
 | **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
 | **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
 

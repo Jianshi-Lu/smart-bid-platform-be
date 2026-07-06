@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 风险分析业务服务。同步调用 DeepSeek，落库风险分析结果（V18 字段引用更新：tendererId → bidRecordId；tendererName → bidderName）。
+ * 风险分析业务服务。同步调用 OpenAI 兼容 LM Studio（本地小模型），通过 Structured Output JSON Schema 约束输出，落库风险分析结果（V18 字段引用更新：tendererId → bidRecordId；tendererName → bidderName）。
  */
 @Service
 public class RiskAnalysisService {
@@ -84,7 +84,7 @@ public class RiskAnalysisService {
     }
 
     /**
-     * 触发一次风险分析。同步调用 DeepSeek API，解析 JSON 填字段，落库并返全字段实体。
+     * 触发一次风险分析。同步调用 OpenAI 兼容 LM Studio API，Structured Output 约束 schema 后 JSON 解析填字段，落库并返全字段实体。
      *
      * @param bidRecordId 投标记录 ID
      * @return 含 analysisId 的完整 RiskAnalysis

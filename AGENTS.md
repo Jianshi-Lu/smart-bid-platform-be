@@ -20,7 +20,7 @@
 - **Lombok 1.18.46**（`@Data` / `@NoArgsConstructor` / `@AllArgsConstructor`）
 - **Thymeleaf 3.1.5**（邮件 HTML 模板）
 - **Spring Boot Starter Mail**（`JavaMailSender`）
-- **Spring AI 2.0.0** + `spring-ai-starter-model-deepseek`（AI 风险分析）
+- **Spring AI 2.0.0** + `spring-ai-starter-model-openai`（LM Studio，本地小模型；AI 风险分析通过 Structured Output 约束）
 - **DevTools**（运行时重载）
 
 ## Project Structure（简要索引）
@@ -114,11 +114,13 @@ src/main/resources/
 ### 业务 CRUD
 
 | 模块 | 端点数 | 路径前缀 |
-|------|:---:|------|
+|------|:---:|---------|
+| 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
 | 投标记录 (BidRecord) | 9 | `/bid-record/...` |
-| **AI 风险分析** | 2 | `/bid-record/{action}/{id}` |
+| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 2 | `/bid-record/{action}/{id}` |
+| **风险记录查询**（v0.2+，敏感数据只读） | 1 | `/risk-analysis` |
 
 ### 服务状态 + 邮件测试
 
@@ -132,7 +134,7 @@ src/main/resources/
 
 | Method | Path | 说明 |
 |-------|------|------|
-| POST | `/bid-record/analyze-risk/{id}` | 同步调用 DeepSeek，落库，返全字段 `RiskAnalysis` |
+| POST | `/bid-record/analyze-risk/{id}` | 同步调用 OpenAI 兼容 LM Studio，Structured Output 约束 schema，落库，返全字段 `RiskAnalysis` |
 | GET | `/bid-record/risk-history/{id}` | 历史分析记录（按时间倒序） |
 
 ## Async Task（`AsyncTaskManager`）
