@@ -1,0 +1,608 @@
+<mxfile host="drawio-plugin" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" modified="2026-07-07T03:16:01.823Z" version="22.1.22" etag="6AMZsINiHBhgtmZJGY0m" type="embed" pages="6">
+  <diagram name="1-System Context (C4 L1)" id="tab1">
+    <mxGraphModel dx="1731" dy="1149" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="系统上下文图 (C4 Level 1) — bid-winning-backend" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" value="招标方经办人&#xa;Bid Handler" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="280" y="100" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="u2" value="评标人员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="680" y="100" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="u3" value="系统管理员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="1080" y="100" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sys" value="&lt;b&gt;bid-winning-backend&lt;/b&gt;&lt;br&gt;&lt;br&gt;Spring Boot 4.0.6 + Java 25&lt;br&gt;MyBatis-Plus 3.5.15&lt;br&gt;Spring AI 2.0.0 + LM Studio&lt;br&gt;&lt;br&gt;&lt;i&gt;政府采购中标管理后端&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="480" y="380" width="440" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="ext1" value="&lt;b&gt;MySQL 8&lt;/b&gt;&lt;br&gt;&lt;br&gt;5 张业务表&lt;br&gt;逻辑外键&lt;br&gt;连接池 + MyBatis" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="80" y="640" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext2" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenAI 兼容 /v1/chat/completions&lt;br&gt;gemma-4-e4b (本地小模型)&lt;br&gt;GBNF grammar 约束" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="320" y="640" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext3" value="&lt;b&gt;QQ SMTP&lt;/b&gt;&lt;br&gt;&lt;br&gt;smtp.qq.com:587&lt;br&gt;STARTTLS + 授权码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="600" y="640" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext4" value="&lt;b&gt;浏览器 / curl / Postman&lt;/b&gt;&lt;br&gt;&lt;br&gt;HTTP/JSON 客户端" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="840" y="640" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext5" value="&lt;b&gt;QQ 邮箱收件人&lt;/b&gt;&lt;br&gt;&lt;br&gt;企业 / 个人邮箱&lt;br&gt;接收中标通知 / 业务通知" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="640" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="维护经办人 / 公告 / 投标 / 风险数据" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u1" target="sys" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="查询风险分析 / 历史分析" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u2" target="sys" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="服务探活 / 邮件测试" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u3" target="sys" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="SQL (MyBatis-Plus)" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="OpenAI HTTP (Structured Output)" style="endArrow=classic;html=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="SMTP (STARTTLS)" style="endArrow=classic;html=1;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="HTTP/JSON" style="endArrow=classic;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="投递中标通知书" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ext3" target="ext5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="2-Container (C4 L2)" id="tab2">
+    <mxGraphModel dx="779" dy="517" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="容器图 (C4 Level 2) — 应用技术栈分布" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="&lt;b&gt;客户端容器&lt;/b&gt;&lt;br&gt;[Container: Web/Curl]&lt;br&gt;&lt;br&gt;浏览器 / Postman / curl&lt;br&gt;HTTP/JSON" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="180" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="app" value="&lt;b&gt;bid-winning-backend&lt;/b&gt;&lt;br&gt;[Container: Spring Boot App]&lt;br&gt;&lt;br&gt;Java 25 + Spring Boot 4.0.6&lt;br&gt;Embedded Tomcat (8080 / 80)&lt;br&gt;Servlet-based (spring-boot-starter-webmvc)&lt;br&gt;MyBatis-Plus + PageHelper&lt;br&gt;Spring AI + Lombok + fastjson2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="420" y="160" width="380" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql" value="&lt;b&gt;MySQL 8&lt;/b&gt;&lt;br&gt;[Container: Database]&lt;br&gt;&lt;br&gt;10.0.0.100:3306 (dev)&lt;br&gt;${MYSQL_URL} (test/prod)&lt;br&gt;5 张业务表 (V1~V19 DDL)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="940" y="180" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="lms" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;[Container: AI Inference]&lt;br&gt;&lt;br&gt;localhost:1234/v1 (dev)&lt;br&gt;OpenAI 兼容 /v1/chat/completions&lt;br&gt;gemma-4-e4b + GBNF grammar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="420" y="440" width="380" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="smtp" value="&lt;b&gt;QQ SMTP&lt;/b&gt;&lt;br&gt;[Container: Mail Server]&lt;br&gt;&lt;br&gt;smtp.qq.com:587&lt;br&gt;STARTTLS + 授权码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="940" y="440" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="actuator" value="&lt;b&gt;Spring Boot Actuator&lt;/b&gt;&lt;br&gt;[Container: Observability]&lt;br&gt;&lt;br&gt;/actuator/health&lt;br&gt;/actuator/info" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="60" y="440" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="HTTP/JSON 28 端点" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=11;fontStyle=1;" parent="1" source="client" target="app" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="MySQL Wire / MyBatis-Plus / PageHelper" style="endArrow=classic;html=1;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;fontSize=11;" parent="1" source="app" target="mysql" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="OpenAI HTTP API (Structured Output)" style="endArrow=classic;html=1;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;fontSize=11;" parent="1" source="app" target="lms" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="SMTP (STARTTLS, JavaMailSender)" style="endArrow=classic;html=1;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;fontSize=11;" parent="1" source="app" target="smtp" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="暴露健康检查" style="endArrow=classic;html=1;exitX=0.3;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="actuator" target="app" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="&lt;i&gt;部署 profile: dev (8080) / test (8080) / prod (80)&lt;/i&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="60" y="600" width="1200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="&lt;i&gt;dev 启用 DevTools 热重载 + 详细 log;&lt;br&gt;prod 用环境变量注入 MYSQL_URL/USER/PASS + PROD_MAIL_*&lt;/i&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="60" y="630" width="1200" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="3-Component (C4 L3) MAIN" id="tab3">
+    <mxGraphModel dx="779" dy="517" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="组件图 (C4 Level 3) — Spring Boot 应用内部组件" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="600" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_pres" value="Presentation 层 — 6 Controller (含 GlobalExceptionHandler)" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="80" width="2280" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_bh" value="&lt;b&gt;BidHandlerInfoController&lt;/b&gt;&lt;br&gt;/bid-handler-info/* (7 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="20" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_if" value="&lt;b&gt;InvitationForBidController&lt;/b&gt;&lt;br&gt;/invitation-for-bid/* (8 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="260" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_br" value="&lt;b&gt;BidRecordController&lt;/b&gt;&lt;br&gt;/bid-record/* (9 端点 + 2 AI 子端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="500" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_ra" value="&lt;b&gt;RiskAnalysisController&lt;/b&gt;&lt;br&gt;GET /risk-analysis (1 端点, 只读)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="740" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_sc" value="&lt;b&gt;StatusCheckController&lt;/b&gt;&lt;br&gt;/service-status + /send-email + /send-notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="980" y="40" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_geh" value="&lt;b&gt;GlobalExceptionHandler&lt;/b&gt;&lt;br&gt;统一异常捕获 → Result 包装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="lane_pres" vertex="1">
+          <mxGeometry x="1240" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_label1" value="@RestController&#xa;@RequestParam / @PathVariable&#xa;@Valid 校验 DTO" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;" parent="lane_pres" vertex="1">
+          <mxGeometry x="20" y="110" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctrl_label2" value="Spring 4.x MVC + 全局异常" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;" parent="lane_pres" vertex="1">
+          <mxGeometry x="1240" y="110" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_app" value="Application 层 — 8 Service (BaseService + 5 业务 + 2 工具型)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="310" width="2280" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_base" value="&lt;b&gt;BaseService&lt;T&gt;&lt;/b&gt;&lt;br&gt;abstract 通用 CRUD + 邮件 + 资源搜索" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="20" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_bh" value="&lt;b&gt;BidHandlerInfoService&lt;/b&gt;&lt;br&gt;extends BaseService&#xa;7 端点业务逻辑" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="260" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_if" value="&lt;b&gt;InvitationForBidService&lt;/b&gt;&lt;br&gt;extends BaseService&#xa;8 端点 + 状态机校验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="500" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_br" value="&lt;b&gt;BidRecordService&lt;/b&gt;&lt;br&gt;extends BaseService&#xa;bidNo 3 次重试 + UNIQUE 兜底" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="740" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_risk" value="&lt;b&gt;RiskAnalysisService&lt;/b&gt;&lt;br&gt;AI 调用 + parseAndBuild + persist&#xa;OpenAiChatModel + ChatClient.defaultOptions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="980" y="40" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_loader" value="&lt;b&gt;BidRecordLoader&lt;/b&gt;&lt;br&gt;detail 加载 (资质材料)&#xa;Markdown → HTML" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="1260" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_mail" value="&lt;b&gt;MailService&lt;/b&gt;&lt;br&gt;JavaMailSender&#xa;Thymeleaf 模板渲染" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="1500" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_status" value="&lt;b&gt;StatusCheckService&lt;/b&gt;&lt;br&gt;业务流不继承 BaseService&#xa;发邮件异步延迟 5s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+          <mxGeometry x="1740" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_note" value="@Transactional(rollbackFor = Exception.class) 写方法事务&#xa;@Resource 注入 Mapper&#xa;@EnableAsync 异步" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;" parent="lane_app" vertex="1">
+          <mxGeometry x="20" y="120" width="600" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_domain" value="Domain 层 — 5 Entity + 1 Enum + 16 DTO + Result/Diff" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="560" width="2280" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_bh" value="&lt;b&gt;BidHandlerInfo&lt;/b&gt;&lt;br&gt;@TableName bid_handler_info&#xa;PK bid_handler_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="20" y="40" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_if" value="&lt;b&gt;InvitationForBid&lt;/b&gt;&lt;br&gt;@TableName invitation_for_bid&#xa;PK invitation_id&#xa;+ 18 字段 (3 必填)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="240" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_br" value="&lt;b&gt;BidRecord&lt;/b&gt;&lt;br&gt;@TableName bid_record&#xa;PK bid_record_id&#xa;FK invitation_id, UNIQUE(inv, name, no)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="480" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_ra" value="&lt;b&gt;RiskAnalysis&lt;/b&gt;&lt;br&gt;@TableName risk_analysis&#xa;PK analysis_id&#xa;FK bid_record_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="720" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_his" value="&lt;b&gt;InvitationForBidStatusHistory&lt;/b&gt;&lt;br&gt;@TableName invitation_for_bid_status_history&#xa;PK history_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="960" y="40" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_enum" value="&lt;b&gt;BidNoticeStatus&lt;/b&gt;&lt;br&gt;enum: DRAFT / PUBLISHED /&#xa;CLOSED / AWARDED / CANCELLED&#xa;canTransitionTo() 状态机" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="lane_domain" vertex="1">
+          <mxGeometry x="1220" y="40" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="dto_grp" value="&lt;b&gt;16 DTOs (按业务分包)&lt;/b&gt;&lt;br&gt;dto/bidhandler/* (4) Add/Update/Delete/BatchAdd&#xa;dto/bidrecord/* (3) Add/Update/BatchDelete&#xa;dto/invitationforbid/* (5) Add/Update/BatchAdd/BatchDelete/StatusUpdate&#xa;dto/statuscheck/* (2) PlainText/BidWinningMail&#xa;dto/common/* (2) Result / Diff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;fontSize=10;align=left;spacingLeft=10;" parent="lane_domain" vertex="1">
+          <mxGeometry x="1480" y="40" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dto_note" value="Lombok @Data / @NoArgsConstructor / @AllArgsConstructor&#xa;Jakarta Validation: @NotBlank / @NotNull / @Size&#xa;PATCH 风格: 仅 @Size, 无 @NotBlank/@NotNull" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;" parent="lane_domain" vertex="1">
+          <mxGeometry x="20" y="120" width="600" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_infra" value="Infrastructure 层 — 6 Mapper + MyBatis-Plus + JDBC + PageHelper" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="810" width="2280" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="map_base" value="&lt;b&gt;BaseMapper&lt;T&gt;&lt;/b&gt;&lt;br&gt;项目自建泛型基接口&#xa;7 标准方法签名" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="20" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="map_bh" value="&lt;b&gt;BidHandlerInfoMapper&lt;/b&gt;&#xa;+ XML: 7 标准 SQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="260" y="40" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="map_if" value="&lt;b&gt;InvitationForBidMapper&lt;/b&gt;&#xa;+ XML: 7 标准 + status 查询" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="480" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="map_br" value="&lt;b&gt;BidRecordMapper&lt;/b&gt;&#xa;+ XML: 7 标准 + bidNo 计算 + byInvitation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="720" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="map_ra" value="&lt;b&gt;RiskAnalysisMapper&lt;/b&gt;&#xa;+ XML: 7 标准 + byBidRecordId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="960" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="map_his" value="&lt;b&gt;InvitationForBidStatusHistoryMapper&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=11;" parent="lane_infra" vertex="1">
+          <mxGeometry x="1200" y="40" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mp_box" value="&lt;b&gt;MyBatis-Plus 3.5.15 + JDBC + MySQL Connector&#xa;PageHelper 4.1.0 (ThreadLocal 分页)&#xa;@MapperScan 自动生成代理 (BidWinningBackendApplication)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" parent="lane_infra" vertex="1">
+          <mxGeometry x="1480" y="40" width="600" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_cross" value="横切关注点 (Cross-Cutting) — Util / Mail / AOP / Async / Actuator / DevTools" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="1040" width="2280" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="util_pf" value="&lt;b&gt;PromptFiller&lt;/b&gt;&lt;br&gt;classpath:prompts/*.txt 加载&#xa;{{var}} 替换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+          <mxGeometry x="20" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="util_rs" value="&lt;b&gt;ResourceSearcher&lt;/b&gt;&lt;br&gt;URI/路径解析&#xa;copy_down Markdown→HTML" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+          <mxGeometry x="260" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="util_at" value="&lt;b&gt;AsyncTaskManager&lt;/b&gt;&lt;br&gt;static new Thread()&#xa;延迟任务 (5s 邮件)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+          <mxGeometry x="500" y="40" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cross_mail" value="&lt;b&gt;JavaMailSender (Spring Boot Mail)&#xa;+ Thymeleaf 3.1.5&#xa;templates/*.html (3 模板)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" parent="lane_cross" vertex="1">
+          <mxGeometry x="740" y="40" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="cross_ai" value="&lt;b&gt;Spring AI 2.0.0&#xa;ChatClient + OpenAiChatModel&#xa;ResponseFormat(JSON_SCHEMA)&#xa;Structured Output 约束&#xa;→ LM Studio /v1/chat/completions&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=10;" parent="lane_cross" vertex="1">
+          <mxGeometry x="1040" y="40" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="cross_aop" value="&lt;b&gt;@EnableAspectJAutoProxy&#xa;+ aspectjweaver 1.x&lt;/b&gt;&#xa;AOP 切面预留&#xa;(历史邮件通知已废弃)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" parent="lane_cross" vertex="1">
+          <mxGeometry x="1380" y="40" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cross_obs" value="&lt;b&gt;Actuator + DevTools + Logging&lt;/b&gt;&#xa;/actuator/health, info&#xa;热重载 (dev only)&#xa;slf4j → logs/app.log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;" parent="lane_cross" vertex="1">
+          <mxGeometry x="1680" y="40" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_mysql" value="&lt;b&gt;MySQL 8&lt;/b&gt;&#xa;5 张表" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="60" y="1280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_lms" value="&lt;b&gt;LM Studio&lt;/b&gt;&#xa;gemma-4-e4b" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="320" y="1280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_smtp" value="&lt;b&gt;QQ SMTP&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="580" y="1280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="edg1" value="REST" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_bh" target="svc_bh" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg2" value="REST" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_if" target="svc_if" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg3" value="REST" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_br" target="svc_br" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg3b" value="AI 子端点" style="endArrow=classic;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_br" target="svc_risk" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg4" value="只读" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_ra" target="svc_risk" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg5" value="REST" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ctrl_sc" target="svc_status" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg6" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="svc_bh" target="svc_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg7" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="svc_if" target="svc_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg8" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="svc_br" target="svc_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg9" value="注入" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="svc_bh" target="map_bh" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg10" value="注入" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="svc_if" target="map_if" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg11" value="注入" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="svc_br" target="map_br" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg12" value="注入" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="svc_risk" target="map_ra" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg13" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="map_bh" target="map_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg14" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="map_if" target="map_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg15" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="map_br" target="map_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg16" value="extends" style="endArrow=open;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="map_ra" target="map_base" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg17" value="@TableName" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="ent_bh" target="ctrl_bh" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg18" value="@TableName" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="ent_if" target="ctrl_if" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg19" value="@TableName" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="ent_br" target="ctrl_br" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg20" value="MySQL" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;fontStyle=1;" parent="1" source="lane_infra" target="ext_mysql" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg21" value="OpenAI HTTP" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;fontStyle=1;" parent="1" source="cross_ai" target="ext_lms" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg22" value="SMTP" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;fontStyle=1;" parent="1" source="cross_mail" target="ext_smtp" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg23" value="加载 prompts/*" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="util_pf" target="svc_risk" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg24" value="注入 ChatClient" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="cross_ai" target="svc_risk" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edg25" value="捕获异常" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;strokeColor=#d79b00;" parent="1" source="ctrl_geh" target="lane_app" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="4-Layered Architecture" id="tab4">
+    <mxGraphModel dx="779" dy="517" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="分层架构图 — Classic 4-Layer + 横切层" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="350" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="&lt;b&gt;L1 表现层 (Presentation)&lt;/b&gt;&lt;br&gt;&lt;br&gt;6 Controller + GlobalExceptionHandler&#xa;@RestController / @RequestMapping / @Valid&#xa;HTTP/JSON 入参出参 (28 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
+          <mxGeometry x="100" y="100" width="1200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="&lt;b&gt;L2 业务层 (Application / Domain Logic)&lt;/b&gt;&lt;br&gt;&lt;br&gt;8 Service (BaseService + 5 业务 + 2 工具型)&#xa;@Transactional(rollbackFor = Exception.class) 事务&#xa;业务规则: bidNo 3 次重试 / 状态机 canTransitionTo() / AI parseAndBuild" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
+          <mxGeometry x="100" y="220" width="1200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="&lt;b&gt;L3 持久层 (Infrastructure / Persistence)&lt;/b&gt;&lt;br&gt;&lt;br&gt;6 Mapper (@Mapper) + 5 XML (SQL)&#xa;MyBatis-Plus 3.5.15 + PageHelper 4.1.0 (ThreadLocal)&#xa;@MapperScan 自动生成代理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
+          <mxGeometry x="100" y="340" width="1200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="&lt;b&gt;L4 数据层 (Data)&lt;/b&gt;&lt;br&gt;&lt;br&gt;MySQL 8 — 5 张业务表&#xa;V1~V19 Flyway 兼容 DDL(未启用 Flyway)&#xa;逻辑外键 (DB 层无 FK 约束)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=center;" parent="1" vertex="1">
+          <mxGeometry x="100" y="460" width="1200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ld1" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=14;" parent="1" source="l1" target="l2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ld2" value="@Resource 注入&#xa;@Transactional" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;" parent="1" source="l2" target="l3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ld3" value="SQL / JDBC" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;" parent="1" source="l3" target="l4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cross_label" value="横切关注点 (Cross-Cutting)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=14;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="100" y="600" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="&lt;b&gt;AI 集成层&lt;/b&gt;&lt;br&gt;Spring AI 2.0.0&#xa;ChatClient + ResponseFormat&#xa;→ LM Studio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="100" y="640" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="&lt;b&gt;邮件集成层&lt;/b&gt;&lt;br&gt;JavaMailSender + Thymeleaf&#xa;templates/*.html&#xa;→ QQ SMTP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="360" y="640" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="&lt;b&gt;工具层 (Util)&lt;/b&gt;&lt;br&gt;PromptFiller: 加载 prompts/*&#xa;ResourceSearcher: 路径解析&#xa;AsyncTaskManager: 异步延迟" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="620" y="640" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="&lt;b&gt;异常处理&lt;/b&gt;&lt;br&gt;GlobalExceptionHandler&#xa;统一捕获 → Result 包装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="880" y="640" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="&lt;b&gt;可观测性 + DevTools&lt;/b&gt;&lt;br&gt;Actuator (health, info)&#xa;DevTools (dev 热重载)&#xa;slf4j → logs/app.log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="1100" y="640" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c_arrow1" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;fontSize=10;" parent="1" source="c1" target="l2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c_arrow2" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;fontSize=10;" parent="1" source="c2" target="l2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c_arrow3" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;fontSize=10;" parent="1" source="c3" target="l2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c_arrow4" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;strokeColor=#d79b00;fontSize=10;" parent="1" source="c4" target="l1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="c_arrow5" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;fontSize=10;" parent="1" source="c5" target="l1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="&lt;b&gt;依赖规则 (Dependency Rule):&lt;/b&gt;&lt;br&gt;  上层 → 下层 (L1→L2→L3→L4)&#xa;  横切层 → 业务层 (L2) 或 表现层 (L1)&#xa;  下层绝不依赖上层 (无循环依赖)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="100" y="780" width="600" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="&lt;b&gt;类数量速查:&lt;/b&gt;&lt;br&gt;  L1: 6 Controller + 1 Handler = 7&lt;br&gt;  L2: 8 Service (含 BaseService 抽象基)&lt;br&gt;  Domain: 5 Entity + 1 Enum + 16 DTO = 22&lt;br&gt;  L3: 6 Mapper + 5 XML + 1 Base = 12&lt;br&gt;  L4: 5 张业务表&#xa;  Util: 3 (PromptFiller / ResourceSearcher / AsyncTaskManager)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="720" y="780" width="580" height="120" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="5-AI Risk Analysis Sequence" id="tab5">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="时序图 — POST /bid-record/analyze-risk/{id} 端到端链路" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="客户端" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="100" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="DispatcherServlet" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="180" y="80" width="120" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="BidRecordController" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="340" y="80" width="140" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="RiskAnalysisService" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="520" y="80" width="140" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="ChatClient&#xa;(defaultOptions)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="700" y="80" width="140" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="Spring AI&#xa;OpenAI Client" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="880" y="80" width="140" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" value="LM Studio&#xa;/v1/chat/completions" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="80" width="160" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" value="gemma-4-e4b&#xa;+ GBNF grammar" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="80" width="140" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" value="RiskAnalysisMapper&#xa;+ MyBatis-Plus" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=20;fontSize=12;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1440" y="80" width="160" height="1180" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="1. POST /bid-record/analyze-risk/2" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=11;" edge="1" parent="1" source="c1" target="c2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="2. 路由到 BidRecordController.analyzeRisk(id)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=11;" edge="1" parent="1" source="c2" target="c3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="40" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m3" value="3. service.analyzeRisk(bidRecordId)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=11;" edge="1" parent="1" source="c3" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="80" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m4" value="4. bidRecordMapper.selectById(2)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;dashed=1;" edge="1" parent="1" source="c4" target="c9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-150" y="120" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m5" value="5. BidRecord entity" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;dashed=1;direction=south;" edge="1" parent="1" source="c9" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-150" y="160" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m6" value="6. loader.loadDetail() (资质材料)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;dashed=1;exitX=0.3;exitY=1;" edge="1" parent="1" source="c4" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="200" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m7" value="7. promptFiller.loadFromResource(prompts/risk-analysis-system-v1.txt)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;dashed=1;exitX=0.7;exitY=1;entryX=0.7;entryY=0;" edge="1" parent="1" source="c4" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="240" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m8" value="8. chatClient.prompt().system(...).user(...).call().content()" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=11;" edge="1" parent="1" source="c4" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="300" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m9" value="9. 携带 defaultOptions=JSON_SCHEMA 序列化" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=10;" edge="1" parent="1" source="c5" target="c6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="340" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m10" value="10. HTTP POST /v1/chat/completions&#xa;{ model, messages, response_format: { type: json_schema, json_schema: &#39;{...}&#39; } }" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=10;" edge="1" parent="1" source="c6" target="c7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="400" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m11" value="11. 编译 JSON Schema → GBNF grammar" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=10;" edge="1" parent="1" source="c7" target="c8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="480" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m12" value="12. token 采样 (logit mask 非法 token)" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="c8" target="c8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="540" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m13" value="13. { riskLevel, summary, suggestions } JSON" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c8" target="c7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="600" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m14" value="14. OpenAI 兼容 chat.completion 响应" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c7" target="c6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="660" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m15" value="15. content 字段 → Java String" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c6" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="720" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m16" value="16. raw String" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c5" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="780" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m17" value="17. parseAndBuild() — JSON.parseObject 提取字段" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="c4" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="840" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m18" value="18. mapper.insert(analysis) @Transactional" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=1;exitY=0;entryX=0;entryY=0;fontSize=10;" edge="1" parent="1" source="c4" target="c9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="900" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m19" value="19. INSERT INTO risk_analysis ... ; analysisId 回填" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;fontSize=10;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="c9" target="c9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="960" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m20" value="20. saved RiskAnalysis entity" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c9" target="c4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="1020" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m21" value="21. return Result&lt;RiskAnalysis&gt;" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c4" target="c3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="1080" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m22" value="22. JSON 响应" style="endArrow=classic;html=1;rounded=0;edgeStyle=elbowEdgeStyle;elbow=vertical;exitX=0;exitY=0;entryX=1;entryY=0;fontSize=10;direction=south;" edge="1" parent="1" source="c3" target="c1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-100" y="1140" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend" value="&lt;b&gt;图例:&lt;/b&gt;&lt;br&gt;━━ 实线 = HTTP/REST 调用&lt;br&gt;┄┄ 虚线 = 内部方法调用 / 数据流&lt;br&gt;⮕ 圆头箭头 = 同步返回" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1280" width="500" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="6-ER Diagram" id="tab6">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="ER 图 — 5 张业务表 + 4 个逻辑外键" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="t_bh" value="&lt;b&gt;bid_handler_info&lt;/b&gt;&lt;br&gt;PK bid_handler_id INT&#xa;handler_name VARCHAR(50)&#xa;company_name VARCHAR(100)&#xa;department_name VARCHAR(100)&#xa;target_email VARCHAR(255)&#xa;created_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="260" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="t_if" value="&lt;b&gt;invitation_for_bid&lt;/b&gt;&lt;br&gt;PK invitation_id INT&#xa;FK bid_handler_id INT&lt;b&gt;*&lt;/b&gt;&#xa;project_no VARCHAR(50)&#xa;purchase_task_no VARCHAR(50)&#xa;platform_category VARCHAR(50)&#xa;tender_process VARCHAR(50)&#xa;tender_method VARCHAR(50)&#xa;purchase_method VARCHAR(50)&#xa;is_fixed_price TINYINT(1)&#xa;has_document_fee TINYINT(1)&#xa;deposit DECIMAL&#xa;credit_report_required TINYINT(1)&#xa;registration_deadline DATETIME&#xa;technical_tender_deadline DATETIME&#xa;business_tender_deadline DATETIME&#xa;notes TEXT&#xa;purchase_company VARCHAR(100)&#xa;purchase_department VARCHAR(100)&#xa;tendering_party VARCHAR(100)&#xa;status ENUM(DRAFT/PUBLISHED/...)&#xa;created_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="500" y="120" width="320" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="t_br" value="&lt;b&gt;bid_record&lt;/b&gt;&lt;br&gt;PK bid_record_id INT&#xa;FK invitation_id INT&lt;b&gt;*&lt;/b&gt;&#xa;bidder_name VARCHAR(100)&#xa;quote_price DECIMAL&#xa;bidder_contact VARCHAR(255)&#xa;credentials VARCHAR(500)&#xa;bid_no INT&#xa;bid_at DATETIME&#xa;&lt;i&gt;UNIQUE(invitation_id, bidder_name, bid_no)&lt;/i&gt;" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="900" y="180" width="280" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="t_ra" value="&lt;b&gt;risk_analysis&lt;/b&gt;&lt;br&gt;PK analysis_id INT&#xa;FK bid_record_id INT&lt;b&gt;*&lt;/b&gt;&#xa;bidder_name VARCHAR(100)&#xa;risk_level VARCHAR(10)&#xa;summary VARCHAR(500)&#xa;suggestions VARCHAR(255)&#xa;raw_response TEXT&#xa;prompt_version VARCHAR(20)&#xa;analyzed_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="220" width="280" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="t_his" value="&lt;b&gt;invitation_for_bid_status_history&lt;/b&gt;&lt;br&gt;PK history_id INT&#xa;FK invitation_id INT&lt;b&gt;*&lt;/b&gt;&#xa;old_status VARCHAR(20)&#xa;new_status VARCHAR(20)&#xa;change_time DATETIME&#xa;remark VARCHAR(255)" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="640" y="640" width="320" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="fk1" value="FK bid_handler_id (逻辑外键)" style="endArrow=open;html=1;startArrow=ERmany;startFill=0;endArrow=ERmany;endFill=0;edgeStyle=orthogonalEdgeStyle;fontSize=10;strokeColor=#9673a6;dashed=1;" edge="1" parent="1" source="t_bh" target="t_if">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk2" value="FK invitation_id (逻辑外键)" style="endArrow=open;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;edgeStyle=orthogonalEdgeStyle;fontSize=10;strokeColor=#9673a6;dashed=1;" edge="1" parent="1" source="t_if" target="t_br">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk3" value="FK bid_record_id (逻辑外键)" style="endArrow=open;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;edgeStyle=orthogonalEdgeStyle;fontSize=10;strokeColor=#9673a6;dashed=1;" edge="1" parent="1" source="t_br" target="t_ra">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fk4" value="FK invitation_id (逻辑外键)" style="endArrow=open;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;edgeStyle=orthogonalEdgeStyle;fontSize=10;strokeColor=#9673a6;dashed=1;" edge="1" parent="1" source="t_if" target="t_his">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" value="&lt;b&gt;*&lt;/b&gt; = 逻辑外键 (Logical FK)&#xa;&lt;br&gt;DB 层无 FK 约束&#xa;&lt;br&gt;应用层负责引用完整性" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="60" y="640" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="&lt;b&gt;命名约定:&lt;/b&gt;&lt;br&gt;PK = 主键&#xa;&lt;br&gt;FK = 逻辑外键&#xa;&lt;br&gt;所有表带 created_at&#xa;&lt;br&gt;V1~V19 DDL (Flyway 兼容,未启用)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="640" width="500" height="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

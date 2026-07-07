@@ -357,3 +357,4 @@ export PROD_MAIL_USERNAME=... PROD_MAIL_PASSWORD=...
 ## 12. 关联文档
 
 - AI Structured Output 链路说明:[`docs/structured-output.md`](structured-output.md) — Spring AI + LM Studio + 本地模型 Structured Output 端到端链路、GBNF grammar 原理、调优手段
+- 完整架构图(6 tab, C4 L1~L3 + 分层 + 时序 + ER):[`docs/architecture-diagram.drawio`](architecture-diagram.drawio) — 用 draw.io 打开,6 tab 全景
