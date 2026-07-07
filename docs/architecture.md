@@ -83,7 +83,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
   ↓
 ④ Mapper XML（namespace = Mapper 接口 FQN，SQL 独立于 Java）
   ↓
-⑤ Service（extends BaseService<T>，子类实现 getMapper() + getIdExtractor()）
+⑤ Service(业务 CRUD 型 extends BaseService<T>,子类实现 getMapper() + getIdExtractor();业务流型如 RiskAnalysisService / StatusCheckService 不继承,直接 @Service + 注入依赖)
   ↓
 ⑥ DTO（@NotBlank / @NotNull / @Size 校验；PATCH 风格 UpdateRequest 仅 @Size）
   ↓
@@ -95,7 +95,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 | 维度 | 约定 |
 |------|------|
 | Mapper 接口 | 继承 `BaseMapper<T>`（7 标准方法），手写 XML |
-| Service | 继承 `BaseService<T>`，写方法统一 `@Transactional(rollbackFor = Exception.class)` |
+| Service | 业务 CRUD 型继承 `BaseService<T>`,写方法统一 `@Transactional(rollbackFor = Exception.class)`;业务流型不继承,自行管理事务 |
 | DTO 命名 | `AddRequest` / `UpdateRequest`（PATCH 风格，仅 @Size）/ `BatchDeleteRequest` / `BatchAddRequest`（含 @Valid 内嵌）/ `StatusUpdateRequest` / `DeleteRequest` |
 | Controller 响应 | `Result<T>`；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>` |
 | 业务状态码 | 200 成功 / 400 参数错误 / 404 资源不存在 / 500 服务器错误（GlobalExceptionHandler 统一处理） |
@@ -299,7 +299,7 @@ service.sendOperationEmail(entity);
 | 决策 | 理由 |
 |------|------|
 | **Mapper XML 而非注解 SQL** | 坚持 Java/SQL 分离，便于 DBA 维护 |
-| **Service 继承 BaseService** | 消除 3 业务 Service 重复 CRUD 代码 |
+| **业务 Service 分类** | 业务 CRUD 型(3 个:BidHandlerInfo/InvitationForBid/BidRecord)继承 `BaseService` 消除重复;业务流型(2 个:RiskAnalysis/StatusCheck)不继承,因业务逻辑独立,避免被通用 CRUD API 污染(同 `StatusCheckService` 先例) |
 | **DTO 每端点独立** | 避免端点间耦合，符合阿里《Java 开发手册》 |
 | **PATCH 语义** | 调用方传哪些字段就更新哪些字段，null = 不修改 |
 | **批量删除 data 返实体列表** | 前端 diff 友好，多 1 次 SELECT（PK 索引，毫秒级）|
@@ -322,7 +322,7 @@ service.sendOperationEmail(entity);
 2. **Entity**：`entity/Xxx.java`（@TableName + @TableId + Lombok 三件套）
 3. **Mapper 接口**：`mapper/XxxMapper.java extends BaseMapper<Xxx>`（@Mapper 注解）
 4. **Mapper XML**：`resources/mapper/XxxMapper.xml`（namespace = FQN，7 个标准 SQL 标签 + 可选 `<selectByXxxId>`）
-5. **Service**：`service/XxxService.java extends BaseService<Xxx>`（getMapper + getIdExtractor 两个方法）
+5. **Service**:`service/XxxService.java` — 业务 CRUD 型 `extends BaseService<Xxx>`(getMapper + getIdExtractor 两个方法);业务流型不继承,直接 `@Service` + 注入依赖
 6. **DTO**：`dto/xxx/{AddRequest, UpdateRequest, BatchDeleteRequest}.java`
 7. **Controller**：`controller/XxxController.java`（6 标准 CRUD 端点：add / getById / patch / delete / list / batch-delete；可选 batch-add / status / AI 子端点）
 8. **AI 风险分析（如需要）**：`service/riskanalysis/XxxRiskAnalysisService.java`（参考 RiskAnalysisService）

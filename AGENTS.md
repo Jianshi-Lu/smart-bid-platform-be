@@ -230,8 +230,8 @@ src/main/resources/
 | 维度 | 约定 |
 |------|------|
 | Mapper 接口 | 继承 `BaseMapper<T>`（项目自建泛型基接口），手写 XML SQL |
-| Service | 继承 `BaseService<T>`（项目自建泛型基类），子类实现 `getMapper()` + `getIdExtractor()` |
-| 写方法事务 | `@Transactional(rollbackFor = Exception.class)`（由 `BaseService` 统一加） |
+| Service | 业务 CRUD 型(`BidHandlerInfoService` / `InvitationForBidService` / `BidRecordService`)继承 `BaseService<T>`(项目自建泛型基类,子类实现 `getMapper()` + `getIdExtractor()`);业务流型(`RiskAnalysisService` / `StatusCheckService`)**不**继承,直接 `@Service` + 注入所需依赖(如 Mapper、OpenAiChatModel、JavaMailSender) |
+| 写方法事务 | `@Transactional(rollbackFor = Exception.class)`(由 `BaseService` 统一加);**未**继承 BaseService 的 Service 自行在写方法上加注解(如 `RiskAnalysisService.persist`) |
 | DTO 命名 | `<Entity>AddRequest`（创建入参：必填字段带 `@NotBlank` / `@NotNull` + `@Size`）/ `<Entity>UpdateRequest`（PATCH 风格：**仅 `@Size`，无 `@NotBlank`/`@NotNull`**）/ `<Entity>BatchDeleteRequest` / `<Entity>BatchAddRequest`（含 `@Valid` 内嵌）/ `<Entity>DeleteRequest` / `<Entity>StatusUpdateRequest` |
 | Controller 响应 | `Result<T>` 包装；PATCH → `Result<Diff<T>>`；批量删除 → `Result<List<Entity>>` |
 | 业务状态码 | 200=成功, 400=参数错误, 404=资源不存在 |
@@ -242,7 +242,7 @@ src/main/resources/
 | JSON 序列化 | fastjson2（项目无 Jackson） |
 | Bean 名冲突 | `JavaMailSender` Bean 名 `mailSender`，自建类**不可**叫 `MailSender`（会冲突） |
 | `Page<Object>` | 不实现 `AutoCloseable`，**不可**用 try-with-resources |
-| Spring AI 实践 | 构造器注入 `ChatClient.Builder`，构造器里 `build()` 一次缓存为 `final` 字段 |
+| Spring AI 实践 | 构造器注入 `OpenAiChatModel`,在 `ChatClient.builder(model).defaultOptions(opts).build()` 里装载 Structured Output JSON Schema,缓存为 `final` 字段;输出 JSON Schema 用 Java text block 写在 Service 常量里 |
 
 ## 端到端开发流程（7 层链路）
 
@@ -257,7 +257,7 @@ src/main/resources/
   ↓
 ④ Mapper XML（namespace 绑定接口，SQL 独立于 Java）
   ↓
-⑤ Service（注入 Mapper，不继承 IService）
+⑤ Service（注入 Mapper,不继承 MP `IService`;业务 CRUD 型继承 `BaseService<T>`,业务流型不继承）
   ↓
 ⑥ DTO（@NotBlank / @Size 校验）
   ↓
