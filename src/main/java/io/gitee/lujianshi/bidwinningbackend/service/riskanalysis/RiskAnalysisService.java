@@ -13,6 +13,7 @@ import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
 import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel.ResponseFormat;
@@ -60,6 +62,16 @@ public class RiskAnalysisService {
             """;
 
     private final ChatClient chatClient;
+
+    /**
+     * 自注入 Spring 代理,用于绕过 {@code @Transactional} 同类自调失效。
+     * {@link #persist(RiskAnalysis)} 标了 {@code @Transactional(rollbackFor = Exception.class)},
+     * 但 {@code analyzeRisk} 同类内调它时事务代理不会触发,得走 self 走代理。
+     * <p>{@code @Lazy} 避免循环依赖(Spring 实例化本 Bean 时尚无代理可用,需延后注入)。</p>
+     */
+    @Resource
+    @Lazy
+    private RiskAnalysisService self;
 
     @Resource
     private BidRecordLoader loader;
@@ -121,7 +133,7 @@ public class RiskAnalysisService {
 
         long startNs = System.nanoTime();
 
-        // 调用模型,获取完整 ChatResponse(同时拿 content 与 reasoningContent,见 extractRawContent JavaDoc)
+        // 调用模型,获取完整 ChatResponse(防止内容回复从 content 落入 reasoningContent,见 extractRawContent JavaDoc)
         ChatResponse chatResponse = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
@@ -137,7 +149,7 @@ public class RiskAnalysisService {
 
         RiskAnalysis analysis = parseAndBuild(bidRecordId, record.getBidderName(), raw, analyzedAt);
 
-        RiskAnalysis saved = persist(analysis);
+        RiskAnalysis saved = self.persist(analysis);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
     }
@@ -193,10 +205,12 @@ public class RiskAnalysisService {
         if (response == null) {
             return "";
         }
-        AssistantMessage msg = response.getResult().getOutput();
-        if (msg == null) {
+        Generation gen = response.getResult();
+        if (gen == null) {
             return "";
         }
+        AssistantMessage msg = gen.getOutput();
+        // 取 content 字段
         String content = msg.getText();
         if (content != null && !content.isBlank()) {
             return content;
@@ -205,13 +219,12 @@ public class RiskAnalysisService {
         // 取 AssistantMessage.metadata 是因为 spring-ai-openai 2.0 内 OpenAiChatModel
         // 已把 reasoning_content 字段透传到这里,key="reasoningContent"(camelCase)。
         Map<String, Object> metadata = msg.getMetadata();
-        if (metadata != null) {
-            Object reasoning = metadata.get("reasoningContent");
-            if (reasoning != null && !reasoning.toString().isBlank()) {
-                log.info("[风险分析] content 为空,降级到 reasoningContent (length={})",
-                        reasoning.toString().length());
-                return reasoning.toString();
-            }
+        Object reasoning = metadata.get("reasoningContent");
+        // 取 reasoning_content 字段
+        if (reasoning != null && !reasoning.toString().isBlank()) {
+            log.info("[风险分析] content 为空,降级到 reasoningContent (length={})",
+                    reasoning.toString().length());
+            return reasoning.toString();
         }
         return "";
     }
