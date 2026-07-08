@@ -118,9 +118,9 @@ src/main/resources/
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
-| 投标记录 (BidRecord) | 9 | `/bid-record/...` |
-| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 2 | `/bid-record/{action}/{id}` |
-| **风险记录查询**（v0.2+，敏感数据只读） | 1 | `/risk-analysis` |
+| 投标记录 (BidRecord) | 8 | `/bid-record/...` |
+| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 1 | `/bid-record/{action}/{id}` |
+| **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
 
 ### 服务状态 + 邮件测试
 
@@ -135,7 +135,7 @@ src/main/resources/
 | Method | Path | 说明 |
 |-------|------|------|
 | POST | `/bid-record/analyze-risk/{id}` | 同步调用 OpenAI 兼容 LM Studio，Structured Output 约束 schema，落库，返全字段 `RiskAnalysis` |
-| GET | `/bid-record/risk-history/{id}` | 历史分析记录（按时间倒序） |
+| GET | `/risk-analysis/by-bid-record/{id}` | 历史分析记录（按时间倒序） |
 
 ## Async Task（`AsyncTaskManager`）
 

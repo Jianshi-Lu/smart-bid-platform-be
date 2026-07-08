@@ -24,9 +24,9 @@
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 招标经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
-| 投标记录 (BidRecord) | 9 | `/bid-record/...` |
-| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 2 | `/bid-record/{action}/{id}` |
-| **风险记录查询**（v0.2+，敏感数据只读） | 1 | `/risk-analysis` |
+| 投标记录 (BidRecord) | 8 | `/bid-record/...` |
+| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 1 | `/bid-record/{action}/{id}` |
+| **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
 
 > **v18 命名变更**：招标方相关表统一使用 World Bank 术语"Invitation for Bids"；经办人使用"bid handler"。详见 [database.md §1](database.md#1-表结构总览)。
 
@@ -35,7 +35,6 @@
 | Method | Path | 说明 |
 |--------|------|------|
 | POST | `/bid-record/analyze-risk/{id}` | 同步调 OpenAI 兼容 LM Studio，Structured Output 约束 schema，解析 JSON，落库，返全字段 `RiskAnalysis` |
-| GET | `/bid-record/risk-history/{id}` | 历史分析记录（按 `analyzedAt` 倒序） |
 
 ---
 
@@ -440,7 +439,6 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 | **GET** | **`/bid-record/by-invitation/{invitationId}`** | **按招标公告查询（不分页）** | **`Result<List<BidRecord>>`** |
 | POST | `/bid-record/batch-delete` | 批量删除 | `Result<List<BidRecord>>` |
 | POST | `/bid-record/analyze-risk/{id}` | AI 风险分析（同步） | `Result<RiskAnalysis>` |
-| GET | `/bid-record/risk-history/{id}` | 历史风险分析 | `Result<List<RiskAnalysis>>` |
 
 > `PATCH` 不开放修改 `bidRecordId`/`invitationId`/`bidNo`/`bidAt`（主键与外键、投标次数、投标时间由服务端维护）。
 > `bidNo` 服务端按 `(invitationId, bidderName)` 自动计算 `max(bid_no)+1`，并发同号场景内置 3 次重试 + UNIQUE 兜底。
@@ -532,16 +530,6 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 ```
 
-### 5.9 `GET /bid-record/risk-history/{id}`
-
-查询 `bid_record_id = {id}` 的所有历史风险分析记录（按 `analyzedAt DESC`）。
-
-**响应**：`Result<List<RiskAnalysis>>`。
-
-```bash
-curl "http://{host}:{port}/bid-record/risk-history/1"
-```
-
 ---
 
 ## 6. 风险分析记录查询（RiskAnalysis）
@@ -556,6 +544,7 @@ curl "http://{host}:{port}/bid-record/risk-history/1"
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
 | GET | `/risk-analysis` | 分页查询全部历史风险分析记录 | `Result<PageInfo<RiskAnalysis>>` |
+| GET | `/risk-analysis/by-bid-record/{id}` | 按投标记录 ID 查询所有历史风险分析记录 | `Result<List<RiskAnalysis>>` |
 
 ### 6.1 `GET /risk-analysis`
 
@@ -628,6 +617,42 @@ curl "http://{host}:{port}/risk-analysis?page=1&pageSize=10&sort=analysis_id%20d
       }
     ]
   }
+}
+```
+
+### 6.2 `GET /risk-analysis/by-bid-record/{id}`
+
+> ⚠️ **v0.3 路径迁移**:旧路径 `GET /bid-record/risk-history/{id}` 已经从 `BidRecordController` 移除(归到 `RiskAnalysisController` 域名下,详见 commit)。前端需切到新路径,否则 404。
+
+查询指定投标记录 ID 的所有历史风险分析记录(按 `analyzedAt DESC`)。
+
+| Path 参数 | 类型 | 必填 |
+|----------|------|:---:|
+| `id` | Integer | ✅ |
+
+**响应**:`Result<List<RiskAnalysis>>`,无记录时 `data = []`(不是 null)。
+
+```bash
+curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
+```
+
+```json
+{
+  "code": 200,
+  "message": "查询成功",
+  "data": [
+    {
+      "analysisId": 47,
+      "bidRecordId": 2,
+      "bidderName": "示例公司",
+      "riskLevel": "MEDIUM",
+      "summary": "...",
+      "suggestions": "...",
+      "rawResponse": "{...}",
+      "promptVersion": "v1",
+      "analyzedAt": "2026-07-08T09:53:22"
+    }
+  ]
 }
 ```
 

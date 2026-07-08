@@ -163,15 +163,4 @@ public class BidRecordController {
     public Result<RiskAnalysis> analyzeRisk(@PathVariable Integer id) {
         return Result.success(riskAnalysisService.analyzeRisk(id), "分析完成");
     }
-
-    /**
-     * 查询指定投标记录的历史风险分析记录（按时间倒序）。
-     *
-     * @param id 投标记录 ID
-     * @return 历史分析记录列表，无记录时返空列表
-     */
-    @GetMapping("/bid-record/risk-history/{id}")
-    public Result<List<RiskAnalysis>> getRiskHistory(@PathVariable Integer id) {
-        return Result.success(riskAnalysisService.getHistory(id), "查询成功");
-    }
 }
