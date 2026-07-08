@@ -13,8 +13,10 @@ spring:
       api-key: ${DEEPSEEK_API_KEY}
 
     openai:
-      base-url: http://localhost:1234/v1
+      base-url: http://127.0.0.1:8000/v1
       api-key: ${LM_STUDIO_QWEN3.6-27B}
+      chat:
+        model: "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-MLX-oQ4-MTP"
       read-timeout: 120s
 
 

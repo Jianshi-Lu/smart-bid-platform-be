@@ -1,61 +1,61 @@
-<mxfile host="drawio-plugin" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" modified="2026-07-07T08:15:33.803Z" etag="A59eNfAv1kediM2vKSQQ" version="22.1.22" type="embed" pages="6">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" pages="6">
   <diagram name="1-System Context (C4 L1)" id="tab1">
-    <mxGraphModel dx="1206" dy="1480" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+    <mxGraphModel dx="1461" dy="916" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" value="系统上下文图 (C4 Level 1) — bid-winning-backend" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
-          <mxGeometry x="350" y="20" width="700" height="40" as="geometry" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" value="系统上下文图 (C4 Level 1) — bid-winning-backend" vertex="1">
+          <mxGeometry height="40" width="700" x="350" y="20" as="geometry" />
         </mxCell>
-        <mxCell id="u1" value="招标方经办人&#xa;Bid Handler" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="280" y="100" width="40" height="60" as="geometry" />
+        <mxCell id="u1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" value="招标方经办人&#xa;Bid Handler" vertex="1">
+          <mxGeometry height="60" width="40" x="280" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="u2" value="评标人员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="680" y="100" width="40" height="60" as="geometry" />
+        <mxCell id="u2" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" value="评标人员" vertex="1">
+          <mxGeometry height="60" width="40" x="680" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="u3" value="系统管理员" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="1080" y="100" width="40" height="60" as="geometry" />
+        <mxCell id="u3" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;labelPosition=center;fontSize=12;" value="系统管理员" vertex="1">
+          <mxGeometry height="60" width="40" x="1080" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="sys" value="&lt;b&gt;bid-winning-backend&lt;/b&gt;&lt;br&gt;&lt;br&gt;Spring Boot 4.0.6 + Java 25&lt;br&gt;MyBatis-Plus 3.5.15&lt;br&gt;Spring AI 2.0.0 + LM Studio&lt;br&gt;&lt;br&gt;&lt;i&gt;政府采购中标管理后端&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
-          <mxGeometry x="480" y="380" width="440" height="140" as="geometry" />
+        <mxCell id="sys" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;verticalAlign=top;spacingTop=10;" value="&lt;b&gt;bid-winning-backend&lt;/b&gt;&lt;br&gt;&lt;br&gt;Spring Boot 4.0.6 + Java 25&lt;br&gt;MyBatis-Plus 3.5.15&lt;br&gt;Spring AI 2.0.0 + LM Studio&lt;br&gt;&lt;br&gt;&lt;i&gt;政府采购中标管理后端&lt;/i&gt;" vertex="1">
+          <mxGeometry height="140" width="440" x="480" y="380" as="geometry" />
         </mxCell>
-        <mxCell id="ext1" value="&lt;b&gt;MySQL 8&lt;/b&gt;&lt;br&gt;&lt;br&gt;5 张业务表&lt;br&gt;逻辑外键&lt;br&gt;连接池 + MyBatis" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="80" y="640" width="200" height="100" as="geometry" />
+        <mxCell id="ext1" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" value="&lt;b&gt;MySQL 8&lt;/b&gt;&lt;br&gt;&lt;br&gt;5 张业务表&lt;br&gt;逻辑外键&lt;br&gt;连接池 + MyBatis" vertex="1">
+          <mxGeometry height="100" width="200" x="80" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="ext2" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenAI 兼容 /v1/chat/completions&lt;br&gt;gemma-4-e4b (本地小模型)&lt;br&gt;GBNF grammar 约束" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="320" y="640" width="240" height="100" as="geometry" />
+        <mxCell id="ext2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;&lt;br&gt;OpenAI 兼容 /v1/chat/completions&#xa;&lt;br&gt;gemma-4-e4b (本地小模型)&#xa;&lt;br&gt;GBNF grammar 约束&#xa;&lt;br&gt;&lt;font color=&quot;#d6b656&quot;&gt;⚠ env var ${LM_STUDIO_QWEN3.6-27B} 命名异常 (模型名置于 key 位)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="240" x="320" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="ext3" value="&lt;b&gt;QQ SMTP&lt;/b&gt;&lt;br&gt;&lt;br&gt;smtp.qq.com:587&lt;br&gt;STARTTLS + 授权码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="600" y="640" width="200" height="100" as="geometry" />
+        <mxCell id="ext3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" value="&lt;b&gt;QQ SMTP&lt;/b&gt;&lt;br&gt;&lt;br&gt;smtp.qq.com:587&lt;br&gt;STARTTLS + 授权码" vertex="1">
+          <mxGeometry height="100" width="200" x="600" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="ext4" value="&lt;b&gt;浏览器 / curl / Postman&lt;/b&gt;&lt;br&gt;&lt;br&gt;HTTP/JSON 客户端" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="840" y="640" width="240" height="100" as="geometry" />
+        <mxCell id="ext4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" value="&lt;b&gt;浏览器 / curl / Postman&lt;/b&gt;&lt;br&gt;&lt;br&gt;HTTP/JSON 客户端" vertex="1">
+          <mxGeometry height="100" width="240" x="840" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="ext5" value="&lt;b&gt;QQ 邮箱收件人&lt;/b&gt;&lt;br&gt;&lt;br&gt;企业 / 个人邮箱&lt;br&gt;接收中标通知 / 业务通知" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" parent="1" vertex="1">
-          <mxGeometry x="1120" y="640" width="220" height="100" as="geometry" />
+        <mxCell id="ext5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" value="&lt;b&gt;QQ 邮箱收件人&lt;/b&gt;&lt;br&gt;&lt;br&gt;企业 / 个人邮箱&lt;br&gt;接收中标通知 / 业务通知" vertex="1">
+          <mxGeometry height="100" width="220" x="1120" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="e1" value="维护经办人 / 公告 / 投标 / 风险数据" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u1" target="sys" edge="1">
+        <mxCell id="e1" edge="1" parent="1" source="u1" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.1;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="sys" value="维护经办人 / 公告 / 投标 / 风险数据">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e2" value="查询风险分析 / 历史分析" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u2" target="sys" edge="1">
+        <mxCell id="e2" edge="1" parent="1" source="u2" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="sys" value="查询风险分析 / 历史分析">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e3" value="服务探活 / 邮件测试" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="u3" target="sys" edge="1">
+        <mxCell id="e3" edge="1" parent="1" source="u3" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="sys" value="服务探活 / 邮件测试">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e4" value="SQL (MyBatis-Plus)" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext1" edge="1">
+        <mxCell id="e4" edge="1" parent="1" source="sys" style="endArrow=classic;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="ext1" value="SQL (MyBatis-Plus)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e5" value="OpenAI HTTP (Structured Output)" style="endArrow=classic;html=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext2" edge="1">
+        <mxCell id="e5" edge="1" parent="1" source="sys" style="endArrow=classic;html=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="ext2" value="OpenAI HTTP (Structured Output)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e6" value="SMTP (STARTTLS)" style="endArrow=classic;html=1;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext3" edge="1">
+        <mxCell id="e6" edge="1" parent="1" source="sys" style="endArrow=classic;html=1;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="ext3" value="SMTP (STARTTLS)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e7" value="HTTP/JSON" style="endArrow=classic;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="sys" target="ext4" edge="1">
+        <mxCell id="e7" edge="1" parent="1" source="sys" style="endArrow=classic;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" target="ext4" value="HTTP/JSON">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e8" value="投递中标通知书" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;" parent="1" source="ext3" target="ext5" edge="1">
+        <mxCell id="e8" edge="1" parent="1" source="ext3" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;" target="ext5" value="投递中标通知书">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
@@ -78,7 +78,7 @@
         <mxCell id="mysql" value="&lt;b&gt;MySQL 8&lt;/b&gt;&lt;br&gt;[Container: Database]&lt;br&gt;&lt;br&gt;10.0.0.100:3306 (dev)&lt;br&gt;${MYSQL_URL} (test/prod)&lt;br&gt;5 张业务表 (V1~V19 DDL)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
           <mxGeometry x="940" y="180" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="lms" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;[Container: AI Inference]&lt;br&gt;&lt;br&gt;localhost:1234/v1 (dev)&lt;br&gt;OpenAI 兼容 /v1/chat/completions&lt;br&gt;gemma-4-e4b + GBNF grammar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+        <mxCell id="lms" value="&lt;b&gt;LM Studio&lt;/b&gt;&lt;br&gt;[Container: AI Inference]&lt;br&gt;&lt;br&gt;localhost:1234/v1 (dev)&#xa;&lt;br&gt;OpenAI 兼容 /v1/chat/completions&#xa;&lt;br&gt;gemma-4-e4b + GBNF grammar&#xa;&lt;br&gt;&lt;font color=&quot;#d6b656&quot;&gt;⚠ env var ${LM_STUDIO_QWEN3.6-27B} 命名异常&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
           <mxGeometry x="420" y="440" width="380" height="120" as="geometry" />
         </mxCell>
         <mxCell id="smtp" value="&lt;b&gt;QQ SMTP&lt;/b&gt;&lt;br&gt;[Container: Mail Server]&lt;br&gt;&lt;br&gt;smtp.qq.com:587&lt;br&gt;STARTTLS + 授权码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="1" vertex="1">
@@ -102,7 +102,7 @@
         <mxCell id="e5" value="暴露健康检查" style="endArrow=classic;html=1;exitX=0.3;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontSize=10;dashed=1;" parent="1" source="actuator" target="app" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e6" value="&lt;i&gt;部署 profile: dev (8080) / test (8080) / prod (80)&lt;/i&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;" parent="1" vertex="1">
+        <mxCell id="e6" value="&lt;i&gt;部署 profile: dev (8080) / test (8080) / prod (80)&#xa;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;⚠ application-prod.yml 缺 spring.datasource&lt;/b&gt;&lt;/font&gt;&lt;font color=&quot;#b85450&quot;&gt; 切 prod profile 启动将失败&lt;/font&gt;&lt;/i&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="60" y="600" width="1200" height="30" as="geometry" />
         </mxCell>
         <mxCell id="e7" value="&lt;i&gt;dev 启用 DevTools 热重载 + 详细 log;&lt;br&gt;prod 用环境变量注入 MYSQL_URL/USER/PASS + PROD_MAIL_*&lt;/i&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=10;" parent="1" vertex="1">
@@ -128,10 +128,10 @@
         <mxCell id="ctrl_if" value="&lt;b&gt;InvitationForBidController&lt;/b&gt;&lt;br&gt;/invitation-for-bid/* (8 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="260" y="40" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ctrl_br" value="&lt;b&gt;BidRecordController&lt;/b&gt;&lt;br&gt;/bid-record/* (9 端点 + 2 AI 子端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+        <mxCell id="ctrl_br" value="&lt;b&gt;BidRecordController&lt;/b&gt;&lt;br&gt;/bid-record/* (8 端点 + 1 AI 子端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="500" y="40" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ctrl_ra" value="&lt;b&gt;RiskAnalysisController&lt;/b&gt;&lt;br&gt;GET /risk-analysis (1 端点, 只读)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+        <mxCell id="ctrl_ra" value="&lt;b&gt;RiskAnalysisController&lt;/b&gt;&lt;br&gt;GET /risk-analysis&#xa;GET /risk-analysis/by-bid-record/{id}&#xa;(2 端点 · 只读)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="740" y="40" width="220" height="60" as="geometry" />
         </mxCell>
         <mxCell id="ctrl_sc" value="&lt;b&gt;StatusCheckController&lt;/b&gt;&lt;br&gt;/service-status + /send-email + /send-notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
@@ -164,7 +164,7 @@
         <mxCell id="svc_risk" value="&lt;b&gt;RiskAnalysisService&lt;/b&gt;&lt;br&gt;AI 调用 + parseAndBuild + persist&#xa;OpenAiChatModel + ChatClient.defaultOptions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
           <mxGeometry x="980" y="40" width="260" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="svc_loader" value="&lt;b&gt;BidRecordLoader&lt;/b&gt;&lt;br&gt;detail 加载 (资质材料)&#xa;Markdown → HTML" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+        <mxCell id="svc_loader" value="&lt;b&gt;BidRecordLoader&lt;/b&gt;&lt;br&gt;loadDetail() 返回 Markdown 字符串&#xa;供 prompt 模板 {{detail}} 注入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
           <mxGeometry x="1260" y="40" width="220" height="70" as="geometry" />
         </mxCell>
         <mxCell id="svc_mail" value="&lt;b&gt;MailService&lt;/b&gt;&lt;br&gt;JavaMailSender&#xa;Thymeleaf 模板渲染" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
@@ -233,10 +233,10 @@
         <mxCell id="util_pf" value="&lt;b&gt;PromptFiller&lt;/b&gt;&lt;br&gt;classpath:prompts/*.txt 加载&#xa;{{var}} 替换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
           <mxGeometry x="20" y="40" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="util_rs" value="&lt;b&gt;ResourceSearcher&lt;/b&gt;&lt;br&gt;URI/路径解析&#xa;copy_down Markdown→HTML" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+        <mxCell id="util_rs" value="&lt;b&gt;ResourceSearcher&lt;/b&gt;&lt;br&gt;模板文件存在性校验&#xa;classpath:/templates/*.html&#xa;&lt;font color=&quot;#b85450&quot;&gt;⚠ copy_down 1.1 死依赖 (Java 零引用)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
           <mxGeometry x="260" y="40" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="util_at" value="&lt;b&gt;AsyncTaskManager&lt;/b&gt;&lt;br&gt;static new Thread()&#xa;延迟任务 (5s 邮件)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+        <mxCell id="util_at" value="&lt;b&gt;AsyncTaskManager&lt;/b&gt;&lt;br&gt;static new Thread() (非 Spring Bean)&#xa;延迟任务 (5s 邮件)&#xa;&lt;font color=&quot;#d6b656&quot;&gt;无线程池 · 无 @Async&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
           <mxGeometry x="500" y="40" width="220" height="70" as="geometry" />
         </mxCell>
         <mxCell id="cross_mail" value="&lt;b&gt;JavaMailSender (Spring Boot Mail)&#xa;+ Thymeleaf 3.1.5&#xa;templates/*.html (3 模板)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" parent="lane_cross" vertex="1">
@@ -406,7 +406,7 @@
         <mxCell id="note" value="&lt;b&gt;依赖规则 (Dependency Rule):&lt;/b&gt;&lt;br&gt;  上层 → 下层 (L1→L2→L3→L4)&#xa;  横切层 → 业务层 (L2) 或 表现层 (L1)&#xa;  下层绝不依赖上层 (无循环依赖)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="100" y="780" width="600" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="note2" value="&lt;b&gt;类数量速查:&lt;/b&gt;&lt;br&gt;  L1: 6 Controller + 1 Handler = 7&lt;br&gt;  L2: 8 Service (含 BaseService 抽象基)&lt;br&gt;  Domain: 5 Entity + 1 Enum + 16 DTO = 22&lt;br&gt;  L3: 6 Mapper + 5 XML + 1 Base = 12&lt;br&gt;  L4: 5 张业务表&#xa;  Util: 3 (PromptFiller / ResourceSearcher / AsyncTaskManager)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
+        <mxCell id="note2" value="&lt;b&gt;类数量速查:&lt;/b&gt;&lt;br&gt;  L1: 5 Controller + 1 Handler = 6&lt;br&gt;  L2: 8 Service (含 BaseService 抽象基)&lt;br&gt;  Domain: 5 Entity + 1 Enum + 16 DTO = 22&lt;br&gt;  L3: 6 Mapper + 5 XML + 1 Base = 12&lt;br&gt;  L4: 5 张业务表&#xa;  Util: 3 (PromptFiller / ResourceSearcher / AsyncTaskManager)&#xa;  &lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;⚠ pom 死依赖:&lt;/b&gt;&lt;/font&gt;&lt;font color=&quot;#b85450&quot;&gt; deepseek starter + copy_down 1.1 — Java 代码零引用&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="720" y="780" width="580" height="120" as="geometry" />
         </mxCell>
       </root>
@@ -569,7 +569,7 @@
         <mxCell id="title" value="ER 图 — 5 张业务表 + 4 个逻辑外键" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;" parent="1" vertex="1">
           <mxGeometry x="400" y="20" width="800" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="t_bh" value="&lt;b&gt;bid_handler_info&lt;/b&gt;&lt;br&gt;PK bid_handler_id INT&#xa;handler_name VARCHAR(50)&#xa;company_name VARCHAR(100)&#xa;department_name VARCHAR(100)&#xa;target_email VARCHAR(255)&#xa;created_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+        <mxCell id="t_bh" value="&lt;b&gt;bid_handler_info&lt;/b&gt;&lt;br&gt;PK bid_handler_id INT&#xa;handler_name VARCHAR(50)&#xa;company_name VARCHAR(100)&#xa;department_name VARCHAR(100)&#xa;target_email VARCHAR(255)" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="60" y="120" width="260" height="180" as="geometry" />
         </mxCell>
         <mxCell id="t_if" value="&lt;b&gt;invitation_for_bid&lt;/b&gt;&lt;br&gt;PK invitation_id INT&#xa;FK bid_handler_id INT&lt;b&gt;*&lt;/b&gt;&#xa;project_no VARCHAR(50)&#xa;purchase_task_no VARCHAR(50)&#xa;platform_category VARCHAR(50)&#xa;tender_process VARCHAR(50)&#xa;tender_method VARCHAR(50)&#xa;purchase_method VARCHAR(50)&#xa;is_fixed_price TINYINT(1)&#xa;has_document_fee TINYINT(1)&#xa;deposit DECIMAL&#xa;credit_report_required TINYINT(1)&#xa;registration_deadline DATETIME&#xa;technical_tender_deadline DATETIME&#xa;business_tender_deadline DATETIME&#xa;notes TEXT&#xa;purchase_company VARCHAR(100)&#xa;purchase_department VARCHAR(100)&#xa;tendering_party VARCHAR(100)&#xa;status ENUM(DRAFT/PUBLISHED/...)&#xa;created_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
@@ -581,7 +581,7 @@
         <mxCell id="t_ra" value="&lt;b&gt;risk_analysis&lt;/b&gt;&lt;br&gt;PK analysis_id INT&#xa;FK bid_record_id INT&lt;b&gt;*&lt;/b&gt;&#xa;bidder_name VARCHAR(100)&#xa;risk_level VARCHAR(10)&#xa;summary VARCHAR(500)&#xa;suggestions VARCHAR(255)&#xa;raw_response TEXT&#xa;prompt_version VARCHAR(20)&#xa;analyzed_at DATETIME" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
           <mxGeometry x="1240" y="220" width="280" height="240" as="geometry" />
         </mxCell>
-        <mxCell id="t_his" value="&lt;b&gt;invitation_for_bid_status_history&lt;/b&gt;&lt;br&gt;PK history_id INT&#xa;FK invitation_id INT&lt;b&gt;*&lt;/b&gt;&#xa;old_status VARCHAR(20)&#xa;new_status VARCHAR(20)&#xa;change_time DATETIME&#xa;remark VARCHAR(255)" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+        <mxCell id="t_his" value="&lt;b&gt;invitation_for_bid_status_history&lt;/b&gt;&lt;br&gt;PK history_id INT&#xa;FK invitation_id INT&lt;b&gt;*&lt;/b&gt;&#xa;from_status VARCHAR(20)&#xa;to_status VARCHAR(20)&#xa;created_at DATETIME&#xa;remark VARCHAR(255)" style="shape=table;startSize=30;container=1;collapsible=0;childLayout=tableLayout;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
           <mxGeometry x="640" y="640" width="320" height="160" as="geometry" />
         </mxCell>
         <mxCell id="fk1" value="FK bid_handler_id (逻辑外键)" style="endArrow=open;html=1;startArrow=ERmany;startFill=0;endArrow=ERmany;endFill=0;edgeStyle=orthogonalEdgeStyle;fontSize=10;strokeColor=#9673a6;dashed=1;" parent="1" source="t_bh" target="t_if" edge="1">
@@ -599,7 +599,7 @@
         <mxCell id="note1" value="&lt;b&gt;*&lt;/b&gt; = 逻辑外键 (Logical FK)&#xa;&lt;br&gt;DB 层无 FK 约束&#xa;&lt;br&gt;应用层负责引用完整性" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="60" y="640" width="280" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="note2" value="&lt;b&gt;命名约定:&lt;/b&gt;&lt;br&gt;PK = 主键&#xa;&lt;br&gt;FK = 逻辑外键&#xa;&lt;br&gt;所有表带 created_at&#xa;&lt;br&gt;V1~V19 DDL (Flyway 兼容,未启用)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
+        <mxCell id="note2" value="&lt;b&gt;命名约定:&lt;/b&gt;&lt;br&gt;PK = 主键&#xa;&lt;br&gt;FK = 逻辑外键 (DB 无约束)&#xa;&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;⚠ bid_handler_info 无 created_at&lt;/b&gt;&lt;/font&gt;&#xa;&lt;br&gt;V1~V19 DDL (Flyway 兼容,未启用)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;verticalAlign=top;" parent="1" vertex="1">
           <mxGeometry x="1040" y="640" width="500" height="80" as="geometry" />
         </mxCell>
       </root>
