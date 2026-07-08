@@ -18,6 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel.ResponseFormat;
@@ -40,10 +42,11 @@ public class RiskAnalysisService {
 
     /**
      * Structured Output JSON Schema,约束 LLM 仅输出符合此结构的 JSON 对象。
-     * 通过 {@link OpenAiChatOptions#responseFormat} 传给下游 OpenAI 兼容服务(LM Studio 本地)。
+     * 通过 {@link OpenAiChatOptions# responseFormat} 传给下游 OpenAI 兼容服务(LM Studio 本地)。
      * 字段定义与 {@link RiskAnalysis} 实体保持一致,riskLevel 限定 4 档枚举。
      */
-    private static final String OUTPUT_SCHEMA = """
+    private static final String OUTPUT_SCHEMA =
+            """
             {
               "type": "object",
               "properties": {
@@ -118,12 +121,13 @@ public class RiskAnalysisService {
 
         long startNs = System.nanoTime();
 
-        // 调用模型，获取原始输出
-        String raw = chatClient.prompt()
+        // 调用模型,获取完整 ChatResponse(同时拿 content 与 reasoningContent,见 extractRawContent JavaDoc)
+        ChatResponse chatResponse = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
                 .call()
-                .content();
+                .chatResponse();
+        String raw = extractRawContent(chatResponse);
         long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
 
         LocalDateTime analyzedAt = LocalDateTime.now();
@@ -139,8 +143,82 @@ public class RiskAnalysisService {
     }
 
     /**
+     * 从 ChatResponse 抽取 LLM 原始文本输出。
+     *
+     * <p><b>为什么需要这个方法</b>:某些 Hybrid Reasoning(混合推理)模型
+     * (实测代表: <code>huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mlx</code>)
+     * 在启用了 {@code response_format=json_schema} 的情况下,仍然把"实际 JSON 输出"写进
+     * OpenAI 兼容响应的 <code>reasoning_content</code> 字段,而不是 <code>content</code>
+     * 字段。LM Studio 实际日志:</p>
+     *
+     * <pre>
+     * "choices": [{
+     *   "message": {
+     *     "role": "assistant",
+     *     "content": "",                                          // ← 空
+     *     "reasoning_content": "{\"riskLevel\": \"MEDIUM\", ...}"  // ← JSON 在这里
+     *   },
+     *   "finish_reason": "stop"
+     * }]
+     * </pre>
+     *
+     * <p>如果仅用 {@code chatClient.call().content()},会读到空字符串 → {@code parseAndBuild}
+     * 拿到 null → DB 写入撞 <code>risk_level</code> NOT NULL 约束,产生 500 内部服务错误。</p>
+     *
+     * <p><b>为什么取 {@code AssistantMessage.metadata["reasoningContent"]} 能 work</b>:
+     * 反编译 <code>spring-ai-openai-2.0.0.jar</code> 确认 {@code OpenAiChatModel}
+     * 内部已经实现了这个透传:</p>
+     *
+     * <ol>
+     *   <li>{@code OpenAiChatModel.getReasoningContent(Choice)} 私有方法从
+     *       {@code ChatCompletionMessage._additionalProperties().get("reasoning_content")}
+     *       读取(OpenAI 官方字段不在 POJO schema 中,只有 additionalProperties 能兜底)</li>
+     *   <li>{@code OpenAiChatModel.internalCall} 把读到的 reasoning 字符串塞进 7 键 Map,
+     *       交给 {@code buildGeneration} 构造 {@code AssistantMessage},作为 metadata 一员</li>
+     *   <li>map key 是常量 {@code private static final String REASONING_CONTENT = "reasoningContent"};
+     *       (注意:snake_case 的 JSON 字段在 Spring AI 透传时被改写成 camelCase)</li>
+     * </ol>
+     *
+     * <p>所以 <b>不需要</b>降级到 raw HTTP 调用、也不需要绕开 Spring AI,
+     * 只需要从 {@code ChatResponse} 层级拿 {@code metadata} 即可。</p>
+     *
+     * <p>降级路径触发时打 INFO 日志(<i>"降级到 reasoningContent"</i>),便于排查"为什么我 prompt 没变,
+     * JSON 却在 reasoning 字段里"的偶发问题 — 一般表明当前模型版本不遵守 Structured Output。</p>
+     *
+     * @param response Spring AI {@link ChatClient#call()} 返回的 {@link ChatResponse},可为 {@code null}
+     * @return 优先 {@code AssistantMessage.getContent()},为空时降级
+     *         {@code metadata["reasoningContent"]},全空返 {@code ""}
+     */
+    private String extractRawContent(ChatResponse response) {
+        if (response == null) {
+            return "";
+        }
+        AssistantMessage msg = response.getResult().getOutput();
+        if (msg == null) {
+            return "";
+        }
+        String content = msg.getText();
+        if (content != null && !content.isBlank()) {
+            return content;
+        }
+        // 兜底:Hybrid Reasoning 模型把 JSON 输出塞进 reasoning_content。
+        // 取 AssistantMessage.metadata 是因为 spring-ai-openai 2.0 内 OpenAiChatModel
+        // 已把 reasoning_content 字段透传到这里,key="reasoningContent"(camelCase)。
+        Map<String, Object> metadata = msg.getMetadata();
+        if (metadata != null) {
+            Object reasoning = metadata.get("reasoningContent");
+            if (reasoning != null && !reasoning.toString().isBlank()) {
+                log.info("[风险分析] content 为空,降级到 reasoningContent (length={})",
+                        reasoning.toString().length());
+                return reasoning.toString();
+            }
+        }
+        return "";
+    }
+
+    /**
      * 解析 AI 原始 JSON 响应，构造 RiskAnalysis 实体。
-     * <p>JSON 解析失败时 riskLevel/summary/suggestions 保持 null，rawResponse 始终保留。</p>
+     * <p>JSON 解析失败时 riskLevel/summary/suggestions 字段保持 null，rawResponse 始终保留。</p>
      *
      * @param bidRecordId 投标记录 ID
      * @param bidderName  投标人名称

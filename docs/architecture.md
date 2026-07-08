@@ -309,6 +309,7 @@ service.sendOperationEmail(entity);
 | **fastjson2 而非 Jackson** | 项目已引入复用，避免新增依赖 |
 | **MailService 而非 MailSender** | 避免与 Spring Boot 自动配置的 `JavaMailSender`（Bean 名 mailSender）同名冲突 |
 | **AI OpenAiChatModel 注入 + ChatClient.defaultOptions** | 符合 Spring AI 2.0 官方推荐；注入 `OpenAiChatModel`，在 `ChatClient.builder(...).defaultOptions(opts).build()` 中装载 Structured Output JSON Schema 约束，缓存为 final 字段 |
+| **Hybrid Reasoning 模型 fallback** | `extractRawContent` 优先读 `AssistantMessage.getText()`，为空时降级 `metadata["reasoningContent"]`（Spring AI 2.0 `OpenAiChatModel.internalCall` 内部已把 LM Studio 的 `reasoning_content` 透传至此，key 为 camelCase）；适用 huihui-qwen 系 Hybrid Reasoning 模型把 JSON 输出塞 reasoning 字段的场景。详见 [`docs/structured-output.md` §9.1](structured-output.md#91-hybrid-reasoning-模型-fallback已实施) |
 | **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
 | **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
 

@@ -264,6 +264,62 @@ Spring AI 反序列化 `content` 字段为 Java `String`,传入 `RiskAnalysisSer
 <<< [风险分析] 落库成功 analysisId=10
 ```
 
+### 9.1 Hybrid Reasoning 模型 fallback(已实施)
+
+**问题背景(排错过程):**
+
+第 9 节以上描述的是"理想情况" — gemma-4-e4b 这类非 reasoning 模型,会把 JSON 直接写到 `content` 字段。但切换到 `huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mlx` 之后出现反例:
+
+| 模型 | content | reasoning_content | 后端表现 |
+|---|---|---|---|
+| gemma-4-e4b | `{"riskLevel":"LOW",...}` | `""` | ✅ 正常解析 |
+| huihui-qwen3.6 Hybrid Reasoning | `""` | `{"riskLevel":"MEDIUM",...}` | ❌ **500: Column 'risk_level' cannot be null** |
+
+模型明明遵守了 Structured Output schema,但**把 JSON 输出塞到了 `reasoning_content`** 而不是 `content`。`chatClient.call().content()` 读到空字符串,后续 `parseAndBuild` 把所有字段留 null,撞 DB NOT NULL。
+
+**根因调研:**
+
+反编译 `~/.m2/repository/org/springframework/ai/spring-ai-openai/2.0.0/spring-ai-openai-2.0.0.jar`:
+
+```java
+private static final String REASONING_CONTENT = "reasoningContent";   // ← AssistantMessage.metadata map key
+private String getReasoningContent(ChatCompletion.Choice choice) {
+    return choice.message()._additionalProperties().get("reasoning_content").asString().orElse("");
+}
+```
+
+也就是说 **Spring AI 2.0 内部已经支持透传 `reasoning_content`**,但只放进 `AssistantMessage.getMetadata()` 这个 Map,key 是 camelCase 的 `"reasoningContent"`,没有对应的便捷 getter。Spring AI 设计上是"未来给 Reasoning 模型专门支持的预留位",但目前**没有任何公开 API 让你直接拿这个字段**。
+
+**解决方案(Layer 1.5):**
+
+不动 ChatClient 形态,不改 schema,不在 OpenAI 兼容响应上加 monkey-patch。**只用 `ChatResponse` 替代 `String` 作为返回值**,从 `AssistantMessage.getMetadata()` 兜底读 `reasoningContent`:
+
+```java
+ChatResponse response = chatClient.prompt()
+    .system(systemPrompt).user(userPrompt)
+    .call().chatResponse();
+String raw = extractRawContent(response);  // 优先 content,空时降级 reasoningContent
+```
+
+`extractRawContent` 见 `RiskAnalysisService.java`,JavaDoc 内有完整的反编译验证 + 兜底条件 + 降级日志触发条件。
+
+降级路径触发日志:
+```
+[风险分析] content 为空,降级到 reasoningContent (length=304)
+```
+
+**取舍:**
+
+| 方案 | 工作量 | 收益 |
+|---|---|---|
+| A. prompt 强制改写 Qwen 把 JSON 写 content | 0 | ❌ Qwen 系 Hybrid Reasoning 模型不遵守此 prompt 约束,实测多次失败 |
+| B. 绕开 Spring AI 用 RestClient 拿原始 body | ~200 行 | 完全控制,但失去 Spring AI 的 retry / observability / prompt cache |
+| **C. 本次方案(chatResponse + metadata 兜底)** | **~30 行** | ✅ 现有链路完全保留,只在 extract 一层做防御 |
+
+**对 Structured Output schema 的影响:**
+
+零。GBNF grammar 采样阶段物理约束未变 — Qwen 模型**就是把被采样的 JSON 字符放进了另一个字段**,跟 grammar 行为无关。Schema 仍然在防"模型在前面吐一段 prose + 然后写 JSON",只是模型的 prose 和 JSON 这两个角色被分离到不同字段而已。
+
 ---
 
 ## 10. 关键调试手段
