@@ -18,7 +18,7 @@ import java.util.List;
  *
  * <p>本 Controller 仅为敏感风险数据提供前端只读入口：不暴露 DELETE / PATCH / POST 写端点，
  * 全部新增与删除走数据库手工操作，AI 触发分析走
- * {@code BidRecordController.analyzeRisk}（副作用为 {@link RiskAnalysisService#persist}）。</p>
+ * {@code BidRecordController.analyzeRisk}（副作用为 {@link RiskAnalysisService#persist(RiskAnalysis)}）。</p>
  *
  * <p>当前 2 端点：</p>
  * <ul>

@@ -13,7 +13,13 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
 
 /**
- * 招标公告状态变更历史 — 数据库实体。对应表 {@code invitation_for_bid_status_history}（V18 重命名自 tender_notice_status_history）。
+ * 招标公告状态变更历史 — 数据库实体。对应表 {@code invitation_for_bid_status_history}。
+ *
+ * <p>用于审计 {@link InvitationForBid} 的状态机变更；{@code invitationId} 是逻辑外键，
+ * DB 层不强制 FK 约束。</p>
+ *
+ * @see BidNoticeStatus
+ * @since V18
  */
 @Data
 @NoArgsConstructor

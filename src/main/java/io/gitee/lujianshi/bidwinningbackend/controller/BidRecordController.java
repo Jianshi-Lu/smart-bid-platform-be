@@ -18,7 +18,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 投标记录 Controller。8 端点（6 标准 CRUD + 1 按公告过滤 + 2 AI 风险分析）（V18 重命名自 TendererDetailController）。
+ * 投标记录 Controller。8 端点（6 标准 CRUD + 1 按公告过滤 + 1 AI 风险分析）。
+ *
+ * <p>风险分析历史查询已拆分到 {@link RiskAnalysisController}，本 Controller 仅保留触发分析的写入口。</p>
+ *
+ * @since V18
  */
 @RestController
 public class BidRecordController {

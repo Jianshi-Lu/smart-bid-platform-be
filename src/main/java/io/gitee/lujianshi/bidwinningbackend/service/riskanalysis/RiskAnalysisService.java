@@ -34,7 +34,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 风险分析业务服务。同步调用 OpenAI 兼容 LM Studio（本地小模型），通过 Structured Output JSON Schema 约束输出，落库风险分析结果（V18 字段引用更新：tendererId → bidRecordId；tendererName → bidderName）。
+ * 风险分析业务服务。同步调用 OpenAI 兼容 LM Studio，通过 Structured Output JSON Schema 约束输出，
+ * 再解析并落库风险分析结果。
+ *
+ * <p>写入 {@code risk_analysis} 表时通过 {@link #self} 走 Spring 代理调用 {@link #persist(RiskAnalysis)}，
+ * 避免同类自调用导致事务注解失效。</p>
+ *
+ * @since V18
  */
 @Service
 public class RiskAnalysisService {
@@ -43,9 +49,9 @@ public class RiskAnalysisService {
     private static final String PROMPT_VERSION = "v1";
 
     /**
-     * Structured Output JSON Schema,约束 LLM 仅输出符合此结构的 JSON 对象。
-     * 通过 {@link OpenAiChatOptions# responseFormat} 传给下游 OpenAI 兼容服务(LM Studio 本地)。
-     * 字段定义与 {@link RiskAnalysis} 实体保持一致,riskLevel 限定 4 档枚举。
+     * Structured Output JSON Schema，约束 LLM 仅输出符合此结构的 JSON 对象。
+     * 通过 {@link OpenAiChatOptions.Builder#responseFormat(ResponseFormat)} 传给下游 OpenAI 兼容服务。
+     * 字段定义与 {@link RiskAnalysis} 实体保持一致，riskLevel 限定 4 档枚举。
      */
     private static final String OUTPUT_SCHEMA =
             """
@@ -85,7 +91,11 @@ public class RiskAnalysisService {
     @Resource
     private PromptFiller promptFiller;
 
-    // 限定输出格式并事实上创建chatClient(SpringAI)实例
+    /**
+     * 构造风险分析 ChatClient，并把 Structured Output JSON Schema 固化到默认调用参数中。
+     *
+     * @param openAiChatModel Spring AI OpenAI 兼容聊天模型 Bean
+     */
     public RiskAnalysisService(OpenAiChatModel openAiChatModel) {
         ResponseFormat responseFormat = ResponseFormat.builder()
                 .type(ResponseFormat.Type.JSON_SCHEMA)
@@ -269,7 +279,10 @@ public class RiskAnalysisService {
     }
 
     /**
-     * 落库（独立事务）。analysisId 通过 useGeneratedKeys 回填。
+     * 落库风险分析记录。analysisId 通过 useGeneratedKeys 回填。
+     *
+     * @param analysis 待落库的风险分析实体
+     * @return 已落库实体（含回填后的 analysisId）
      */
     @Transactional(rollbackFor = Exception.class)
     public RiskAnalysis persist(RiskAnalysis analysis) {
@@ -279,6 +292,9 @@ public class RiskAnalysisService {
 
     /**
      * 查询指定投标记录的历史分析记录（按时间倒序）。
+     *
+     * @param bidRecordId 投标记录 ID
+     * @return 历史分析记录列表，无记录时返回空列表
      */
     public List<RiskAnalysis> getHistory(Integer bidRecordId) {
         return mapper.selectByBidRecordId(bidRecordId);
