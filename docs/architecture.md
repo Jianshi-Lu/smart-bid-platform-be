@@ -12,12 +12,13 @@
 | 分页 | PageHelper | 4.1.0（`pagehelper-spring-boot-starter`） |
 | 邮件 | Spring Boot Starter Mail | — |
 | 模板引擎 | Thymeleaf | 3.1.5 |
-| AI | Spring AI + OpenAI 兼容 | 2.0.0（`spring-ai-starter-model-openai`，接 LM Studio 本地小模型） |
+| AI | Spring AI + OpenAI/DeepSeek Starter | 2.0.0（运行时使用 OpenAI 兼容配置接 LM Studio，本地模型由 `application-dev.yml` 指定） |
 | JSON | fastjson2 | 2.0.52 |
 | 工具 | Lombok | 1.18.46 |
 | 开发 | DevTools | — |
+| 观测 | Spring Boot Actuator | — |
 
-**环境约束**：dev/test 必须设 `MYSQL_URL/USER/PASS` 三个环境变量；prod 必须设 `PROD_MAIL_USERNAME/PASSWORD`。
+**环境约束**：dev/test 必须设 `MYSQL_URL/MYSQL_USERNAME/MYSQL_PASSWORD` 三个环境变量；dev 还需要 `MAIL_PASSWORD`，并通过 JVM 系统属性提供 `LM_STUDIO_QWEN3.6-27B`；prod 当前只配置了邮件参数，若直接切 prod profile 还需补齐数据源配置。
 
 ---
 
@@ -42,10 +43,11 @@
 ```
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
-├── controller/                             # 4 Controller + GlobalExceptionHandler
-│   ├── BidRecordController.java            # 投标记录（9 端点：6 标准 CRUD + 1 批量删除 + 1 按公告查询 + 2 AI 风险分析）
+├── controller/                             # 5 Controller + GlobalExceptionHandler
+│   ├── BidRecordController.java            # 投标记录（8 端点：6 标准 CRUD + 1 按公告查询 + 1 AI 风险分析触发）
 │   ├── BidHandlerInfoController.java       # 招标经办人（7 端点：6 标准 CRUD + 1 批量新增）
 │   ├── InvitationForBidController.java     # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
+│   ├── RiskAnalysisController.java         # 风险分析记录只读查询（2 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── dto/                                    # 按业务模块分包
@@ -63,9 +65,9 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── BidHandlerInfoService.java
 │   ├── InvitationForBidService.java
 │   ├── mail/MailService.java               # SMTP 发送
-│   ├── riskanalysis/                       # AI 风险分析
+│   ├── riskanalysis/                       # AI 风险分析 + 历史查询
 │   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
-│   │   └── RiskAnalysisService.java        # 构造器注入 OpenAiChatModel + ChatClient.defaultOptions（Structured Output），调用 LM Studio
+│   │   └── RiskAnalysisService.java        # OpenAiChatModel + ChatClient.defaultOptions（Structured Output），content/reasoningContent 双路径抽取
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 ```
@@ -157,7 +159,7 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 LM Studio、Schema 约束后 JSON 解析、落库（V18 已改字段引用：`tendererId` → `bidRecordId`）。
+构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 OpenAI 兼容 LM Studio、抽取 `content`（为空时降级读取 `metadata["reasoningContent"]`）、JSON 解析、通过 Spring 代理调用 `persist` 落库。`RiskAnalysisController` 只读暴露 `listAll` 与 `getHistory`，不提供修改/删除入口。
 
 ### 5.9 `BidRecordService`（重试逻辑）
 
@@ -273,6 +275,7 @@ service.sendOperationEmail(entity);
 | Controller | 端点 | 触发方法 |
 |---|---|---|
 | `BidHandlerInfoController` | `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` |
+| `BidHandlerInfoController` | `POST /bid-handler-info/batch-add` | `service.sendBatchAddEmail(created, request.getTargetEmail())` |
 | 其他 26 个端点 | — | 未发送 |
 
 ### 8.4 邮件模板
@@ -337,9 +340,8 @@ service.sendOperationEmail(entity);
 export MYSQL_URL='jdbc:mysql://...:3306/bid-winning?...' \
        MYSQL_USERNAME=jianshi \
        MYSQL_PASSWORD=xxx \
-       DEEPSEEK_API_KEY=sk-xxx \
        MAIL_PASSWORD=xxx
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-DLM_STUDIO_QWEN3.6-27B=lm-studio"
 
 # test
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=test

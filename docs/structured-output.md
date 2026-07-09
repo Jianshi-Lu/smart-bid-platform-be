@@ -1,8 +1,8 @@
 # Structured Output 链路笔记
 
-> 适用版本:Spring AI 2.0.0 + LM Studio(OpenAI 兼容 `/v1/chat/completions`)+ 本地小模型(如 `google/gemma-4-e4b`)
+> 适用版本:Spring AI 2.0.0 + LM Studio(OpenAI 兼容 `/v1/chat/completions`)+ 本地模型(当前 dev 配置为 Qwen3.6 Hybrid Reasoning 模型)
 >
-> 本项目落地位置:`RiskAnalysisService.java:41-78`
+> 本项目落地位置:`RiskAnalysisService.java` 的 `OUTPUT_SCHEMA`、构造器、`analyzeRisk`、`extractRawContent`
 
 ---
 
@@ -38,11 +38,11 @@
 ┌────────────────────────────────────────────────────────────────────────┐
 │  ① Java 后端                                                          │
 │  RiskAnalysisService.java                                              │
-│  - RISK_SCHEMA 常量(Java text block)                                  │
+│  - OUTPUT_SCHEMA 常量(Java text block)                                │
 │  - ResponseFormat.builder().type(JSON_SCHEMA).jsonSchema(SCHEMA).build()│
 │  - ChatClient.builder(model).defaultOptions(opts).build()              │
 │                                                                        │
-│           ↓ chatClient.prompt().system(...).user(...).call().content() │
+│           ↓ chatClient.prompt().system(...).user(...).call().chatResponse()│
 │                                                                        │
 │  ② Spring AI 运行时                                                    │
 │  - OpenAiChatOptions → JSON 序列化                                     │
@@ -58,8 +58,8 @@
 │           ↓                                                            │
 │                                                                        │
 │  ③ HTTP 传输                                                           │
-│  POST http://localhost:1234/v1/chat/completions                        │
-│  Authorization: Bearer lm-studio                                       │
+│  POST http://127.0.0.1:8000/v1/chat/completions                        │
+│  Authorization: Bearer ${LM_STUDIO_QWEN3.6-27B}                        │
 │           ↓                                                            │
 │                                                                        │
 │  ④ LM Studio server                                                    │
@@ -88,7 +88,8 @@
 │  }                                                                     │
 │           ↓                                                            │
 │                                                                        │
-│  ⑧ Spring AI 反序列化 → Java String                                    │
+│  ⑧ Spring AI 反序列化 → ChatResponse                                   │
+│  → extractRawContent(content 优先, reasoningContent 兜底)              │
 │  → RiskAnalysisService.parseAndBuild()                                 │
 │  → JSON.parseObject(raw) → JSONObject                                  │
 │  → RiskAnalysis 实体 → mapper.insert() → DB                            │
@@ -100,8 +101,7 @@
 ## 4. Step 1:Java 后端构造 schema 与 options
 
 ```java
-// RiskAnalysisService.java:41-52
-private static final String RISK_SCHEMA = """
+private static final String OUTPUT_SCHEMA = """
         {
           "type": "object",
           "properties": {
@@ -114,11 +114,10 @@ private static final String RISK_SCHEMA = """
         }
         """;
 
-// RiskAnalysisService.java:68-78
 public RiskAnalysisService(OpenAiChatModel openAiChatModel) {
     ResponseFormat responseFormat = ResponseFormat.builder()
             .type(ResponseFormat.Type.JSON_SCHEMA)
-            .jsonSchema(RISK_SCHEMA)
+            .jsonSchema(OUTPUT_SCHEMA)
             .build();
     OpenAiChatOptions.Builder defaults = OpenAiChatOptions.builder()
             .responseFormat(responseFormat);
@@ -145,7 +144,7 @@ public RiskAnalysisService(OpenAiChatModel openAiChatModel) {
 
 ```json
 {
-  "model": "google/gemma-4-e4b",
+  "model": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-MLX-oQ4-MTP",
   "messages": [
     {"role": "system", "content": "你是一位专业的政府采购风险分析师..."},
     {"role": "user", "content": "请分析以下投标人的风险情况..."}
@@ -237,7 +236,7 @@ LM Studio 生成结束后,把 token 流组装成字符串,塞回 OpenAI 兼容�
 {
   "id": "chatcmpl-y6x5cd6x881yil1bsn4dw",
   "object": "chat.completion",
-  "model": "google/gemma-4-e4b",
+  "model": "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-MLX-oQ4-MTP",
   "choices": [{
     "index": 0,
     "message": {
@@ -251,7 +250,7 @@ LM Studio 生成结束后,把 token 流组装成字符串,塞回 OpenAI 兼容�
 }
 ```
 
-Spring AI 反序列化 `content` 字段为 Java `String`,传入 `RiskAnalysisService.parseAndBuild`:
+Spring AI 返回 `ChatResponse`，后端通过 `extractRawContent` 优先读取 `content`，为空时降级读取 `metadata["reasoningContent"]`，再传入 `RiskAnalysisService.parseAndBuild`:
 
 ```
 <<< [风险分析] AI 响应 (length=304, elapsed=6390ms, analyzedAt=...):
@@ -328,7 +327,7 @@ String raw = extractRawContent(response);  // 优先 content,空时降级 reason
 |---|---|
 | 看 LM Studio 收到什么请求 | `lms log stream`(终端开 stream) |
 | 看 Spring AI 发出的 HTTP body | `logging.level.org.springframework.ai.openai=DEBUG` |
-| 直接 curl LM Studio 验证 schema | 手动 POST 到 `http://localhost:1234/v1/chat/completions` 带 `response_format` |
+| 直接 curl LM Studio 验证 schema | 手动 POST 到 `http://127.0.0.1:8000/v1/chat/completions` 带 `response_format` |
 | 看 model 是否支持 grammar | LM Studio → Developer → 看模型详情,小模型(< 7B)实测不可靠 |
 
 ---
@@ -337,7 +336,7 @@ String raw = extractRawContent(response);  // 优先 content,空时降级 reason
 
 ### 限制
 
-1. **小模型支持不可靠** — LM Studio 官方明确警告"7B 以下模型可能不支持 Structured Output"。本项目 gemma-4-e4b 实测 OK,但不是所有小模型都行。
+1. **模型支持不可靠** — LM Studio 官方明确警告"7B 以下模型可能不支持 Structured Output"。本项目曾用 gemma-4-e4b 实测 OK；当前 Qwen3.6 Hybrid Reasoning 模型还需要 `reasoningContent` 兜底。
 2. **JSON Schema 受支持子集** — 不是完整 JSON Schema。当前用的子集(`object` + `string` + `enum` + `required` + `additionalProperties:false`)是 OpenAI/LM Studio 都保证支持的。复杂特性(`$ref`、`oneOf`、`pattern`)部分支持。
 3. **prompt 强化仍是必要的纵深防御** — `risk-analysis-system-v1.txt` 末尾追加的"输出格式(严格)"段保留,作为 schema 失败时的 fallback。
 
@@ -345,8 +344,8 @@ String raw = extractRawContent(response);  // 优先 content,空时降级 reason
 
 如果 Structured Output 在某些模型上仍失败,后端可以做二次校验:
 - 多策略 JSON 提取:`JSON.parseObject(raw)` → 剥离 ```` ```json ```` 围栏 → 找首个 `{` 到末个 `}` 的子串
-- 提取后字段缺失/枚举非法 → 抛 `RiskAnalysisParseException` → 502 给前端
-- 这是 plan mode 阶段讨论过的方案,本项目暂不实现(因为 Layer 1 已经稳定工作)
+- 提取后字段缺失/枚举非法 → 抛业务异常并返回明确错误码
+- 这是后续可选增强,本项目暂未实现；当前仍依赖 Structured Output + `reasoningContent` 兜底避免解析为空
 
 ---
 
