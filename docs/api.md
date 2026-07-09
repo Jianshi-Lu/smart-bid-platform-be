@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 28 端点（含 2 AI 风险分析端点 + 1 风险记录查询端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 28 端点（含 1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -24,7 +24,7 @@
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 招标经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
-| 投标记录 (BidRecord) | 8 | `/bid-record/...` |
+| 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+，含在 BidRecord 内） | 1 | `/bid-record/{action}/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
 
@@ -151,6 +151,7 @@
 | 端点 | 触发 | 收件人来源 |
 |------|------|----------|
 | `POST /bid-handler-info/add` | `service.sendOperationEmail(entity)` | `entity.targetEmail`（已落库） |
+| `POST /bid-handler-info/batch-add` | `service.sendBatchAddEmail(created, request.targetEmail)` | `request.targetEmail`（批量汇总邮件，不落库到单一实体） |
 | 其他 26 个端点 | — | 未发送 |
 
 `targetEmail` 为 null/空时跳过发邮件。详见 [architecture.md §8](architecture.md#8-邮件通知service-层-baseservicesendemail)。
@@ -477,7 +478,7 @@ curl -X POST http://{host}:{port}/bid-record/add \
 |----------|------|:---:|
 | `invitationId` | Integer | ✅ |
 
-返回 200 + `List<BidRecord>` 或 404 + null（招标公告不存在）。
+返回 200 + `List<BidRecord>`；无匹配记录时 `data = []`。当前实现不额外校验招标公告是否存在。
 
 ```bash
 curl "http://{host}:{port}/bid-record/by-invitation/1"
