@@ -132,7 +132,10 @@ public class RiskAnalysisService {
                 "bidderName", record.getBidderName() != null ? record.getBidderName() : "",
                 "quotePrice", record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
                 "bidderContact", record.getBidderContact() != null ? record.getBidderContact() : "",
-                "credentials", record.getCredentials() != null ? record.getCredentials() : "未提供",
+                // 当前阶段仅做 List<String> 类型兼容；多文件读取与内容拼接留待风险分析功能改造时实现。
+                "credentials", record.getCredentials() != null
+                        ? JSON.toJSONString(record.getCredentials())
+                        : "未提供",
                 "detail", detailInfo
         );
 

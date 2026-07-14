@@ -1012,7 +1012,7 @@
             <mxRectangle height="30" width="45" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="t_br_r5_c1" parent="t_br_r5" style="shape=partialRectangle;html=1;whiteSpace=wrap;fillColor=none;align=left;spacingLeft=4;fontSize=10;" value="credentials VARCHAR(500)" vertex="1">
+        <mxCell id="t_br_r5_c1" parent="t_br_r5" style="shape=partialRectangle;html=1;whiteSpace=wrap;fillColor=none;align=left;spacingLeft=4;fontSize=10;" value="credentials JSON (Markdown 路径数组)" vertex="1">
           <mxGeometry height="30" width="205" x="45" as="geometry">
             <mxRectangle height="30" width="205" as="alternateBounds" />
           </mxGeometry>

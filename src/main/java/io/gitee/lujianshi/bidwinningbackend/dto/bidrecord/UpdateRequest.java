@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 更新投标记录请求 DTO（PATCH 语义，null 字段表示"不修改"）。
@@ -22,6 +23,5 @@ public class UpdateRequest {
     @Size(max = 255, message = "投标人联系方式长度不能超过255")
     private String bidderContact;
 
-    @Size(max = 500, message = "资信材料链接长度不能超过500")
-    private String credentials;
+    private List<String> credentials;
 }

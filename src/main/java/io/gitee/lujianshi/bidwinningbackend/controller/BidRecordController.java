@@ -36,7 +36,7 @@ public class BidRecordController {
     /**
      * 创建投标记录。Service 自动计算 {@code bidNo}（同公告+同投标人下递增）和 {@code bidAt}（当前时间）。
      *
-     * @param request 创建请求（invitationId / bidderName / quotePrice / bidderContact 必填，credentials 可选）
+     * @param request 创建请求（invitationId / bidderName / quotePrice / bidderContact 必填，credentials 路径列表可选）
      * @return 创建的实体（含自增 bidRecordId）
      */
     @PostMapping("/bid-record/add")
@@ -70,7 +70,7 @@ public class BidRecordController {
      * <p>不允许修改 {@code bidNo} / {@code bidAt}（由 Service 在 add 时自动算）。</p>
      *
      * @param id      投标记录 ID
-     * @param request 更新请求（5 字段全可选）
+     * @param request 更新请求（4 字段全可选，credentials 为 Markdown 路径列表）
      * @return Diff（更新前后对比）
      */
     @PatchMapping("/bid-record/{id}")

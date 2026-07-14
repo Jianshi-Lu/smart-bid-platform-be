@@ -454,7 +454,7 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 | `bidderName` | String | @NotBlank, @Size(max=100) | 投标人名称（v18 重命名自 `tendererName`） |
 | `quotePrice` | BigDecimal | @NotNull | 报价（元） |
 | `bidderContact` | String | @NotBlank, @Size(max=255) | 联系方式（v18 重命名自 `tendererContact`） |
-| `credentials` | String | @Size(max=500) | 资信材料文件链接（可选） |
+| `credentials` | `List<String>` | 可选 | 转换后 Markdown 文件路径数组，顺序与文件顺序一致 |
 
 **服务端自动设置**：
 - `bidNo` = `MAX(bid_no) WHERE invitationId AND bidderName + 1`（首次为 1）
@@ -493,7 +493,7 @@ curl "http://{host}:{port}/bid-record/by-invitation/1"
 | `bidderName` | String | @Size(max=100) |
 | `quotePrice` | BigDecimal | — |
 | `bidderContact` | String | @Size(max=255) |
-| `credentials` | String | @Size(max=500) |
+| `credentials` | `List<String>` | 可选；`null` 表示不修改 |
 
 > 不允许修改：`bidRecordId`、`invitationId`、`bidNo`、`bidAt`。
 

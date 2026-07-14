@@ -11,7 +11,8 @@
         <result column="bidder_name"     property="bidderName"/>
         <result column="quote_price"     property="quotePrice"/>
         <result column="bidder_contact"  property="bidderContact"/>
-        <result column="credentials"     property="credentials"/>
+        <result column="credentials"     property="credentials"
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler"/>
     </resultMap>
 
     <insert id="insert"
@@ -21,7 +22,8 @@
         INSERT INTO bid_record
             (invitation_id, bid_no, bid_at, bidder_name, quote_price, bidder_contact, credentials)
         VALUES
-            (#{invitationId}, #{bidNo}, #{bidAt}, #{bidderName}, #{quotePrice}, #{bidderContact}, #{credentials})
+            (#{invitationId}, #{bidNo}, #{bidAt}, #{bidderName}, #{quotePrice}, #{bidderContact},
+             #{credentials, jdbcType=VARCHAR, typeHandler=com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler})
     </insert>
 
     <update id="updateById"
@@ -34,7 +36,9 @@
             <if test="bidderName != null">bidder_name = #{bidderName},</if>
             <if test="quotePrice != null">quote_price = #{quotePrice},</if>
             <if test="bidderContact != null">bidder_contact = #{bidderContact},</if>
-            <if test="credentials != null">credentials = #{credentials},</if>
+            <if test="credentials != null">
+                credentials = #{credentials, jdbcType=VARCHAR, typeHandler=com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler},
+            </if>
         </set>
         WHERE bid_record_id = #{bidRecordId}
     </update>

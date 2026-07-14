@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 投标记录 — 数据库实体。对应表 {@code bid_record}（V18 重命名自 tenderer_detail，并合并加入
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
  * </ul>
  *
  * <p>唯一索引：{@code uk_attempt (invitation_id, bidder_name, bid_no)} — 防并发同号；二级索引：{@code idx_invitation (invitation_id)} — 按公告过滤。</p>
+ * <p>{@code credentials} 保存转换后 Markdown 文件路径列表，数据库中对应 JSON 数组；列表顺序与资信文件的 {@code file_order} 一致。</p>
  */
 @Data
 @NoArgsConstructor
@@ -47,5 +49,5 @@ public class BidRecord {
 
     private String bidderContact;
 
-    private String credentials;
+    private List<String> credentials;
 }
