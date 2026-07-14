@@ -22,7 +22,7 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
     private BidHandlerInfoMapper mapper;
 
     @Override
-    protected BaseMapper<BidHandlerInfo> getMapper() {
+    protected BaseMapper<BidHandlerInfo, Integer> getMapper() {
         return mapper;
     }
 

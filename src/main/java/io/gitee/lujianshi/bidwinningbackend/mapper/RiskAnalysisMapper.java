@@ -11,7 +11,7 @@ import java.util.List;
  * <p>V18：{@link #selectByBidRecordId} 重命名自 selectByTendererId（FK 列 tendererId → bidRecordId）。</p>
  */
 @Mapper
-public interface RiskAnalysisMapper extends BaseMapper<RiskAnalysis> {
+public interface RiskAnalysisMapper extends BaseMapper<RiskAnalysis, Integer> {
 
     /**
      * 按投标记录 ID 查询历史分析记录（按时间倒序）。

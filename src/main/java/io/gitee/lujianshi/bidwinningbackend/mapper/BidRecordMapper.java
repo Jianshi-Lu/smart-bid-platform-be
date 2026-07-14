@@ -16,7 +16,7 @@ import java.util.List;
  * </ul>
  */
 @Mapper
-public interface BidRecordMapper extends BaseMapper<BidRecord> {
+public interface BidRecordMapper extends BaseMapper<BidRecord, Integer> {
 
     /**
      * 计算指定 (公告, 投标人) 组合的当前最大 bidNo。

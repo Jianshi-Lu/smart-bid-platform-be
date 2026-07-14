@@ -27,7 +27,7 @@ import java.util.function.Function;
  * @param <T> 实体类型
  */
 public abstract class BaseService<T> {
-    protected abstract BaseMapper<T> getMapper();
+    protected abstract BaseMapper<T, Integer> getMapper();
 
     protected abstract Function<T, Integer> getIdExtractor();
 

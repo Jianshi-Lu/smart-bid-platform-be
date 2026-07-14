@@ -35,7 +35,7 @@ public class BidRecordService extends BaseService<BidRecord> {
     private BidRecordMapper mapper;
 
     @Override
-    protected BaseMapper<BidRecord> getMapper() {
+    protected BaseMapper<BidRecord, Integer> getMapper() {
         return mapper;
     }
 

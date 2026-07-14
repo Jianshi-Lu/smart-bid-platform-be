@@ -1,6 +1,6 @@
 # 数据库结构（bid-winning-backend）
 
-> 5 张表的最终结构（V1-V19）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
+> 6 张表的最终结构（V1-V21）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
 >
 > API 契约：[`docs/api.md`](api.md) · 项目架构：[`docs/architecture.md`](architecture.md)
 
@@ -48,11 +48,23 @@
 │  ├─ bidder_name (V18 重命名自 tenderer_name)        │
 │  ├─ quote_price (DECIMAL)                       │
 │  ├─ bidder_contact (V18 重命名自 tenderer_contact) │
-│  └─ credentials (V16)                            │
+│  └─ credentials JSON (V20)                       │
 │                                                  │
 │ UNIQUE (invitation_id, bidder_name, bid_no) — V18│
 │ INDEX (invitation_id) — V18                       │
 └──────────────────────────────────────────────────┘
+           │ 1:N（逻辑外键 bid_record_id，提交投标后回填）
+           ▼
+┌─────────────────────────────────────────────┐
+│ credential_file (V21)                       │  资信文件
+│  ├─ file_id PK                               │
+│  ├─ upload_batch_id                          │
+│  ├─ bid_record_id (提交后回填)                │
+│  ├─ original_file_path                       │
+│  ├─ markdown_file_path                       │
+│  └─ convert_status (UPLOADED/CONVERTING/    │
+│                    CONVERTED/FAILED)         │
+└─────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────┐
 │ risk_analysis (V7→V9→V18)              │  AI 风险分析结果
@@ -145,7 +157,7 @@
 | `bidder_name` | VARCHAR(100) | ✅ | 投标人名称（V18 重命名自 `tenderer_name`） |
 | `quote_price` | DECIMAL(15,2) | ✅ | 报价（元） |
 | `bidder_contact` | VARCHAR(255) | ✅ | 联系方式（V18 重命名自 `tenderer_contact`） |
-| `credentials` | VARCHAR(500) | ❌ | 资信材料文件链接（V16 新增） |
+| `credentials` | JSON | ❌ | 转换后 Markdown 文件路径数组，顺序与 `credential_file.file_order` 一致（V20） |
 
 **索引 / 约束**：
 - PK（bid_record_id）
@@ -157,6 +169,7 @@
 - V10（重命名 `supplier_detail`；`amount` → `quote_price`）
 - V16（重命名 `tenderer_detail`；`supplier_*` → `tenderer_*`；新增 `credentials`）
 - **V18**（重命名 `bid_record`；**PK `tenderer_id` → `bid_record_id`**；新增 `invitation_id`/`bid_no`/`bid_at`；列名 `tenderer_*` → `bidder_*`；加 UNIQUE + INDEX）
+- **V20**（`credentials` 从单个字符串路径改为 Markdown 文件路径 JSON 数组；测试数据直接清空）
 
 ### 2.4 `risk_analysis`（AI 风险分析结果）
 
@@ -182,7 +195,35 @@
 - V16（`supplier_*` → `tenderer_*`）
 - **V18**（`tenderer_*` → `bidder_*`；`idx_tenderer` → `idx_bid_record`）
 
-### 2.5 `invitation_for_bid_status_history`（招标公告状态变更历史）
+### 2.5 `credential_file`（资信文件）
+
+每个原始上传文件对应一条记录；同一次上传的文件通过 `upload_batch_id` 聚合。
+文件上传阶段 `bid_record_id` 保持 `NULL`，创建投标记录后再回填。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `file_id` | BIGINT | ✅ | 文件记录主键，自增 |
+| `upload_batch_id` | CHAR(36) | ✅ | 上传批次 UUID，由 Java 后端生成 |
+| `bid_record_id` | INT | ❌ | 逻辑外键 → `bid_record.bid_record_id`，提交投标后回填 |
+| `file_order` | INT | ✅ | 文件在上传批次中的顺序 |
+| `original_filename` | VARCHAR(255) | ✅ | 用户上传时的原始文件名 |
+| `content_type` | VARCHAR(100) | ❌ | 文件 MIME 类型 |
+| `file_size` | BIGINT | ✅ | 原始文件大小，字节 |
+| `sha256` | CHAR(64) | ✅ | 原始文件 SHA-256 |
+| `storage_type` | VARCHAR(20) | ✅ | 当前为 `LOCAL`，后续可扩展 `MINIO` |
+| `original_file_path` | VARCHAR(500) | ✅ | 原始文件物理存储相对路径 |
+| `markdown_file_path` | VARCHAR(500) | ❌ | 转换后的 Markdown 文件相对路径 |
+| `convert_status` | VARCHAR(20) | ✅ | `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
+| `error_message` | VARCHAR(1000) | ❌ | 转换失败原因 |
+| `created_at` | DATETIME | ✅ | 文件记录创建时间 |
+| `converted_at` | DATETIME | ❌ | Markdown 转换完成时间 |
+| `bound_at` | DATETIME | ❌ | 与投标记录绑定时间 |
+
+**索引**：PK（file_id）+ `idx_upload_batch_id` + `idx_bid_record_id` + `idx_convert_status`
+
+**演进**：**V21**（新建资信文件表）
+
+### 2.6 `invitation_for_bid_status_history`（招标公告状态变更历史）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
@@ -237,8 +278,10 @@ TRUNCATE TABLE tenderer_detail;
 | V17 | `V17__rename_idx_supplier_to_idx_tenderer.sql` | `risk_analysis` 索引名 `idx_supplier` → `idx_tenderer`（V16 漏改） |
 | **V18** | `V18__rename_to_bid_convention.sql` | **全面 bid 化重命名 + bid_record 合并 + 3 列新增** |
 | **V19** | `V19__rename_primary_key_of_bid_handler_info.sql` | **`bid_handler_info` PK 列 `tender_handler_id` → `bid_handler_id`** |
+| **V20** | `V20__change_bid_record_credentials_to_json.sql` | **`bid_record.credentials` 改为 Markdown 路径 JSON 数组；清空测试数据** |
+| **V21** | `V21__create_credential_file.sql` | **新建 `credential_file` 资信文件表** |
 
-**执行顺序**：V1 → V2 → ... → V19
+**执行顺序**：V1 → V2 → ... → V21
 
 **V18 前置**：先 TRUNCATE `risk_analysis` 和 `tenderer_detail`（旧数据无迁移）。
 
@@ -251,6 +294,7 @@ TRUNCATE TABLE tenderer_detail;
 | `BidHandlerInfo` | `bid_handler_info` | `bid_handler_id` | `bidHandlerId` |
 | `InvitationForBid` | `invitation_for_bid` | `invitation_id` | `invitationId` |
 | `BidRecord` | `bid_record` | `bid_record_id` | `bidRecordId` |
+| `CredentialFile` | `credential_file` | `file_id` | `fileId` |
 | `RiskAnalysis` | `risk_analysis` | `analysis_id` | `analysisId` |
 | `InvitationForBidStatusHistory` | `invitation_for_bid_status_history` | `history_id` | `historyId` |
 

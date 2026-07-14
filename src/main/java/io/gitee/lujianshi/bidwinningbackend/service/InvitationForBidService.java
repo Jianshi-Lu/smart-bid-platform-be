@@ -31,7 +31,7 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
     private InvitationForBidStatusHistoryMapper historyMapper;
 
     @Override
-    protected BaseMapper<InvitationForBid> getMapper() {
+    protected BaseMapper<InvitationForBid, Integer> getMapper() {
         return mapper;
     }
 

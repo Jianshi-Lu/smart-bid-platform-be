@@ -10,5 +10,5 @@ import org.apache.ibatis.annotations.Mapper;
  * @see InvitationForBidService
  */
 @Mapper
-public interface InvitationForBidMapper extends BaseMapper<InvitationForBid> {
+public interface InvitationForBidMapper extends BaseMapper<InvitationForBid, Integer> {
 }
