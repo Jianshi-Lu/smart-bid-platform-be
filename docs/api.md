@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 28 端点（含 1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 30 端点（含 2 个资信文件端点、1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -13,7 +13,7 @@
 - dev 默认：`http://localhost:8080`
 - prod：`http://{prod-host}:80`
 
-**请求体**：`application/json; charset=utf-8`（所有端点统一）
+**请求体**：业务 JSON 端点使用 `application/json; charset=utf-8`；文件上传端点使用 `multipart/form-data`。
 
 **字符编码**：UTF-8
 
@@ -24,6 +24,7 @@
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 招标经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
+| 资信文件 (CredentialFile) | 2 | `/credential-files/...` |
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+，含在 BidRecord 内） | 1 | `/bid-record/{action}/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
@@ -426,7 +427,97 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 
 ---
 
-## 5. 投标记录（BidRecord）
+## 5. 资信文件上传（CredentialFile）
+
+| Method | Path | 用途 | 返回 |
+|--------|------|------|------|
+| POST | `/credential-files/upload` | 上传一个或多个原始资信文件并落盘 | `Result<CredentialFileUploadResponse>` |
+| DELETE | `/credential-files/{uploadBatchId}/files/{fileId}` | 删除未提交文件 | `Result<Void>`（当前占位） |
+
+### 5.1 `POST /credential-files/upload`
+
+请求类型为 `multipart/form-data`。多个文件使用同一个 `files` 字段重复提交：
+
+| Form 字段 | 类型 | 必填 | 说明 |
+|-----------|------|:---:|------|
+| `files` | File，可重复 | ✅ | 本次请求中的原始资信文件；单文件最大 150MB |
+| `uploadBatchId` | UUID String | ❌ | 首次上传不传，由后端生成；追加上传时复用此前返回值 |
+
+```bash
+curl -X POST http://localhost:8080/credential-files/upload \
+  -F 'files=@/path/to/license.pdf' \
+  -F 'files=@/path/to/qualification.docx'
+```
+
+追加上传：
+
+```bash
+curl -X POST http://localhost:8080/credential-files/upload \
+  -F 'files=@/path/to/other.pdf' \
+  -F 'uploadBatchId=550e8400-e29b-41d4-a716-446655440000'
+```
+
+成功响应：
+
+```json
+{
+  "code": 200,
+  "message": "上传成功",
+  "data": {
+    "uploadBatchId": "550e8400-e29b-41d4-a716-446655440000",
+    "files": [
+      {
+        "fileOrder": 0,
+        "originalFilename": "license.pdf",
+        "contentType": "application/pdf",
+        "fileSize": 102400,
+        "sha256": "64位小写十六进制摘要",
+        "originalFilePath": "550e8400-e29b-41d4-a716-446655440000/original/文件UUID_license.pdf",
+        "convertStatus": "UPLOADED"
+      }
+    ]
+  }
+}
+```
+
+**存储行为**：
+
+- 开发环境根目录默认为 `/Users/lujianshi/Desktop/projects/MinIO`，可用 `CREDENTIAL_FILE_LOCAL_ROOT` 覆盖。
+- 物理目录为 `{root}/{uploadBatchId}/original/`，文件名为 `{fileUuid}_{安全原文件名}`。
+- API 只返回相对路径，不暴露环境绝对路径。
+- SHA-256 在落盘后重新读取实际文件计算。
+- 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；不影响该批次此前上传的文件。
+- `fileOrder` 当前只表示本次请求内顺序，全批次连续顺序待接入数据库后实现。
+
+**错误响应**：
+
+| 场景 | code | message |
+|------|:---:|---------|
+| 文件集合为空、空文件 | 400 | `上传文件不能为空` |
+| 原始文件名为空 | 400 | `原始文件名不能为空` |
+| `uploadBatchId` 不是合法 UUID | 400 | `上传批次号格式不正确` |
+| 单文件超过 150MB 或请求总体超过 200MB | 400 | `文件大小超过限制` |
+| 文件系统或摘要计算失败 | 500 | `服务器内部错误` |
+
+> **当前阶段边界**：接口已经真实落盘并返回数据库所需元数据，但尚未写入 `credential_file`，也不会触发 Python Markdown 转换。
+
+### 5.2 `DELETE /credential-files/{uploadBatchId}/files/{fileId}`
+
+当前仅用于前后端联调，打印删除成功并返回：
+
+```json
+{
+  "code": 200,
+  "message": "删除成功（占位）",
+  "data": null
+}
+```
+
+当前不会删除物理文件或数据库记录。真实删除、批次归属校验和已绑定文件保护留到后续阶段。
+
+---
+
+## 6. 投标记录（BidRecord）
 
 对应表 `bid_record`，主键 `bid_record_id`。（v18 由 `tenderer_detail` 合并而来）
 
@@ -444,7 +535,7 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 > `PATCH` 不开放修改 `bidRecordId`/`invitationId`/`bidNo`/`bidAt`（主键与外键、投标次数、投标时间由服务端维护）。
 > `bidNo` 服务端按 `(invitationId, bidderName)` 自动计算 `max(bid_no)+1`，并发同号场景内置 3 次重试 + UNIQUE 兜底。
 
-### 5.1 `POST /bid-record/add`
+### 6.1 `POST /bid-record/add`
 
 **请求体**（`AddRequest`，4 字段必填 + 1 可选）：
 
@@ -466,11 +557,11 @@ curl -X POST http://{host}:{port}/bid-record/add \
   -d '{"invitationId":1,"bidderName":"ABC公司","quotePrice":1234567.89,"bidderContact":"abc@example.com"}'
 ```
 
-### 5.2 `GET /bid-record/{id}`
+### 6.2 `GET /bid-record/{id}`
 
 返回 200 + 实体 或 404 + null。
 
-### 5.3 `GET /bid-record/by-invitation/{invitationId}`
+### 6.3 `GET /bid-record/by-invitation/{invitationId}`
 
 按招标公告 ID 查询所有投标记录，**不分页**，按 `bid_at ASC` 排序（按投标时间正序展示评标过程）。
 
@@ -484,7 +575,7 @@ curl -X POST http://{host}:{port}/bid-record/add \
 curl "http://{host}:{port}/bid-record/by-invitation/1"
 ```
 
-### 5.4 `PATCH /bid-record/{id}`
+### 6.4 `PATCH /bid-record/{id}`
 
 **请求体**（`UpdateRequest`，4 字段全可选）：
 
@@ -503,11 +594,11 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
   -d '{"quotePrice":999999.99}'
 ```
 
-### 5.5 `DELETE /bid-record/{id}`
+### 6.5 `DELETE /bid-record/{id}`
 
 返回 200 + null 或 404 + null。
 
-### 5.6 `GET /bid-record`
+### 6.6 `GET /bid-record`
 
 | Query | 类型 | 默认 |
 |------|------|------|
@@ -515,13 +606,13 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 | `pageSize` | Integer | 10 |
 | `sort` | String | `bid_record_id desc` |
 
-### 5.7 `POST /bid-record/batch-delete`
+### 6.7 `POST /bid-record/batch-delete`
 
 ```json
 { "ids": [1, 2, 3] }
 ```
 
-### 5.8 `POST /bid-record/analyze-risk/{id}`
+### 6.8 `POST /bid-record/analyze-risk/{id}`
 
 **同步调用 OpenAI 兼容 LM Studio**，Structured Output 约束 schema，解析 JSON，落库 risk_analysis 表。
 
@@ -533,7 +624,7 @@ curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 
 ---
 
-## 6. 风险分析记录查询（RiskAnalysis）
+## 7. 风险分析记录查询（RiskAnalysis）
 
 对应表 `risk_analysis`，主键 `analysis_id`。**敏感数据，只读入口**：不暴露 DELETE / PATCH / POST 写端点，新增与删除仅在数据库手工操作。
 
@@ -547,7 +638,7 @@ curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 | GET | `/risk-analysis` | 分页查询全部历史风险分析记录 | `Result<PageInfo<RiskAnalysis>>` |
 | GET | `/risk-analysis/by-bid-record/{id}` | 按投标记录 ID 查询所有历史风险分析记录 | `Result<List<RiskAnalysis>>` |
 
-### 6.1 `GET /risk-analysis`
+### 7.1 `GET /risk-analysis`
 
 | Query | 类型 | 默认 | 说明 |
 |-------|------|------|------|
@@ -621,7 +712,7 @@ curl "http://{host}:{port}/risk-analysis?page=1&pageSize=10&sort=analysis_id%20d
 }
 ```
 
-### 6.2 `GET /risk-analysis/by-bid-record/{id}`
+### 7.2 `GET /risk-analysis/by-bid-record/{id}`
 
 > ⚠️ **v0.3 路径迁移**:旧路径 `GET /bid-record/risk-history/{id}` 已经从 `BidRecordController` 移除(归到 `RiskAnalysisController` 域名下,详见 commit)。前端需切到新路径,否则 404。
 

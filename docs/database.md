@@ -200,6 +200,8 @@
 每个原始上传文件对应一条记录；同一次上传的文件通过 `upload_batch_id` 聚合。
 文件上传阶段 `bid_record_id` 保持 `NULL`，创建投标记录后再回填。
 
+> **当前实现状态**：`POST /credential-files/upload` 已完成本地原文件落盘、SHA-256 计算和相对路径返回，但尚未执行本表 INSERT。以下字段已经由上传响应提供，下一阶段接入 `CredentialFileMapper` 后再持久化。
+
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
 | `file_id` | BIGINT | ✅ | 文件记录主键，自增 |
@@ -218,6 +220,14 @@
 | `created_at` | DATETIME | ✅ | 文件记录创建时间 |
 | `converted_at` | DATETIME | ❌ | Markdown 转换完成时间 |
 | `bound_at` | DATETIME | ❌ | 与投标记录绑定时间 |
+
+当前本地存储路径约定：
+
+```text
+{upload_batch_id}/original/{file_uuid}_{安全原文件名}
+```
+
+数据库中的 `original_file_path` 保存上述相对路径，存储根目录由运行环境配置，不写入数据库。`sha256` 使用 JDK `MessageDigest(SHA-256)` 对落盘后的实际内容计算。
 
 **索引**：PK（file_id）+ `idx_upload_batch_id` + `idx_bid_record_id` + `idx_convert_status`
 

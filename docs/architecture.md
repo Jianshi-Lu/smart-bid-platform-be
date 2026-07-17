@@ -14,6 +14,7 @@
 | 模板引擎 | Thymeleaf | 3.1.5 |
 | AI | Spring AI + OpenAI/DeepSeek Starter | 2.0.0（运行时使用 OpenAI 兼容配置接 LM Studio，本地模型由 `application-dev.yml` 指定） |
 | JSON | fastjson2 | 2.0.52 |
+| 文件存储 | Java NIO 本地存储抽象 | 开发阶段使用本地目录，预留 MinIO 实现 |
 | 工具 | Lombok | 1.18.46 |
 | 开发 | DevTools | — |
 | 观测 | Spring Boot Actuator | — |
@@ -43,27 +44,37 @@
 ```
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
-├── controller/                             # 5 Controller + GlobalExceptionHandler
+├── controller/                             # 6 Controller + GlobalExceptionHandler
 │   ├── BidRecordController.java            # 投标记录（8 端点：6 标准 CRUD + 1 按公告查询 + 1 AI 风险分析触发）
 │   ├── BidHandlerInfoController.java       # 招标经办人（7 端点：6 标准 CRUD + 1 批量新增）
 │   ├── InvitationForBidController.java     # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
 │   ├── RiskAnalysisController.java         # 风险分析记录只读查询（2 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
+│   ├── CredentialFileController.java       # 资信原文件上传 + 删除占位端点
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── dto/                                    # 按业务模块分包
 │   ├── common/                             # Result / Diff
 │   ├── bidhandler/                         # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
 │   ├── invitationforbid/                   # 同上 + StatusUpdateRequest / BatchDeleteRequest
 │   ├── bidrecord/                          # AddRequest / UpdateRequest / BatchDeleteRequest
+│   ├── credentialfile/                     # CredentialFileUploadResponse / Item
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 5 数据库实体：BidHandlerInfo / InvitationForBid / BidRecord / RiskAnalysis / InvitationForBidStatusHistory
-├── enums/                                  # 业务枚举：BidNoticeStatus
-├── mapper/                                 # @Mapper 接口 extends BaseMapper
+├── entity/                                 # 6 个数据库实体（含 CredentialFile）
+├── enums/                                  # BidNoticeStatus / CredentialFileConvertStatus
+├── mapper/                                 # 6 个业务 Mapper + BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
 │   ├── BidRecordService.java               # add 方法含 3 次重试逻辑 + listByInvitationId
 │   ├── BidHandlerInfoService.java
 │   ├── InvitationForBidService.java
+│   ├── credentialfile/
+│   │   ├── CredentialFileUploadService.java # 上传批次、落盘、摘要与失败补偿编排
+│   │   └── storage/
+│   │       ├── CredentialFileStorage.java   # 存储端口：保存 / 打开 / 删除
+│   │       └── LocalCredentialFileStorage.java # Java NIO 本地存储适配器
+│   ├── filedigest/
+│   │   ├── FileDigestCalculator.java        # 通用文件摘要端口
+│   │   └── Sha256FileDigestCalculator.java  # JDK MessageDigest SHA-256 实现
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析 + 历史查询
 │   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
@@ -141,6 +152,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 
 `@RestControllerAdvice` + `@ExceptionHandler`：
 - `MethodArgumentNotValidException`（@Valid 校验失败）→ 400 + 第一个错误消息
+- `MaxUploadSizeExceededException`（单文件或 multipart 请求总体超限）→ 400 + "文件大小超过限制"
 - `IllegalArgumentException` → 400 + 异常消息
 - 其他 `Exception` → 500 + "服务器内部错误"（不泄漏堆栈）
 
@@ -165,6 +177,51 @@ public static void execute(Runnable task, long delayMillis)
 
 `add(entity)` 必须在事务内做 3 次重试，每次重试前先查 `(invitation_id, bidder_name)` 下的 `MAX(bid_no)` 计算 `bidNo = max + 1`（null 时为 1），再 INSERT。捕获 `DuplicateKeyException`（并发同号）后重试。3 次后仍冲突抛 `IllegalStateException`。
 
+### 5.10 `CredentialFileUploadService`（上传编排）
+
+负责一次 multipart 上传请求的应用层编排：校验文件、生成或复用批次 UUID、调用存储端口落盘、重新读取持久化内容计算 SHA-256、组装类型化响应。任一步失败时只补偿删除当前请求已经创建的文件，不影响同一批次此前成功上传的内容。
+
+当前 `fileOrder` 只表示本次请求内顺序；全批次连续顺序与 `credential_file` 入库留到下一阶段实现。
+
+### 5.11 `CredentialFileStorage`（存储端口）
+
+定义 `storeOriginal` / `open` / `delete` 三项能力。上传编排依赖接口而不是本地文件系统，后续可新增 MinIO 适配器而不修改 Controller 和上传流程。
+
+`LocalCredentialFileStorage` 是当前实现，目录结构为：
+
+```text
+{credential-file.storage.local-root}/
+└── {uploadBatchId}/
+    └── original/
+        └── {fileUuid}_{安全原文件名}
+```
+
+接口和后续数据库只保存 `{uploadBatchId}/original/{storedFilename}` 相对路径。实现使用 `CREATE_NEW` 防止覆盖，并在路径规范化后校验目标仍位于存储根目录内。
+
+### 5.12 `FileDigestCalculator`（摘要端口）
+
+以 `InputStream` 为输入，不依赖 Multipart、本地 `Path` 或具体存储技术。`Sha256FileDigestCalculator` 使用 JDK `MessageDigest` 和 `HexFormat` 计算 64 位小写十六进制摘要；上传编排在文件落盘后重新打开文件流计算摘要，保证摘要对应实际持久化内容。
+
+### 5.13 资信文件上传调用链
+
+```text
+POST /credential-files/upload (multipart/form-data)
+  ↓
+CredentialFileController
+  ↓
+CredentialFileUploadService
+  ├─ 生成/校验 uploadBatchId
+  ├─ CredentialFileStorage.storeOriginal
+  │    └─ LocalCredentialFileStorage → 本地 {batchId}/original
+  ├─ CredentialFileStorage.open
+  ├─ FileDigestCalculator.calculate → SHA-256
+  └─ CredentialFileUploadResponse
+       ↓
+Result.success(data, "上传成功")
+```
+
+**当前边界**：已真实落盘并返回元数据，但尚未插入 `credential_file`，删除端点仍为占位，也尚未触发 Python Markdown 转换。
+
 ---
 
 ## 6. 异常处理链路
@@ -187,6 +244,14 @@ Spring 抛 MethodArgumentNotValidException
 GlobalExceptionHandler.handleValidation
   ↓
 返 Result.error(400, 第一个校验错误消息)
+
+multipart 文件超过 150MB 或请求总体超过 200MB
+  ↓ Controller 执行前即解析失败
+Spring 抛 MaxUploadSizeExceededException
+  ↓
+GlobalExceptionHandler.handleMaxUploadSizeExceeded
+  ↓
+返 Result.error(400, "文件大小超过限制")
 
 未捕获异常
   ↓
@@ -315,6 +380,9 @@ service.sendOperationEmail(entity);
 | **Hybrid Reasoning 模型 fallback** | `extractRawContent` 优先读 `AssistantMessage.getText()`，为空时降级 `metadata["reasoningContent"]`（Spring AI 2.0 `OpenAiChatModel.internalCall` 内部已把 LM Studio 的 `reasoning_content` 透传至此，key 为 camelCase）；适用 huihui-qwen 系 Hybrid Reasoning 模型把 JSON 输出塞 reasoning 字段的场景。详见 [`docs/structured-output.md` §9.1](structured-output.md#91-hybrid-reasoning-模型-fallback已实施) |
 | **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
 | **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
+| **文件存储使用端口 + 适配器** | 上传编排依赖 `CredentialFileStorage`，当前接本地 NIO 实现，后续迁移 MinIO 时替换适配器 |
+| **摘要算法独立于存储** | `FileDigestCalculator` 只消费输入流，SHA-256 使用 JDK 标准库封装，可复用于原文件、Markdown 与一致性校验 |
+| **文件路径保存相对路径** | 不把 `/Users/...` 等环境根目录写入 API/数据库，切换 Linux 或 MinIO 时无需迁移历史路径 |
 
 ---
 
