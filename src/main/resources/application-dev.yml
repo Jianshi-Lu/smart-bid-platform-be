@@ -2,6 +2,10 @@ server:
   address: 0.0.0.0
   port: 8080
 
+credential-file:
+  storage:
+    local-root: ${CREDENTIAL_FILE_LOCAL_ROOT:/Users/lujianshi/Desktop/projects/MinIO}
+
 spring:
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
