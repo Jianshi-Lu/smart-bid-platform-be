@@ -1,6 +1,9 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
+import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
+import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.CredentialFileUploadService;
+import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -8,20 +11,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * 资信文件上传 Controller。
  *
- * <p>当前仅提供前后端联调占位端点：不写本地文件、不操作 {@code credential_file} 表，
- * 只生成或复用上传批次号并返回基础文件信息。</p>
+ * <p>上传端点负责接收 multipart 参数，具体批次处理、文件落盘与摘要计算由 Service 编排。
+ * 当前阶段不操作 {@code credential_file} 表，删除端点仍为前后端联调占位实现。</p>
  */
 @RestController
 public class CredentialFileController {
+
+    @Resource
+    private CredentialFileUploadService credentialFileUploadService;
 
     /**
      * 上传一个或多个原始资信文件。
@@ -31,41 +33,11 @@ public class CredentialFileController {
      * @return 上传批次号和文件基础信息
      */
     @PostMapping("/credential-files/upload")
-    public Result<Map<String, Object>> upload(
+    public Result<CredentialFileUploadResponse> upload(
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam(value = "uploadBatchId", required = false) String uploadBatchId) {
-        // 校验前端输入
-        if (files == null || files.isEmpty()) {
-            return Result.error(400, "上传文件不能为空");
-        }
-
-        // 生成uuid
-        String effectiveBatchId = uploadBatchId == null || uploadBatchId.isBlank()
-                ? UUID.randomUUID().toString()
-                : uploadBatchId;
-
-        List<Map<String, Object>> fileItems = new ArrayList<>();
-        for (int index = 0; index < files.size(); index++) {
-            MultipartFile file = files.get(index);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("fileOrder", index);
-            item.put("originalFilename", file.getOriginalFilename());
-            item.put("contentType", file.getContentType());
-            item.put("fileSize", file.getSize());
-            item.put("convertStatus", "UPLOADED");
-            fileItems.add(item);
-        }
-
-        System.out.printf("[CREDENTIAL_UPLOAD] 占位上传成功: batch=%s, count=%d%n",
-                effectiveBatchId, files.size());
-
-        // TODO: 校验已有 uploadBatchId 是否存在，并校验当前请求是否有权操作该批次。
-        // TODO: 生成批次目录，在 original 目录保存原始文件并计算 SHA-256。
-        // TODO: 保存成功后插入 credential_file，bid_record_id 保持 NULL。
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("uploadBatchId", effectiveBatchId);
-        data.put("files", fileItems);
-        return Result.success(data, "上传成功（占位）");
+        CredentialFileUploadResponse response = credentialFileUploadService.upload(files, uploadBatchId);
+        return Result.success(response, "上传成功");
     }
 
     /**
