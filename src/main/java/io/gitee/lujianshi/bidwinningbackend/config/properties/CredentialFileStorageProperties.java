@@ -22,7 +22,6 @@ public class CredentialFileStorageProperties {
 
     private MinioProperties minio = new MinioProperties();
 
-
     /** 本地文件系统配置。 */
     @Getter
     @Setter
