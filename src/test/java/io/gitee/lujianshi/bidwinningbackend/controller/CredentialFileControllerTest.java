@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
+import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.CredentialFileUploadService;
@@ -25,10 +26,12 @@ class CredentialFileControllerTest {
     @Test
     void shouldDelegateMultipartUploadAndReturnTypedResponse() {
         CredentialFileUploadService uploadService = new CredentialFileUploadService();
+        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        properties.getLocal().setRoot(tempDir.toString());
         ReflectionTestUtils.setField(
                 uploadService,
                 "credentialFileStorage",
-                new LocalCredentialFileStorage(tempDir.toString()));
+                new LocalCredentialFileStorage(properties));
         ReflectionTestUtils.setField(
                 uploadService,
                 "fileDigestCalculator",

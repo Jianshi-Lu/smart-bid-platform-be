@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile;
 
+import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.enums.CredentialFileConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage.LocalCredentialFileStorage;
@@ -105,10 +106,12 @@ class CredentialFileUploadServiceTest {
 
     private CredentialFileUploadService createService(FileDigestCalculator calculator) {
         CredentialFileUploadService service = new CredentialFileUploadService();
+        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        properties.getLocal().setRoot(tempDir.toString());
         ReflectionTestUtils.setField(
                 service,
                 "credentialFileStorage",
-                new LocalCredentialFileStorage(tempDir.toString()));
+                new LocalCredentialFileStorage(properties));
         ReflectionTestUtils.setField(service, "fileDigestCalculator", calculator);
         return service;
     }

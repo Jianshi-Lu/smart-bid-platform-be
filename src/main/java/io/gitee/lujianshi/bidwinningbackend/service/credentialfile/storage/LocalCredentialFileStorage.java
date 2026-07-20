@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
-import org.springframework.beans.factory.annotation.Value;
+import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -26,11 +26,11 @@ public class LocalCredentialFileStorage implements CredentialFileStorage {
     /**
      * 创建本地存储实现。
      *
-     * @param localRoot 本地存储根目录
+     * @param properties 资信文件存储配置，必须包含本地存储根目录
      * @throws IllegalArgumentException 根目录为空时抛出
      */
-    public LocalCredentialFileStorage(
-            @Value("${credential-file.storage.local-root}") String localRoot) {
+    public LocalCredentialFileStorage(CredentialFileStorageProperties properties) {
+        String localRoot = properties.getLocal().getRoot();
         if (localRoot == null || localRoot.isBlank()) {
             throw new IllegalArgumentException("资信文件存储根目录不能为空");
         }

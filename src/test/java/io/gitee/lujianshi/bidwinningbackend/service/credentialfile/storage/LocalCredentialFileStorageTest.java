@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
+import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -24,7 +25,7 @@ class LocalCredentialFileStorageTest {
 
     @Test
     void shouldStoreAndReopenFileUsingRelativePath() throws Exception {
-        LocalCredentialFileStorage storage = new LocalCredentialFileStorage(tempDir.toString());
+        LocalCredentialFileStorage storage = createStorage();
         String batchId = UUID.randomUUID().toString();
         byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
 
@@ -48,7 +49,7 @@ class LocalCredentialFileStorageTest {
 
     @Test
     void shouldGenerateDifferentStoredPathsForSameOriginalFilename() throws Exception {
-        LocalCredentialFileStorage storage = new LocalCredentialFileStorage(tempDir.toString());
+        LocalCredentialFileStorage storage = createStorage();
         String batchId = UUID.randomUUID().toString();
 
         CredentialFileStorage.StoredFile first = storage.storeOriginal(
@@ -63,8 +64,14 @@ class LocalCredentialFileStorageTest {
 
     @Test
     void shouldRejectPathOutsideStorageRoot() {
-        LocalCredentialFileStorage storage = new LocalCredentialFileStorage(tempDir.toString());
+        LocalCredentialFileStorage storage = createStorage();
 
         assertThrows(IllegalArgumentException.class, () -> storage.open("../../outside.txt"));
+    }
+
+    private LocalCredentialFileStorage createStorage() {
+        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        properties.getLocal().setRoot(tempDir.toString());
+        return new LocalCredentialFileStorage(properties);
     }
 }
