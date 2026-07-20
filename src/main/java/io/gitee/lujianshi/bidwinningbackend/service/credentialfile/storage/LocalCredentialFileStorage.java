@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
 import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -15,10 +16,16 @@ import java.util.UUID;
  * 基于本地文件系统的资信文件存储实现。
  *
  * <p>物理目录结构为 {@code {root}/{uploadBatchId}/original/}，对外只返回相对路径。</p>
+ * <p>未配置存储类型或明确配置为 {@code LOCAL} 时，由 Spring 注册为存储端口实现。</p>
  *
  * @since 1.0
  */
 @Service
+@ConditionalOnProperty(
+        prefix = "credential-file.storage",
+        name = "type",
+        havingValue = "LOCAL",
+        matchIfMissing = true)
 public class LocalCredentialFileStorage implements CredentialFileStorage {
 
     private final Path storageRoot;
