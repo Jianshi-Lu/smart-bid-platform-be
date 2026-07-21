@@ -38,7 +38,8 @@ class CredentialFileUploadServiceTest {
         MockMultipartFile first = file("license.pdf", "first-content");
         MockMultipartFile second = file("license.pdf", "second-content");
 
-        CredentialFileUploadResponse response = service.upload(List.of(first, second), null);
+        CredentialFileUploadResponse response = service.upload(
+                List.of(first, second), 1001, null);
 
         UUID.fromString(response.getUploadBatchId());
         assertEquals(2, response.getFiles().size());
@@ -61,7 +62,7 @@ class CredentialFileUploadServiceTest {
         String batchId = UUID.randomUUID().toString();
 
         CredentialFileUploadResponse response = service.upload(
-                List.of(file("license.pdf", "content")), batchId);
+                List.of(file("license.pdf", "content")), 1001, batchId);
 
         assertEquals(batchId, response.getUploadBatchId());
         assertTrue(response.getFiles().get(0).getOriginalFilePath().startsWith(batchId + "/original/"));
@@ -86,7 +87,7 @@ class CredentialFileUploadServiceTest {
         CredentialFileUploadService service = createService(calculator, storage);
 
         CredentialFileUploadResponse response = service.upload(
-                List.of(file("license.pdf", "first-content")), null);
+                List.of(file("license.pdf", "first-content")), 1001, null);
 
         String expectedSha256 =
                 "9cd4aefcb376e737ae07795b61419408249765494085c144e2d83561de56d145";
@@ -99,13 +100,17 @@ class CredentialFileUploadServiceTest {
     void shouldRejectInvalidBatchIdAndEmptyFile() {
         CredentialFileUploadService service = createService(new Sha256FileDigestCalculator());
 
+        IllegalArgumentException invalidBidRecordId = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.upload(List.of(file("license.pdf", "content")), 0, null));
         IllegalArgumentException invalidBatch = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.upload(List.of(file("license.pdf", "content")), "../invalid"));
+                () -> service.upload(List.of(file("license.pdf", "content")), 1001, "../invalid"));
         IllegalArgumentException emptyFile = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.upload(List.of(file("empty.pdf", "")), null));
+                () -> service.upload(List.of(file("empty.pdf", "")), 1001, null));
 
+        assertEquals("投标记录 ID 不正确", invalidBidRecordId.getMessage());
         assertEquals("上传批次号格式不正确", invalidBatch.getMessage());
         assertEquals("上传文件不能为空", emptyFile.getMessage());
     }
@@ -137,7 +142,7 @@ class CredentialFileUploadServiceTest {
                 IllegalStateException.class,
                 () -> service.upload(List.of(
                         file("first.pdf", "first-content"),
-                        file("second.pdf", "second-content")), null));
+                        file("second.pdf", "second-content")), 1001, null));
 
         try (var paths = Files.walk(tempDir)) {
             assertFalse(paths.anyMatch(Files::isRegularFile));

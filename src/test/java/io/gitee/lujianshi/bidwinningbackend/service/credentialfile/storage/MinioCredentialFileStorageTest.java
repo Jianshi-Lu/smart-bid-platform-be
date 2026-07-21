@@ -39,6 +39,7 @@ class MinioCredentialFileStorageTest {
 
         CredentialFileStorage.StoredFile storedFile = storage.storeOriginal(
                 new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
                         batchId,
                         "../营业执照.pdf",
                         "application/pdf",
@@ -51,6 +52,8 @@ class MinioCredentialFileStorageTest {
         assertEquals(storedFile.relativePath(), args.object());
         assertEquals(content.length, args.objectSize());
         assertEquals("application/pdf", args.contentType().toString());
+        assertEquals("1001", args.userMetadata().getFirst("x-amz-meta-bid-record-id"));
+        assertEquals(batchId, args.userMetadata().getFirst("x-amz-meta-upload-batch-id"));
         assertEquals(SHA256, args.userMetadata().getFirst("x-amz-meta-sha256"));
         assertSame(input, args.stream());
         assertEquals("营业执照.pdf", storedFile.safeOriginalFilename());
@@ -84,6 +87,7 @@ class MinioCredentialFileStorageTest {
                 IOException.class,
                 () -> storage.storeOriginal(
                         new CredentialFileStorage.StoreOriginalRequest(
+                                1001,
                                 UUID.randomUUID().toString(),
                                 "license.pdf",
                                 "application/pdf",

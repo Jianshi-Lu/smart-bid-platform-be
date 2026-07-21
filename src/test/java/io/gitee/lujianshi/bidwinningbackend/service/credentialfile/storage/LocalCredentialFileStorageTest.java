@@ -76,6 +76,7 @@ class LocalCredentialFileStorageTest {
         byte[] content = "content".getBytes(StandardCharsets.UTF_8);
         CredentialFileStorage.StoreOriginalRequest request =
                 new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
                         UUID.randomUUID().toString(),
                         "license.pdf",
                         "application/pdf",
@@ -95,16 +96,16 @@ class LocalCredentialFileStorageTest {
         byte[] content = new byte[]{1};
 
         assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
-                batchId, "license.pdf", "application/pdf", content.length, null,
+                1001, batchId, "license.pdf", "application/pdf", content.length, null,
                 new ByteArrayInputStream(content)));
         assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
-                batchId, "license.pdf", "application/pdf", content.length, "",
+                1001, batchId, "license.pdf", "application/pdf", content.length, "",
                 new ByteArrayInputStream(content)));
         assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
-                batchId, "license.pdf", "application/pdf", content.length, "abc",
+                1001, batchId, "license.pdf", "application/pdf", content.length, "abc",
                 new ByteArrayInputStream(content)));
         assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
-                batchId, "license.pdf", "application/pdf", content.length, "A".repeat(64),
+                1001, batchId, "license.pdf", "application/pdf", content.length, "A".repeat(64),
                 new ByteArrayInputStream(content)));
     }
 
@@ -120,6 +121,7 @@ class LocalCredentialFileStorageTest {
             String contentType,
             byte[] content) {
         return new CredentialFileStorage.StoreOriginalRequest(
+                1001,
                 batchId,
                 filename,
                 contentType,

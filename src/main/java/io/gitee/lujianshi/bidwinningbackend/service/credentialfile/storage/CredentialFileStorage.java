@@ -15,6 +15,7 @@ public interface CredentialFileStorage {
     /**
      * 原始文件保存请求。
      *
+     * @param bidRecordId 文件所属的投标记录 ID
      * @param uploadBatchId 上传批次 UUID
      * @param originalFilename 客户端提供的原始文件名
      * @param contentType 文件 MIME 类型，未知时可以为空
@@ -23,6 +24,7 @@ public interface CredentialFileStorage {
      * @param input 文件内容输入流，由调用方关闭
      */
     record StoreOriginalRequest(
+            Integer bidRecordId,
             String uploadBatchId,
             String originalFilename,
             String contentType,
@@ -36,6 +38,9 @@ public interface CredentialFileStorage {
          * <p>校验通过后，由 Java 自动将构造参数赋值给对应的 record 字段。</p>
          */
         public StoreOriginalRequest {
+            if (bidRecordId == null || bidRecordId <= 0) {
+                throw new IllegalArgumentException("投标记录 ID 不正确");
+            }
             if (uploadBatchId == null || uploadBatchId.isBlank()) {
                 throw new IllegalArgumentException("上传批次号不能为空");
             }

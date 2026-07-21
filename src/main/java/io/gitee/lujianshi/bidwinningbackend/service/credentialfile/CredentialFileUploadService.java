@@ -37,15 +37,18 @@ public class CredentialFileUploadService {
      * <p>任一文件保存或摘要计算失败时，仅补偿删除本次请求已经创建的文件。</p>
      *
      * @param files         本次上传的文件列表
+     * @param bidRecordId   文件所属的投标记录 ID
      * @param uploadBatchId 已有批次 UUID；首次上传时为空
      * @return 上传批次号和文件持久化结果
-     * @throws IllegalArgumentException 文件为空、文件名非法或批次号格式错误
+     * @throws IllegalArgumentException 投标记录 ID、文件或批次号格式不正确
      * @throws IllegalStateException 文件读写或摘要计算失败
      * @since 1.0
      */
     public CredentialFileUploadResponse upload(
             List<MultipartFile> files,
+            Integer bidRecordId,
             String uploadBatchId) {
+        validateBidRecordId(bidRecordId);
         validateFiles(files);
         String effectiveBatchId = resolveBatchId(uploadBatchId);
 
@@ -58,7 +61,7 @@ public class CredentialFileUploadService {
 
                 // 上传文件入口：携带原始内容摘要落盘
                 CredentialFileStorage.StoredFile storedFile =
-                        storeOriginal(effectiveBatchId, file, sha256);
+                        storeOriginal(bidRecordId, effectiveBatchId, file, sha256);
                 createdPaths.add(storedFile.relativePath());
 
                 uploadedItems.add(new CredentialFileUploadItem(
@@ -84,6 +87,7 @@ public class CredentialFileUploadService {
     /**
      * 打开 Multipart 文件流并委托存储端口完成原文件持久化。
      *
+     * @param bidRecordId 文件所属的投标记录 ID
      * @param uploadBatchId 已确定的上传批次 UUID
      * @param file 待保存的 Multipart 文件
      * @param sha256 原始上传内容的 SHA-256 摘要
@@ -91,18 +95,34 @@ public class CredentialFileUploadService {
      * @throws IOException 文件流读取或持久化失败
      */
     private CredentialFileStorage.StoredFile storeOriginal(
+            Integer bidRecordId,
             String uploadBatchId,
             MultipartFile file,
             String sha256) throws IOException {
         try (InputStream input = file.getInputStream()) {
             return credentialFileStorage.storeOriginal( // 由配置激活的存储实现执行保存
                     new CredentialFileStorage.StoreOriginalRequest(
+                            bidRecordId,
                             uploadBatchId,
                             file.getOriginalFilename(),
                             file.getContentType(),
                             file.getSize(),
                             sha256,
                             input));
+        }
+    }
+
+    /**
+     * 校验上传请求携带的投标记录 ID 基本格式。
+     *
+     * <p>当前阶段尚未接入数据库，仅校验正整数；记录存在性将在落库阶段补充。</p>
+     *
+     * @param bidRecordId 文件所属的投标记录 ID
+     * @throws IllegalArgumentException ID 为空或不是正整数
+     */
+    private void validateBidRecordId(Integer bidRecordId) {
+        if (bidRecordId == null || bidRecordId <= 0) {
+            throw new IllegalArgumentException("投标记录 ID 不正确");
         }
     }
 

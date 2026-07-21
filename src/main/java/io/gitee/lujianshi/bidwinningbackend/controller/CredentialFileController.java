@@ -29,14 +29,17 @@ public class CredentialFileController {
      * 上传一个或多个原始资信文件。
      *
      * @param files         本次上传的文件列表
+     * @param bidRecordId   文件所属的投标记录 ID
      * @param uploadBatchId 已存在的上传批次号；第一次上传时不传
      * @return 上传批次号和文件基础信息
      */
     @PostMapping("/credential-files/upload")
     public Result<CredentialFileUploadResponse> upload(
             @RequestParam("files") List<MultipartFile> files,
+            @RequestParam("bidRecordId") Integer bidRecordId,
             @RequestParam(value = "uploadBatchId", required = false) String uploadBatchId) {
-        CredentialFileUploadResponse response = credentialFileUploadService.upload(files, uploadBatchId);
+        CredentialFileUploadResponse response = credentialFileUploadService.upload(
+                files, bidRecordId, uploadBatchId);
         return Result.success(response, "上传成功");
     }
 

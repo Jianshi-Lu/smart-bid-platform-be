@@ -28,6 +28,10 @@ import java.util.Map;
         havingValue = "MINIO")
 public class MinioCredentialFileStorage implements CredentialFileStorage {
 
+    private static final String BID_RECORD_ID_METADATA_KEY = "bid-record-id";
+
+    private static final String UPLOAD_BATCH_ID_METADATA_KEY = "upload-batch-id";
+
     private static final String SHA256_METADATA_KEY = "sha256";
 
     @Resource
@@ -54,7 +58,10 @@ public class MinioCredentialFileStorage implements CredentialFileStorage {
                 .bucket(bucket())
                 .object(fileKey.relativePath())
                 .stream(request.input(), request.contentLength(), -1L)
-                .userMetadata(Map.of(SHA256_METADATA_KEY, request.sha256()));
+                .userMetadata(Map.of(
+                        BID_RECORD_ID_METADATA_KEY, request.bidRecordId().toString(),
+                        UPLOAD_BATCH_ID_METADATA_KEY, request.uploadBatchId(),
+                        SHA256_METADATA_KEY, request.sha256()));
         if (request.contentType() != null && !request.contentType().isBlank()) {
             argsBuilder.contentType(request.contentType());
         }

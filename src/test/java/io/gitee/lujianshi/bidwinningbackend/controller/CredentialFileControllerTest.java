@@ -44,7 +44,8 @@ class CredentialFileControllerTest {
                 "application/pdf",
                 "test-content".getBytes(StandardCharsets.UTF_8));
 
-        Result<CredentialFileUploadResponse> result = controller.upload(List.of(file), null);
+        Result<CredentialFileUploadResponse> result = controller.upload(
+                List.of(file), 1001, null);
 
         assertEquals(200, result.getCode());
         assertEquals("上传成功", result.getMessage());
