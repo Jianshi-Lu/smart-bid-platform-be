@@ -1,10 +1,11 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.storage.CredentialFileStorageProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,11 +31,9 @@ class LocalCredentialFileStorageTest {
         byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
 
         CredentialFileStorage.StoredFile storedFile = storage.storeOriginal(
-                batchId,
-                "../营业执照.pdf",
-                new ByteArrayInputStream(content));
+                request(batchId, "../营业执照.pdf", "application/pdf", content));
 
-        assertEquals("营业执照.pdf", storedFile.originalFilename());
+        assertEquals("营业执照.pdf", storedFile.safeOriginalFilename());
         assertEquals(content.length, storedFile.fileSize());
         assertTrue(storedFile.relativePath().startsWith(batchId + "/original/"));
         assertFalse(storedFile.relativePath().startsWith(tempDir.toString()));
@@ -53,9 +52,9 @@ class LocalCredentialFileStorageTest {
         String batchId = UUID.randomUUID().toString();
 
         CredentialFileStorage.StoredFile first = storage.storeOriginal(
-                batchId, "license.pdf", new ByteArrayInputStream(new byte[]{1}));
+                request(batchId, "license.pdf", "application/pdf", new byte[]{1}));
         CredentialFileStorage.StoredFile second = storage.storeOriginal(
-                batchId, "license.pdf", new ByteArrayInputStream(new byte[]{2}));
+                request(batchId, "license.pdf", "application/pdf", new byte[]{2}));
 
         assertNotEquals(first.relativePath(), second.relativePath());
         assertTrue(Files.exists(tempDir.resolve(first.relativePath())));
@@ -69,9 +68,40 @@ class LocalCredentialFileStorageTest {
         assertThrows(IllegalArgumentException.class, () -> storage.open("../../outside.txt"));
     }
 
+    @Test
+    void shouldDeleteFileWhenDeclaredLengthDoesNotMatchContent() throws Exception {
+        LocalCredentialFileStorage storage = createStorage();
+        byte[] content = "content".getBytes(StandardCharsets.UTF_8);
+        CredentialFileStorage.StoreOriginalRequest request =
+                new CredentialFileStorage.StoreOriginalRequest(
+                        UUID.randomUUID().toString(),
+                        "license.pdf",
+                        "application/pdf",
+                        content.length + 1L,
+                        new ByteArrayInputStream(content));
+
+        assertThrows(IOException.class, () -> storage.storeOriginal(request));
+        try (var paths = Files.walk(tempDir)) {
+            assertFalse(paths.anyMatch(Files::isRegularFile));
+        }
+    }
+
     private LocalCredentialFileStorage createStorage() {
         CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
         return new LocalCredentialFileStorage(properties);
+    }
+
+    private CredentialFileStorage.StoreOriginalRequest request(
+            String batchId,
+            String filename,
+            String contentType,
+            byte[] content) {
+        return new CredentialFileStorage.StoreOriginalRequest(
+                batchId,
+                filename,
+                contentType,
+                content.length,
+                new ByteArrayInputStream(content));
     }
 }

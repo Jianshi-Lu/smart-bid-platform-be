@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.config.properties;
+package io.gitee.lujianshi.bidwinningbackend.config.storage;
 
 import io.gitee.lujianshi.bidwinningbackend.enums.CredentialFileStorageType;
 import lombok.Getter;

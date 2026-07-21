@@ -54,13 +54,15 @@ public class CredentialFileUploadService {
         try {
             for (int index = 0; index < files.size(); index++) {
                 MultipartFile file = files.get(index);
-                CredentialFileStorage.StoredFile storedFile = storeOriginal(effectiveBatchId, file);    // 存储原文件
+                // 上传文件入口
+                CredentialFileStorage.StoredFile storedFile = storeOriginal(effectiveBatchId, file);
                 createdPaths.add(storedFile.relativePath());
 
+                // 上传文件后再次校验文件
                 String sha256 = calculateDigest(storedFile.relativePath());
                 uploadedItems.add(new CredentialFileUploadItem(
                         index,
-                        storedFile.originalFilename(),
+                        storedFile.safeOriginalFilename(),
                         file.getContentType(),
                         storedFile.fileSize(),
                         sha256,
@@ -91,9 +93,12 @@ public class CredentialFileUploadService {
             MultipartFile file) throws IOException {
         try (InputStream input = file.getInputStream()) {
             return credentialFileStorage.storeOriginal(
-                    uploadBatchId,
-                    file.getOriginalFilename(),
-                    input);
+                    new CredentialFileStorage.StoreOriginalRequest(
+                            uploadBatchId,
+                            file.getOriginalFilename(),
+                            file.getContentType(),
+                            file.getSize(),
+                            input));
         }
     }
 

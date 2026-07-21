@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.storage.CredentialFileStorageProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.UUID;
 
 /**
  * 基于本地文件系统的资信文件存储实现。
@@ -47,40 +46,38 @@ public class LocalCredentialFileStorage implements CredentialFileStorage {
     /**
      * 将原始文件写入批次的 {@code original} 目录，并以 UUID 前缀避免同名覆盖。
      *
-     * @param uploadBatchId 上传批次 UUID
-     * @param originalFilename 用户上传时的原始文件名
-     * @param input 文件内容输入流
+     * @param request 原始文件保存请求
      * @return 规范化文件名、存储相对路径和实际文件大小
      * @throws IOException 目录创建、文件写入或文件大小读取失败
      */
     @Override
-    public StoredFile storeOriginal(
-            String uploadBatchId,
-            String originalFilename,
-            InputStream input) throws IOException {
-        if (input == null) {
-            throw new IllegalArgumentException("文件流不能为空");
-        }
-
-        String safeOriginalFilename = normalizeFilename(originalFilename);
-        String storedFilename = UUID.randomUUID() + "_" + safeOriginalFilename;
-        String relativePath = uploadBatchId + "/original/" + storedFilename;
-        Path targetPath = resolveSafely(relativePath);
+    public StoredFile storeOriginal(StoreOriginalRequest request) throws IOException {
+        CredentialFileStorageKey.OriginalFileKey fileKey =
+                CredentialFileStorageKey.createOriginalFileKey(
+                        request.uploadBatchId(), request.originalFilename());
+        Path targetPath = resolveSafely(fileKey.relativePath());
 
         Files.createDirectories(targetPath.getParent());
         boolean targetCreated = false;
-        try (OutputStream output = Files.newOutputStream(
-                targetPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
-            targetCreated = true;
-            input.transferTo(output);
+        try {
+            try (OutputStream output = Files.newOutputStream(
+                    targetPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                targetCreated = true;
+                request.input().transferTo(output);
+            }
+
+            long actualFileSize = Files.size(targetPath);
+            if (actualFileSize != request.contentLength()) {
+                throw new IOException("文件实际大小与声明长度不一致");
+            }
+            return new StoredFile(
+                    fileKey.safeOriginalFilename(), fileKey.relativePath(), actualFileSize);
         } catch (IOException e) {
             if (targetCreated) {
                 Files.deleteIfExists(targetPath);
             }
             throw e;
         }
-
-        return new StoredFile(safeOriginalFilename, relativePath, Files.size(targetPath));
     }
 
     /**
@@ -118,34 +115,11 @@ public class LocalCredentialFileStorage implements CredentialFileStorage {
      * @throws IllegalArgumentException 路径为空或超出存储根目录
      */
     private Path resolveSafely(String relativePath) {
-        if (relativePath == null || relativePath.isBlank()) {
-            throw new IllegalArgumentException("文件相对路径不能为空");
-        }
-        Path resolvedPath = storageRoot.resolve(relativePath).normalize();
+        String normalizedPath = CredentialFileStorageKey.normalizeRelativePath(relativePath);
+        Path resolvedPath = storageRoot.resolve(normalizedPath).normalize();
         if (!resolvedPath.startsWith(storageRoot)) {
             throw new IllegalArgumentException("文件路径超出存储根目录");
         }
         return resolvedPath;
-    }
-
-    /**
-     * 去除客户端路径片段和控制字符，得到可用于物理存储的安全文件名。
-     *
-     * @param originalFilename 客户端提供的原始文件名
-     * @return 规范化后的文件名
-     * @throws IllegalArgumentException 文件名为空或规范化后不合法
-     */
-    private String normalizeFilename(String originalFilename) {
-        if (originalFilename == null || originalFilename.isBlank()) {
-            throw new IllegalArgumentException("原始文件名不能为空");
-        }
-
-        String unifiedFilename = originalFilename.replace('\\', '/');
-        String filename = unifiedFilename.substring(unifiedFilename.lastIndexOf('/') + 1).trim();
-        filename = filename.replaceAll("[\\p{Cntrl}]", "_");
-        if (filename.isBlank() || ".".equals(filename) || "..".equals(filename)) {
-            throw new IllegalArgumentException("原始文件名不合法");
-        }
-        return filename;
     }
 }

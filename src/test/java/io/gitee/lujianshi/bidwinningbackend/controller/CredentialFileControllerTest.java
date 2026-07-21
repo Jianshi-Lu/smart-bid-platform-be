@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
-import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.storage.CredentialFileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.CredentialFileUploadService;

@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.storage.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.storage.MinioConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -14,7 +15,11 @@ class CredentialFileStorageConditionTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(StorageTestConfiguration.class)
             .withPropertyValues(
-                    "credential-file.storage.local.root=/tmp/credential-files");
+                    "credential-file.storage.local.root=/tmp/credential-files",
+                    "credential-file.storage.minio.endpoint=http://10.0.0.100:9000",
+                    "credential-file.storage.minio.access-key=test-access-key",
+                    "credential-file.storage.minio.secret-key=test-secret-key",
+                    "credential-file.storage.minio.bucket=credential-files");
 
     @Test
     void shouldActivateLocalStorageWhenTypeIsMissing() {
@@ -46,7 +51,11 @@ class CredentialFileStorageConditionTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(CredentialFileStorageProperties.class)
-    @Import({LocalCredentialFileStorage.class, MinioCredentialFileStorage.class})
+    @Import({
+            LocalCredentialFileStorage.class,
+            MinioCredentialFileStorage.class,
+            MinioConfiguration.class
+    })
     static class StorageTestConfiguration {
     }
 }

@@ -1,6 +1,5 @@
-package io.gitee.lujianshi.bidwinningbackend.config;
+package io.gitee.lujianshi.bidwinningbackend.config.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.config.properties.CredentialFileStorageProperties;
 import io.minio.MinioClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
