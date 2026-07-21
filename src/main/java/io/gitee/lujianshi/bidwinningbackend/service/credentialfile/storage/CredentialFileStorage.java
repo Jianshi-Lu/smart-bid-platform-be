@@ -19,6 +19,7 @@ public interface CredentialFileStorage {
      * @param originalFilename 客户端提供的原始文件名
      * @param contentType 文件 MIME 类型，未知时可以为空
      * @param contentLength 文件内容长度，字节
+     * @param sha256 原始上传内容的标准 SHA-256 小写十六进制摘要
      * @param input 文件内容输入流，由调用方关闭
      */
     record StoreOriginalRequest(
@@ -26,9 +27,14 @@ public interface CredentialFileStorage {
             String originalFilename,
             String contentType,
             long contentLength,
+            String sha256,
             InputStream input) {
 
-        /** 校验所有存储实现共同依赖的请求边界。 */
+        /**
+         * 紧凑规范构造器，在字段赋值前校验所有存储实现共同依赖的请求边界。
+         *
+         * <p>校验通过后，由 Java 自动将构造参数赋值给对应的 record 字段。</p>
+         */
         public StoreOriginalRequest {
             if (uploadBatchId == null || uploadBatchId.isBlank()) {
                 throw new IllegalArgumentException("上传批次号不能为空");
@@ -38,6 +44,9 @@ public interface CredentialFileStorage {
             }
             if (contentLength < 0) {
                 throw new IllegalArgumentException("文件长度不能为负数");
+            }
+            if (sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("SHA-256 摘要格式不正确");
             }
             if (input == null) {
                 throw new IllegalArgumentException("文件流不能为空");

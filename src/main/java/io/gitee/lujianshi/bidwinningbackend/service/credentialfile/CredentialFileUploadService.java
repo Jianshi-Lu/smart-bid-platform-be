@@ -54,12 +54,13 @@ public class CredentialFileUploadService {
         try {
             for (int index = 0; index < files.size(); index++) {
                 MultipartFile file = files.get(index);
-                // 上传文件入口
-                CredentialFileStorage.StoredFile storedFile = storeOriginal(effectiveBatchId, file);
+                String sha256 = calculateDigest(file);
+
+                // 上传文件入口：携带原始内容摘要落盘
+                CredentialFileStorage.StoredFile storedFile =
+                        storeOriginal(effectiveBatchId, file, sha256);
                 createdPaths.add(storedFile.relativePath());
 
-                // 上传文件后再次校验文件
-                String sha256 = calculateDigest(storedFile.relativePath());
                 uploadedItems.add(new CredentialFileUploadItem(
                         index,
                         storedFile.safeOriginalFilename(),
@@ -85,32 +86,35 @@ public class CredentialFileUploadService {
      *
      * @param uploadBatchId 已确定的上传批次 UUID
      * @param file 待保存的 Multipart 文件
+     * @param sha256 原始上传内容的 SHA-256 摘要
      * @return 文件存储结果
      * @throws IOException 文件流读取或持久化失败
      */
     private CredentialFileStorage.StoredFile storeOriginal(
             String uploadBatchId,
-            MultipartFile file) throws IOException {
+            MultipartFile file,
+            String sha256) throws IOException {
         try (InputStream input = file.getInputStream()) {
-            return credentialFileStorage.storeOriginal(
+            return credentialFileStorage.storeOriginal( // 由配置激活的存储实现执行保存
                     new CredentialFileStorage.StoreOriginalRequest(
                             uploadBatchId,
                             file.getOriginalFilename(),
                             file.getContentType(),
                             file.getSize(),
+                            sha256,
                             input));
         }
     }
 
     /**
-     * 重新读取已落盘文件并计算其内容摘要。
+     * 在持久化前读取上传文件并计算其内容摘要。
      *
-     * @param relativePath 文件存储相对路径
+     * @param file 待计算摘要的上传文件
      * @return 小写十六进制摘要
-     * @throws IOException 文件重新读取或摘要计算失败
+     * @throws IOException 上传文件读取或摘要计算失败
      */
-    private String calculateDigest(String relativePath) throws IOException {
-        try (InputStream input = credentialFileStorage.open(relativePath)) {
+    private String calculateDigest(MultipartFile file) throws IOException {
+        try (InputStream input = file.getInputStream()) {
             return fileDigestCalculator.calculate(input);
         }
     }

@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalCredentialFileStorageTest {
 
+    private static final String VALID_SHA256 = "0".repeat(64);
+
     @TempDir
     Path tempDir;
 
@@ -78,12 +80,32 @@ class LocalCredentialFileStorageTest {
                         "license.pdf",
                         "application/pdf",
                         content.length + 1L,
+                        VALID_SHA256,
                         new ByteArrayInputStream(content));
 
         assertThrows(IOException.class, () -> storage.storeOriginal(request));
         try (var paths = Files.walk(tempDir)) {
             assertFalse(paths.anyMatch(Files::isRegularFile));
         }
+    }
+
+    @Test
+    void shouldRejectInvalidSha256BeforeStorage() {
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = new byte[]{1};
+
+        assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
+                batchId, "license.pdf", "application/pdf", content.length, null,
+                new ByteArrayInputStream(content)));
+        assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
+                batchId, "license.pdf", "application/pdf", content.length, "",
+                new ByteArrayInputStream(content)));
+        assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
+                batchId, "license.pdf", "application/pdf", content.length, "abc",
+                new ByteArrayInputStream(content)));
+        assertThrows(IllegalArgumentException.class, () -> new CredentialFileStorage.StoreOriginalRequest(
+                batchId, "license.pdf", "application/pdf", content.length, "A".repeat(64),
+                new ByteArrayInputStream(content)));
     }
 
     private LocalCredentialFileStorage createStorage() {
@@ -102,6 +124,7 @@ class LocalCredentialFileStorageTest {
                 filename,
                 contentType,
                 content.length,
+                VALID_SHA256,
                 new ByteArrayInputStream(content));
     }
 }

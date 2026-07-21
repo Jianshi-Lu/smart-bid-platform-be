@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MinioCredentialFileStorageTest {
 
+    private static final String SHA256 =
+            "9cd4aefcb376e737ae07795b61419408249765494085c144e2d83561de56d145";
+
     @Test
     void shouldUploadOriginalFileWithExpectedObjectMetadata() throws Exception {
         RecordingMinioClient minioClient = new RecordingMinioClient();
@@ -40,6 +43,7 @@ class MinioCredentialFileStorageTest {
                         "../营业执照.pdf",
                         "application/pdf",
                         content.length,
+                        SHA256,
                         input));
 
         PutObjectArgs args = minioClient.putObjectArgs;
@@ -47,6 +51,7 @@ class MinioCredentialFileStorageTest {
         assertEquals(storedFile.relativePath(), args.object());
         assertEquals(content.length, args.objectSize());
         assertEquals("application/pdf", args.contentType().toString());
+        assertEquals(SHA256, args.userMetadata().getFirst("x-amz-meta-sha256"));
         assertSame(input, args.stream());
         assertEquals("营业执照.pdf", storedFile.safeOriginalFilename());
         assertEquals(content.length, storedFile.fileSize());
@@ -83,6 +88,7 @@ class MinioCredentialFileStorageTest {
                                 "license.pdf",
                                 "application/pdf",
                                 content.length,
+                                SHA256,
                                 new ByteArrayInputStream(content))));
 
         assertInstanceOf(MinioException.class, exception.getCause());

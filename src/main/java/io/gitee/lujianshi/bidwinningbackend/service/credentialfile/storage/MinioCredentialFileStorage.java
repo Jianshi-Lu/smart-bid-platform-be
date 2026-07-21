@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 
 /**
  * 基于 MinIO 的资信文件存储实现。
@@ -26,6 +27,8 @@ import java.io.InputStream;
         name = "type",
         havingValue = "MINIO")
 public class MinioCredentialFileStorage implements CredentialFileStorage {
+
+    private static final String SHA256_METADATA_KEY = "sha256";
 
     @Resource
     private MinioClient minioClient;
@@ -46,15 +49,18 @@ public class MinioCredentialFileStorage implements CredentialFileStorage {
                 CredentialFileStorageKey.createOriginalFileKey(
                         request.uploadBatchId(), request.originalFilename());
 
+        // 构造 MinIO 对象上传参数
         PutObjectArgs.Builder argsBuilder = PutObjectArgs.builder()
                 .bucket(bucket())
                 .object(fileKey.relativePath())
-                .stream(request.input(), request.contentLength(), -1L);
+                .stream(request.input(), request.contentLength(), -1L)
+                .userMetadata(Map.of(SHA256_METADATA_KEY, request.sha256()));
         if (request.contentType() != null && !request.contentType().isBlank()) {
             argsBuilder.contentType(request.contentType());
         }
 
         try {
+            // MinIO 对象上传入口
             minioClient.putObject(argsBuilder.build());
             return new StoredFile(
                     fileKey.safeOriginalFilename(),
