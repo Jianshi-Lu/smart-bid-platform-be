@@ -4,7 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUpl
 import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.enums.CredentialFileConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage.CredentialFileStorage;
-import io.gitee.lujianshi.bidwinningbackend.service.filedigest.FileDigestCalculator;
+import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.digest.FileDigestCalculator;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

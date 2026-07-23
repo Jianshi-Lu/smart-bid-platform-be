@@ -69,12 +69,12 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── InvitationForBidService.java
 │   ├── credentialfile/
 │   │   ├── CredentialFileUploadService.java # 上传批次、落盘、摘要与失败补偿编排
+│   │   ├── digest/
+│   │   │   ├── FileDigestCalculator.java    # 资信文件摘要端口
+│   │   │   └── Sha256FileDigestCalculator.java # JDK MessageDigest SHA-256 实现
 │   │   └── storage/
 │   │       ├── CredentialFileStorage.java   # 存储端口：保存 / 打开 / 删除
 │   │       └── LocalCredentialFileStorage.java # Java NIO 本地存储适配器
-│   ├── filedigest/
-│   │   ├── FileDigestCalculator.java        # 通用文件摘要端口
-│   │   └── Sha256FileDigestCalculator.java  # JDK MessageDigest SHA-256 实现
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析 + 历史查询
 │   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文

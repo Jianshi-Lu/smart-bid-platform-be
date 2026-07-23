@@ -5,7 +5,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.dto.credentialfile.CredentialFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.CredentialFileUploadService;
 import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage.LocalCredentialFileStorage;
-import io.gitee.lujianshi.bidwinningbackend.service.filedigest.Sha256FileDigestCalculator;
+import io.gitee.lujianshi.bidwinningbackend.service.credentialfile.digest.Sha256FileDigestCalculator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;

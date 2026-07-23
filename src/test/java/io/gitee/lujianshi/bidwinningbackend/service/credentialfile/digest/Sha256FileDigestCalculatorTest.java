@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.filedigest;
+package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.digest;
 
 import org.junit.jupiter.api.Test;
 
