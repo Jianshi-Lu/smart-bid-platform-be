@@ -1,6 +1,6 @@
 # 数据库结构（bid-winning-backend）
 
-> 6 张表的最终结构（V1-V21）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
+> 7 张表的最终结构（V1-V22）。SQL 脚本位于 `src/main/resources/sql/ddl/`，采用 Flyway 兼容命名，**当前未启用 Flyway**（需手动执行）。
 >
 > API 契约：[`docs/api.md`](api.md) · 项目架构：[`docs/architecture.md`](architecture.md)
 
@@ -54,6 +54,14 @@
 │ INDEX (invitation_id) — V18                       │
 └──────────────────────────────────────────────────┘
            │ 1:N（逻辑外键 bid_record_id，提交投标后回填）
+           ▼
+┌─────────────────────────────────────────────┐
+│ credential_file_batch (V22)                 │  资信文件上传批次
+│  ├─ upload_batch_id PK                       │
+│  ├─ bid_record_id / batch_no                 │
+│  └─ batch_status / file_count                │
+└─────────────────────────────────────────────┘
+           │ 1:N（逻辑外键 upload_batch_id）
            ▼
 ┌─────────────────────────────────────────────┐
 │ credential_file (V21)                       │  资信文件
@@ -197,7 +205,8 @@
 
 ### 2.5 `credential_file`（资信文件）
 
-每个原始上传文件对应一条记录；同一次上传的文件通过 `upload_batch_id` 聚合。
+每个原始上传文件对应一条记录；同一次上传的文件通过 `upload_batch_id` 关联到
+`credential_file_batch`。
 文件上传阶段 `bid_record_id` 保持 `NULL`，创建投标记录后再回填。
 
 > **当前实现状态**：`POST /credential-files/upload` 已完成本地原文件落盘、SHA-256 计算和相对路径返回，但尚未执行本表 INSERT。以下字段已经由上传响应提供，下一阶段接入 `CredentialFileMapper` 后再持久化。
@@ -233,7 +242,34 @@
 
 **演进**：**V21**（新建资信文件表）
 
-### 2.6 `invitation_for_bid_status_history`（招标公告状态变更历史）
+### 2.6 `credential_file_batch`（资信文件上传批次）
+
+一个 `bid_record` 可以拥有多个资信文件上传批次；每个批次在原始文件全部上传并校验成功后
+封口，后续不再追加、删除或替换文件。后期重新提交资信材料时创建新的批次记录。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `upload_batch_id` | CHAR(36) | ✅ | 批次 UUID，主键，也是 MinIO 目录名 |
+| `bid_record_id` | INT | ✅ | 逻辑外键 → `bid_record.bid_record_id` |
+| `batch_no` | INT | ✅ | 当前投标记录下的批次序号，从 1 开始 |
+| `batch_status` | VARCHAR(20) | ✅ | `UPLOADING` / `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
+| `file_count` | INT | ✅ | 本批次原始文件数量 |
+| `converted_file_count` | INT | ✅ | 已完成 Markdown 转换的文件数量 |
+| `error_message` | VARCHAR(1000) | ❌ | 批次级失败原因 |
+| `created_at` | DATETIME | ✅ | 批次创建时间 |
+| `uploaded_at` | DATETIME | ❌ | 原始文件全部上传并校验完成时间 |
+| `converting_at` | DATETIME | ❌ | 开始 Markdown 转换时间 |
+| `converted_at` | DATETIME | ❌ | 全部文件转换完成时间 |
+| `updated_at` | DATETIME | ✅ | 最后更新时间 |
+
+**约束与索引**：PK（`upload_batch_id`）+ UNIQUE（`bid_record_id`, `batch_no`）+
+`idx_bid_record_id` + `idx_batch_status`
+
+**当前实现状态**：本版本只建立数据库表，批次 Entity、Mapper、上传时写入和转换状态更新在后续阶段实现。
+
+**演进**：**V22**（新建资信文件上传批次表）
+
+### 2.7 `invitation_for_bid_status_history`（招标公告状态变更历史）
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
@@ -290,8 +326,9 @@ TRUNCATE TABLE tenderer_detail;
 | **V19** | `V19__rename_primary_key_of_bid_handler_info.sql` | **`bid_handler_info` PK 列 `tender_handler_id` → `bid_handler_id`** |
 | **V20** | `V20__change_bid_record_credentials_to_json.sql` | **`bid_record.credentials` 改为 Markdown 路径 JSON 数组；清空测试数据** |
 | **V21** | `V21__create_credential_file.sql` | **新建 `credential_file` 资信文件表** |
+| **V22** | `V22__create_credential_file_batch.sql` | **新建 `credential_file_batch` 资信文件上传批次表** |
 
-**执行顺序**：V1 → V2 → ... → V21
+**执行顺序**：V1 → V2 → ... → V22
 
 **V18 前置**：先 TRUNCATE `risk_analysis` 和 `tenderer_detail`（旧数据无迁移）。
 

@@ -431,7 +431,7 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 
 | Method | Path | 用途 | 返回 |
 |--------|------|------|------|
-| POST | `/credential-files/upload` | 上传一个或多个原始资信文件并落盘 | `Result<CredentialFileUploadResponse>` |
+| POST | `/credential-files/upload` | 一次性上传当前批次的全部原始资信文件并落盘 | `Result<UploadResponse>` |
 | DELETE | `/credential-files/{uploadBatchId}/files/{fileId}` | 删除未提交文件 | `Result<Void>`（当前占位） |
 
 ### 5.1 `POST /credential-files/upload`
@@ -440,21 +440,15 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 
 | Form 字段 | 类型 | 必填 | 说明 |
 |-----------|------|:---:|------|
+| `bidRecordId` | Integer | ✅ | 文件所属的投标记录 ID |
 | `files` | File，可重复 | ✅ | 本次请求中的原始资信文件；单文件最大 150MB |
-| `uploadBatchId` | UUID String | ❌ | 首次上传不传，由后端生成；追加上传时复用此前返回值 |
+| `uploadBatchId` | — | — | 不由请求方传入，由后端为本次上传请求生成 |
 
 ```bash
 curl -X POST http://localhost:8080/credential-files/upload \
+  -F 'bidRecordId=1001' \
   -F 'files=@/path/to/license.pdf' \
   -F 'files=@/path/to/qualification.docx'
-```
-
-追加上传：
-
-```bash
-curl -X POST http://localhost:8080/credential-files/upload \
-  -F 'files=@/path/to/other.pdf' \
-  -F 'uploadBatchId=550e8400-e29b-41d4-a716-446655440000'
 ```
 
 成功响应：
@@ -486,7 +480,8 @@ curl -X POST http://localhost:8080/credential-files/upload \
 - 物理目录为 `{root}/{uploadBatchId}/original/`，文件名为 `{fileUuid}_{安全原文件名}`。
 - API 只返回相对路径，不暴露环境绝对路径。
 - SHA-256 在落盘后重新读取实际文件计算。
-- 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；不影响该批次此前上传的文件。
+- 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；批次不会封口。
+- 全部文件成功后，后端将 `credential_file_batch.batch_status` 更新为 `UPLOADED`，当前批次不可继续追加。
 - `fileOrder` 当前只表示本次请求内顺序，全批次连续顺序待接入数据库后实现。
 
 **错误响应**：
@@ -495,7 +490,6 @@ curl -X POST http://localhost:8080/credential-files/upload \
 |------|:---:|---------|
 | 文件集合为空、空文件 | 400 | `上传文件不能为空` |
 | 原始文件名为空 | 400 | `原始文件名不能为空` |
-| `uploadBatchId` 不是合法 UUID | 400 | `上传批次号格式不正确` |
 | 单文件超过 150MB 或请求总体超过 200MB | 400 | `文件大小超过限制` |
 | 文件系统或摘要计算失败 | 500 | `服务器内部错误` |
 

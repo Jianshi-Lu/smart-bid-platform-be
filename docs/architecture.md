@@ -29,7 +29,7 @@
 1. main() → SpringApplication.run()
 2. 推断应用类型（Servlet-based，因引入了 spring-boot-starter-webmvc）
 3. @EnableAsync 开启异步支持
-4. @MapperScan 扫描 mapper/ 包生成 Mapper 代理
+4. @MapperScan 扫描全局 mapper/ 与 credentialfile/mapper/ 包生成 Mapper 代理
 5. 启动嵌入式 Tomcat（dev: 8080 / test: 8080 / prod: 80）
 6. 扫描 @Component / @Service / @Controller / @RestController / @Configuration 注册为 Bean
 7. 初始化 DispatcherServlet，等待 HTTP 请求
@@ -44,37 +44,40 @@
 ```
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
-├── controller/                             # 6 Controller + GlobalExceptionHandler
+├── controller/                             # 5 其他业务 Controller + GlobalExceptionHandler
 │   ├── BidRecordController.java            # 投标记录（8 端点：6 标准 CRUD + 1 按公告查询 + 1 AI 风险分析触发）
 │   ├── BidHandlerInfoController.java       # 招标经办人（7 端点：6 标准 CRUD + 1 批量新增）
 │   ├── InvitationForBidController.java     # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
 │   ├── RiskAnalysisController.java         # 风险分析记录只读查询（2 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
-│   ├── CredentialFileController.java       # 资信原文件上传 + 删除占位端点
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
-├── dto/                                    # 按业务模块分包
+├── credentialfile/                         # 资信文件普通业务模块（同一 Spring Boot 应用内的垂直切片）
+│   ├── controller/CredentialFileController.java # 资信原文件上传 + 删除占位端点
+│   ├── dto/                                # UploadRequest / UploadResponse
+│   ├── entity/                             # CredentialFile / CredentialFileBatch
+│   ├── enums/                              # 文件状态、存储类型枚举
+│   ├── mapper/                             # CredentialFileMapper / CredentialFileBatchMapper
+│   ├── config/                             # 存储配置模型与 MinIO 客户端配置
+│   ├── service/                            # UploadService / CredentialFileBatchService
+│   ├── intake/                             # multipart 转换后的请求期内部模型
+│   ├── processor/                          # 单文件存储与验证流水线
+│   ├── checksum/                           # 文件校验和计算端口与 SHA-256 实现
+│   ├── integrity/                          # 已存储正文完整性校验
+│   └── storage/                            # 本地文件与 MinIO 存储适配器
+├── dto/                                    # 其他业务 DTO，按业务模块分包
 │   ├── common/                             # Result / Diff
 │   ├── bidhandler/                         # AddRequest / UpdateRequest / BatchAddRequest / DeleteRequest
 │   ├── invitationforbid/                   # 同上 + StatusUpdateRequest / BatchDeleteRequest
 │   ├── bidrecord/                          # AddRequest / UpdateRequest / BatchDeleteRequest
-│   ├── credentialfile/                     # CredentialFileUploadResponse / Item
 │   └── statuscheck/                        # PlainTextMailRequest / BidWinningMailRequest
-├── entity/                                 # 6 个数据库实体（含 CredentialFile）
-├── enums/                                  # BidNoticeStatus / CredentialFileConvertStatus
-├── mapper/                                 # 6 个业务 Mapper + BaseMapper
+├── entity/                                 # 其他业务实体
+├── enums/                                  # 其他业务枚举
+├── mapper/                                 # 其他业务 Mapper + BaseMapper
 ├── service/                                # BaseService + 业务 Service
 │   ├── BaseService.java                    # 通用 CRUD + 邮件通知
 │   ├── BidRecordService.java               # add 方法含 3 次重试逻辑 + listByInvitationId
 │   ├── BidHandlerInfoService.java
 │   ├── InvitationForBidService.java
-│   ├── credentialfile/
-│   │   ├── CredentialFileUploadService.java # 上传批次、落盘、摘要与失败补偿编排
-│   │   ├── digest/
-│   │   │   ├── FileDigestCalculator.java    # 资信文件摘要端口
-│   │   │   └── Sha256FileDigestCalculator.java # JDK MessageDigest SHA-256 实现
-│   │   └── storage/
-│   │       ├── CredentialFileStorage.java   # 存储端口：保存 / 打开 / 删除
-│   │       └── LocalCredentialFileStorage.java # Java NIO 本地存储适配器
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析 + 历史查询
 │   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
@@ -82,6 +85,12 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 ```
+
+### 3.1 `credentialfile` 普通业务模块边界
+
+`credentialfile/` 是当前 Spring Boot 应用内的垂直业务模块，不是独立 Maven 子模块，也不是可单独启动的服务。它将资信文件端点所需的 Controller、DTO、实体、枚举、Mapper、批次服务、文件接入模型、处理器、校验和、完整性校验及存储适配器收拢在同一个业务根包下。
+
+模块通过 Spring Boot 根包扫描自动装配；Mapper 扫描同时覆盖全局 `mapper/` 和模块内 `credentialfile/mapper/`。模块对外暴露 HTTP Controller，内部通过 `FileStorage` 等接口隔离本地文件系统与 MinIO 实现。`Result`、`BaseMapper` 和 `GlobalExceptionHandler` 属于应用级公共能力，不复制到模块内部。
 
 ---
 
@@ -177,50 +186,99 @@ public static void execute(Runnable task, long delayMillis)
 
 `add(entity)` 必须在事务内做 3 次重试，每次重试前先查 `(invitation_id, bidder_name)` 下的 `MAX(bid_no)` 计算 `bidNo = max + 1`（null 时为 1），再 INSERT。捕获 `DuplicateKeyException`（并发同号）后重试。3 次后仍冲突抛 `IllegalStateException`。
 
-### 5.10 `CredentialFileUploadService`（上传编排）
+### 5.10 `UploadService`（批次编排）
 
-负责一次 multipart 上传请求的应用层编排：校验文件、生成或复用批次 UUID、调用存储端口落盘、重新读取持久化内容计算 SHA-256、组装类型化响应。任一步失败时只补偿删除当前请求已经创建的文件，不影响同一批次此前成功上传的内容。
+资信文件 Controller 将 multipart 参数转换为 `credentialfile.intake.UploadBatch`；`credentialfile.service.UploadService` 为本次请求生成
+新的批次 UUID，先创建 `credential_file_batch` 的 `UPLOADING` 记录，再按请求顺序把每个
+`PendingUploadItem` 交给 `PendingUploadItemProcessor`。全部文件成功后批次更新为 `UPLOADED`
+并封口。本服务只负责批次编排、批次记录状态和批次级补偿，不直接读取 `MultipartFile`、
+计算校验和或调用 MinIO SDK。
+
+单个条目失败时，处理器删除当前文件；后续条目失败时，`UploadService` 逆序删除本次请求中
+此前已经验证成功的文件。当前一个请求就是一个不可变批次，不再支持同一批次追加上传；后续
+重新提交资信材料时创建新的 `upload_batch_id`。
 
 当前 `fileOrder` 只表示本次请求内顺序；全批次连续顺序与 `credential_file` 入库留到下一阶段实现。
 
-### 5.11 `CredentialFileStorage`（存储端口）
+### 5.11 `intake` 与 `PendingUploadItemProcessor`
 
-定义 `storeOriginal` / `open` / `delete` 三项能力。上传编排依赖接口而不是本地文件系统，后续可新增 MinIO 适配器而不修改 Controller 和上传流程。
+`intake` 只描述请求生命周期内的后端输入，不负责持久化。`ItemContent.openStream()` 每次调用
+必须返回一条新的、可独立关闭的输入流，使单文件处理器能够先计算上传前 SHA-256，再重新打开
+同一 multipart 内容执行存储，而不把整个文件加载到 Java 堆。
 
-`LocalCredentialFileStorage` 是当前实现，目录结构为：
+`PendingUploadItemProcessor` 完成单文件状态转换：
 
 ```text
-{credential-file.storage.local-root}/
-└── {uploadBatchId}/
-    └── original/
-        └── {fileUuid}_{安全原文件名}
+PendingUploadItem
+  → 上传前计算 SHA-256
+  → 生成 original 逻辑路径与业务 metadata
+  → FileStorage.store
+  → StoredFileIntegrityVerifier
+  → VerifiedStoredFile
 ```
 
-接口和后续数据库只保存 `{uploadBatchId}/original/{storedFilename}` 相对路径。实现使用 `CREATE_NEW` 防止覆盖，并在路径规范化后校验目标仍位于存储根目录内。
+其中 `StoredFile` 表示已经写入存储端、尚未完成正文回读校验；`VerifiedStoredFile` 表示存储属性
+已经确认，且实际正文 SHA-256 与上传前校验和及 MinIO metadata 一致。
 
-### 5.12 `FileDigestCalculator`（摘要端口）
+### 5.12 `FileStorage`（存储端口）
 
-以 `InputStream` 为输入，不依赖 Multipart、本地 `Path` 或具体存储技术。`Sha256FileDigestCalculator` 使用 JDK `MessageDigest` 和 `HexFormat` 计算 64 位小写十六进制摘要；上传编排在文件落盘后重新打开文件流计算摘要，保证摘要对应实际持久化内容。
+定义 `store` / `open` / `delete` 三项通用能力。`store` 接收由调用方准备的逻辑路径、
+MIME 类型、长度、metadata 和内容流，不解释文件是原始文件还是转换文件。单文件处理器和
+完整性校验器依赖接口，
+运行时通过 `credential-file.storage.type` 只激活 `LocalFileStorage` 或 `MinioFileStorage`
+中的一个实现。
 
-### 5.13 资信文件上传调用链
+当前原始上传流程由 `PendingUploadItemProcessor` 调用 `StoragePath` 生成以下逻辑目录结构：
+
+```text
+{uploadBatchId}/
+└── original/
+    └── {fileUuid}_{安全原文件名}
+```
+
+处理器同时通过 `StoredFileMetadata` 构造 `bid-record-id`、`upload-batch-id` 和 `sha256`。
+本地实现将逻辑路径解释为存储根目录下的相对路径，并使用 `CREATE_NEW` 防止覆盖；MinIO
+将其解释为 object key，并在同一次 `putObject` 中透传调用方自定义的文件 metadata。
+这里的“调用方”指 Java 后端，而不是投标用户。未来保存 converted
+文件时可以生成另一条逻辑路径并复用同一个 `store`，不需要扩展存储接口。接口、响应和
+后续数据库都不保存环境相关的本机绝对路径。
+
+### 5.13 `FileChecksumCalculator`（校验和端口）
+
+以 `InputStream` 为输入，不依赖 multipart、本地 `Path` 或具体存储技术。
+`Sha256FileChecksumCalculator` 使用 JDK `MessageDigest` 和 `HexFormat` 计算 64 位小写
+十六进制校验和。该模块只负责计算，不比较结果，也不判断文件是否完整。
+
+### 5.14 资信文件上传与完整性校验调用链
 
 ```text
 POST /credential-files/upload (multipart/form-data)
   ↓
 CredentialFileController
+  └─ multipart → UploadBatch + List<PendingUploadItem>
   ↓
-CredentialFileUploadService
-  ├─ 生成/校验 uploadBatchId
-  ├─ CredentialFileStorage.storeOriginal
-  │    └─ LocalCredentialFileStorage → 本地 {batchId}/original
-  ├─ CredentialFileStorage.open
-  ├─ FileDigestCalculator.calculate → SHA-256
-  └─ CredentialFileUploadResponse
+UploadService
+  ├─ 生成/校验 UploadBatchContext
+  └─ 按顺序遍历 PendingUploadItem
+       ↓
+     PendingUploadItemProcessor
+       ├─ FileChecksumCalculator → 上传前 SHA-256
+       ├─ StoragePath + StoredFileMetadata
+       ├─ FileStorage.store
+       │    ├─ Local Files.copy
+       │    └─ MinIO putObject + statObject
+       └─ StoredFileIntegrityVerifier
+            ├─ FileStorage.open / MinIO getObject(matchETag)
+            ├─ FileChecksumCalculator → 重算正文 SHA-256
+            └─ VerifiedStoredFile
+       ↓
+UploadResponse
        ↓
 Result.success(data, "上传成功")
 ```
 
-**当前边界**：已真实落盘并返回元数据，但尚未插入 `credential_file`，删除端点仍为占位，也尚未触发 Python Markdown 转换。
+**当前边界**：已真实落盘并重新读取文件正文完成 SHA-256 完整性校验，但尚未插入
+`credential_file`，删除端点仍为占位，也尚未触发 Python Markdown 转换。
 
 ---
 
@@ -380,8 +438,11 @@ service.sendOperationEmail(entity);
 | **Hybrid Reasoning 模型 fallback** | `extractRawContent` 优先读 `AssistantMessage.getText()`，为空时降级 `metadata["reasoningContent"]`（Spring AI 2.0 `OpenAiChatModel.internalCall` 内部已把 LM Studio 的 `reasoning_content` 透传至此，key 为 camelCase）；适用 huihui-qwen 系 Hybrid Reasoning 模型把 JSON 输出塞 reasoning 字段的场景。详见 [`docs/structured-output.md` §9.1](structured-output.md#91-hybrid-reasoning-模型-fallback已实施) |
 | **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
 | **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
-| **文件存储使用端口 + 适配器** | 上传编排依赖 `CredentialFileStorage`，当前接本地 NIO 实现，后续迁移 MinIO 时替换适配器 |
-| **摘要算法独立于存储** | `FileDigestCalculator` 只消费输入流，SHA-256 使用 JDK 标准库封装，可复用于原文件、Markdown 与一致性校验 |
+| **请求接入与持久化分离** | `intake` 只承载请求期内部模型，`storage` 才负责本地落盘或 MinIO 对象上传 |
+| **批次与单文件流程分离** | `UploadService` 处理批次顺序和历史文件补偿，`PendingUploadItemProcessor` 处理当前文件完整流水线 |
+| **文件存储使用端口 + 适配器** | 单文件处理器依赖 `FileStorage`，通过配置在本地 NIO 和 MinIO SDK 实现之间切换 |
+| **校验和算法独立于存储** | `FileChecksumCalculator` 只消费输入流，SHA-256 使用 JDK 标准库封装，可复用于原文件、Markdown 与一致性校验 |
+| **状态对象明确生命周期** | `PendingUploadItem` 尚未存储，`StoredFile` 已存储待验证，`VerifiedStoredFile` 已完成正文回读校验 |
 | **文件路径保存相对路径** | 不把 `/Users/...` 等环境根目录写入 API/数据库，切换 Linux 或 MinIO 时无需迁移历史路径 |
 
 ---
