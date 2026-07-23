@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.FileIntegrityException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -10,6 +11,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
  * 全局异常处理器。统一返回 {@link Result} 格式：
  * {@code @Valid} 校验失败 → 400 + 第一个错误消息；
  * 文件上传超限 → 400 + 明确的文件过大提示；
+ * 资信文件完整性校验失败 → 500 + 明确的完整性提示；
  * {@link IllegalArgumentException} → 400 + 异常消息；
  * 其他异常 → 500 兜底（不泄漏堆栈）。
  */
@@ -28,6 +30,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public Result<Void> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException e) {
         return Result.error(400, "文件大小超过限制");
+    }
+
+    /**
+     * 处理资信文件从存储端回读后的内容完整性校验失败。
+     *
+     * <p>响应不暴露对象 Key、期望摘要或实际摘要等内部存储信息。</p>
+     *
+     * @param e 文件完整性校验异常
+     * @return 500 + 文件完整性校验失败提示
+     * @since 1.0
+     */
+    @ExceptionHandler(FileIntegrityException.class)
+    public Result<Void> handleFileIntegrity(
+            FileIntegrityException e) {
+        return Result.error(500, "文件完整性校验失败");
     }
 
     /**
