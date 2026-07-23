@@ -91,9 +91,38 @@ public interface CredentialFileStorage {
      * 文件持久化结果。
      *
      * @param safeOriginalFilename 经过路径剥离和字符清理后的安全原始文件名
-     * @param relativePath      相对于存储根目录的路径
-     * @param fileSize          实际落盘大小，字节
+     * @param relativePath 相对于存储根目录的路径或对象存储 Key
+     * @param fileSize 存储端确认的文件大小，字节
+     * @param contentType 存储端确认的 MIME 类型，未知时可以为空
+     * @param bidRecordId 文件所属的投标记录 ID
+     * @param uploadBatchId 上传批次 UUID
+     * @param sha256 存储端确认的 SHA-256 metadata
+     * @param etag 对象存储 ETag；本地存储或无法提供时为空
+     * @param versionId 对象存储版本 ID；未启用版本控制或本地存储时为空
      */
-    record StoredFile(String safeOriginalFilename, String relativePath, long fileSize) {
+    record StoredFile(
+            String safeOriginalFilename,
+            String relativePath,
+            long fileSize,
+            String contentType,
+            Integer bidRecordId,
+            String uploadBatchId,
+            String sha256,
+            String etag,
+            String versionId) {
+
+        /**
+         * 保留本地存储当前使用的基础结果构造方式。
+         *
+         * <p>本地实现暂不持久化对象 metadata，也不提供 ETag 或版本 ID。</p>
+         *
+         * @param safeOriginalFilename 安全原始文件名
+         * @param relativePath 本地存储相对路径
+         * @param fileSize 实际落盘大小，字节
+         */
+        public StoredFile(String safeOriginalFilename, String relativePath, long fileSize) {
+            this(safeOriginalFilename, relativePath, fileSize,
+                    null, null, null, null, null, null);
+        }
     }
 }

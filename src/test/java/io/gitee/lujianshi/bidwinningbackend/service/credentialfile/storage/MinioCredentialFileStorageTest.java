@@ -3,10 +3,13 @@ package io.gitee.lujianshi.bidwinningbackend.service.credentialfile.storage;
 import io.gitee.lujianshi.bidwinningbackend.config.storage.CredentialFileStorageProperties;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
+import io.minio.HeadObjectResponse;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.StatObjectArgs;
+import io.minio.StatObjectResponse;
 import io.minio.errors.MinioException;
 import okhttp3.Headers;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,6 +40,7 @@ class MinioCredentialFileStorageTest {
         String batchId = UUID.randomUUID().toString();
         byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
         ByteArrayInputStream input = new ByteArrayInputStream(content);
+        minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
 
         CredentialFileStorage.StoredFile storedFile = storage.storeOriginal(
                 new CredentialFileStorage.StoreOriginalRequest(
@@ -56,9 +61,160 @@ class MinioCredentialFileStorageTest {
         assertEquals(batchId, args.userMetadata().getFirst("x-amz-meta-upload-batch-id"));
         assertEquals(SHA256, args.userMetadata().getFirst("x-amz-meta-sha256"));
         assertSame(input, args.stream());
+        assertEquals("credential-files", minioClient.statObjectArgs.bucket());
+        assertEquals(args.object(), minioClient.statObjectArgs.object());
+        assertEquals("version-1", minioClient.statObjectArgs.versionId());
         assertEquals("营业执照.pdf", storedFile.safeOriginalFilename());
         assertEquals(content.length, storedFile.fileSize());
+        assertEquals("application/pdf", storedFile.contentType());
+        assertEquals(1001, storedFile.bidRecordId());
+        assertEquals(batchId, storedFile.uploadBatchId());
+        assertEquals(SHA256, storedFile.sha256());
+        assertEquals("etag-1", storedFile.etag());
+        assertEquals("version-1", storedFile.versionId());
         assertTrue(storedFile.relativePath().startsWith(batchId + "/original/"));
+    }
+
+    @Test
+    void shouldDeleteUploadedObjectWhenMetadataDoesNotMatch() {
+        RecordingMinioClient minioClient = new RecordingMinioClient();
+        MinioCredentialFileStorage storage = createStorage(minioClient);
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
+        minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
+        minioClient.statSha256 = "0".repeat(64);
+
+        IOException exception = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertTrue(exception.getMessage().contains("metadata 不一致"));
+        assertNotNull(minioClient.removeObjectArgs);
+        assertEquals(minioClient.putObjectArgs.object(), minioClient.removeObjectArgs.object());
+        assertEquals("version-1", minioClient.removeObjectArgs.versionId());
+    }
+
+    @Test
+    void shouldDeleteUploadedObjectWhenRequiredMetadataIsMissing() {
+        RecordingMinioClient minioClient = new RecordingMinioClient();
+        MinioCredentialFileStorage storage = createStorage(minioClient);
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
+        minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
+        minioClient.statBidRecordId = null;
+
+        IOException exception = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertTrue(exception.getMessage().contains("bid-record-id"));
+        assertNotNull(minioClient.removeObjectArgs);
+    }
+
+    @Test
+    void shouldDeleteUploadedObjectWhenEtagOrVersionDoesNotMatch() {
+        RecordingMinioClient minioClient = new RecordingMinioClient();
+        MinioCredentialFileStorage storage = createStorage(minioClient);
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
+        minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
+        minioClient.statEtag = "other-etag";
+
+        IOException etagException = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertTrue(etagException.getMessage().contains("ETag"));
+        assertNotNull(minioClient.removeObjectArgs);
+
+        minioClient.statEtag = "etag-1";
+        minioClient.statVersionId = "other-version";
+        minioClient.removeObjectArgs = null;
+
+        IOException versionException = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertTrue(versionException.getMessage().contains("版本"));
+        assertNotNull(minioClient.removeObjectArgs);
+    }
+
+    @Test
+    void shouldDeleteUploadedObjectWhenStatFails() {
+        RecordingMinioClient minioClient = new RecordingMinioClient();
+        MinioCredentialFileStorage storage = createStorage(minioClient);
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
+        minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
+        minioClient.statFailure = new MinioException("stat failed");
+
+        IOException exception = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertInstanceOf(MinioException.class, exception.getCause());
+        assertNotNull(minioClient.removeObjectArgs);
+        assertEquals(minioClient.putObjectArgs.object(), minioClient.removeObjectArgs.object());
+    }
+
+    @Test
+    void shouldPreserveOriginalFailureWhenCleanupFails() {
+        RecordingMinioClient minioClient = new RecordingMinioClient();
+        MinioCredentialFileStorage storage = createStorage(minioClient);
+        String batchId = UUID.randomUUID().toString();
+        byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
+        minioClient.prepareStoredObject(batchId, content.length + 1L, "application/pdf");
+        minioClient.removeFailure = new MinioException("cleanup failed");
+
+        IOException exception = assertThrows(
+                IOException.class,
+                () -> storage.storeOriginal(new CredentialFileStorage.StoreOriginalRequest(
+                        1001,
+                        batchId,
+                        "license.pdf",
+                        "application/pdf",
+                        content.length,
+                        SHA256,
+                        new ByteArrayInputStream(content))));
+
+        assertTrue(exception.getMessage().contains("对象大小"));
+        assertEquals(1, exception.getSuppressed().length);
+        assertSame(minioClient.removeFailure, exception.getSuppressed()[0]);
     }
 
     @Test
@@ -122,9 +278,21 @@ class MinioCredentialFileStorageTest {
     private static final class RecordingMinioClient extends MinioClient {
 
         private PutObjectArgs putObjectArgs;
+        private StatObjectArgs statObjectArgs;
         private GetObjectArgs getObjectArgs;
         private RemoveObjectArgs removeObjectArgs;
         private MinioException putFailure;
+        private MinioException statFailure;
+        private MinioException removeFailure;
+        private String statBidRecordId;
+        private String statUploadBatchId;
+        private String statSha256;
+        private long statFileSize;
+        private String statContentType;
+        private String writeEtag = "etag-1";
+        private String writeVersionId = "version-1";
+        private String statEtag = "etag-1";
+        private String statVersionId = "version-1";
         private final GetObjectResponse getObjectResponse;
 
         private RecordingMinioClient() {
@@ -140,13 +308,57 @@ class MinioCredentialFileStorageTest {
                     new ByteArrayInputStream(new byte[0]));
         }
 
+        private void prepareStoredObject(
+                String uploadBatchId,
+                long fileSize,
+                String contentType) {
+            this.statBidRecordId = "1001";
+            this.statUploadBatchId = uploadBatchId;
+            this.statSha256 = SHA256;
+            this.statFileSize = fileSize;
+            this.statContentType = contentType;
+        }
+
         @Override
         public ObjectWriteResponse putObject(PutObjectArgs args) throws MinioException {
             this.putObjectArgs = args;
             if (putFailure != null) {
                 throw putFailure;
             }
-            return null;
+            return new ObjectWriteResponse(
+                    new Headers.Builder().build(),
+                    args.bucket(),
+                    args.region(),
+                    args.object(),
+                    writeEtag,
+                    writeVersionId);
+        }
+
+        @Override
+        public StatObjectResponse statObject(StatObjectArgs args) throws MinioException {
+            this.statObjectArgs = args;
+            if (statFailure != null) {
+                throw statFailure;
+            }
+            Headers.Builder headers = new Headers.Builder()
+                    .add("ETag", "\"" + statEtag + "\"")
+                    .add("Content-Length", Long.toString(statFileSize))
+                    .add("Content-Type", statContentType)
+                    .add("Last-Modified", "Tue, 15 Nov 1994 12:45:26 GMT");
+            if (statVersionId != null) {
+                headers.add("x-amz-version-id", statVersionId);
+            }
+            if (statBidRecordId != null) {
+                headers.add("x-amz-meta-bid-record-id", statBidRecordId);
+            }
+            if (statUploadBatchId != null) {
+                headers.add("x-amz-meta-upload-batch-id", statUploadBatchId);
+            }
+            if (statSha256 != null) {
+                headers.add("x-amz-meta-sha256", statSha256);
+            }
+            return new StatObjectResponse(new HeadObjectResponse(
+                    headers.build(), args.bucket(), args.region(), args.object()));
         }
 
         @Override
@@ -156,8 +368,11 @@ class MinioCredentialFileStorageTest {
         }
 
         @Override
-        public void removeObject(RemoveObjectArgs args) {
+        public void removeObject(RemoveObjectArgs args) throws MinioException {
             this.removeObjectArgs = args;
+            if (removeFailure != null) {
+                throw removeFailure;
+            }
         }
     }
 }
