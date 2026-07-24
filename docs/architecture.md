@@ -52,17 +52,16 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── credentialfile/                         # 资信文件普通业务模块（同一 Spring Boot 应用内的垂直切片）
-│   ├── controller/CredentialFileController.java # 资信原文件上传 + 删除占位端点
+│   ├── controller/FileUploadController.java     # 资信原文件上传 + 删除占位端点
 │   ├── dto/                                # UploadRequest / UploadResponse
 │   ├── entity/                             # CredentialFile / CredentialFileBatch
 │   ├── enums/                              # 文件状态、存储类型枚举
 │   ├── mapper/                             # CredentialFileMapper / CredentialFileBatchMapper
 │   ├── config/                             # 存储配置模型与 MinIO 客户端配置
-│   ├── service/                            # UploadService / CredentialFileBatchService
+│   ├── service/                            # FileUploadService / FileConvertService
 │   ├── intake/                             # multipart 转换后的请求期内部模型
 │   ├── processor/                          # 单文件存储与验证流水线
 │   ├── checksum/                           # 文件校验和计算端口与 SHA-256 实现
-│   ├── integrity/                          # 已存储正文完整性校验
 │   └── storage/                            # 本地文件与 MinIO 存储适配器
 ├── dto/                                    # 其他业务 DTO，按业务模块分包
 │   ├── common/                             # Result / Diff
@@ -88,7 +87,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 
 ### 3.1 `credentialfile` 普通业务模块边界
 
-`credentialfile/` 是当前 Spring Boot 应用内的垂直业务模块，不是独立 Maven 子模块，也不是可单独启动的服务。它将资信文件端点所需的 Controller、DTO、实体、枚举、Mapper、批次服务、文件接入模型、处理器、校验和、完整性校验及存储适配器收拢在同一个业务根包下。
+`credentialfile/` 是当前 Spring Boot 应用内的垂直业务模块，不是独立 Maven 子模块，也不是可单独启动的服务。它将资信文件端点所需的 Controller、DTO、实体、枚举、Mapper、批次服务、文件接入模型、处理器、校验和算法及存储适配器收拢在同一个业务根包下。
 
 模块通过 Spring Boot 根包扫描自动装配；Mapper 扫描同时覆盖全局 `mapper/` 和模块内 `credentialfile/mapper/`。模块对外暴露 HTTP Controller，内部通过 `FileStorage` 等接口隔离本地文件系统与 MinIO 实现。`Result`、`BaseMapper` 和 `GlobalExceptionHandler` 属于应用级公共能力，不复制到模块内部。
 
@@ -186,49 +185,52 @@ public static void execute(Runnable task, long delayMillis)
 
 `add(entity)` 必须在事务内做 3 次重试，每次重试前先查 `(invitation_id, bidder_name)` 下的 `MAX(bid_no)` 计算 `bidNo = max + 1`（null 时为 1），再 INSERT。捕获 `DuplicateKeyException`（并发同号）后重试。3 次后仍冲突抛 `IllegalStateException`。
 
-### 5.10 `UploadService`（批次编排）
+### 5.10 `FileUploadService`（批次编排）
 
-资信文件 Controller 将 multipart 参数转换为 `credentialfile.intake.UploadBatch`；`credentialfile.service.UploadService` 为本次请求生成
+资信文件 Controller 将 multipart 参数转换为 `credentialfile.intake.UploadBatch`；`credentialfile.service.FileUploadService` 为本次请求生成
 新的批次 UUID，先创建 `credential_file_batch` 的 `UPLOADING` 记录，再按请求顺序把每个
-`PendingUploadItem` 交给 `PendingUploadItemProcessor`。全部文件成功后批次更新为 `UPLOADED`
+`UploadItem` 交给 `UploadItemProcessor`。全部文件成功后批次更新为 `UPLOADED`
 并封口。本服务只负责批次编排、批次记录状态和批次级补偿，不直接读取 `MultipartFile`、
 计算校验和或调用 MinIO SDK。
 
-单个条目失败时，处理器删除当前文件；后续条目失败时，`UploadService` 逆序删除本次请求中
+单个条目失败时，处理器删除当前文件；后续条目失败时，`FileUploadService` 逆序删除本次请求中
 此前已经验证成功的文件。当前一个请求就是一个不可变批次，不再支持同一批次追加上传；后续
 重新提交资信材料时创建新的 `upload_batch_id`。
 
-当前 `fileOrder` 只表示本次请求内顺序；全批次连续顺序与 `credential_file` 入库留到下一阶段实现。
+每个处理成功的文件立即以本次请求内的 `fileOrder` 写入 `credential_file`；任一文件失败时，
+数据库事务回滚批次及文件记录，服务同时补偿删除本次请求已写入的存储对象。
 
-### 5.11 `intake` 与 `PendingUploadItemProcessor`
+### 5.11 `intake` 与 `UploadItemProcessor`
 
-`intake` 只描述请求生命周期内的后端输入，不负责持久化。`ItemContent.openStream()` 每次调用
+`intake` 只描述请求生命周期内的后端输入，不负责持久化。`UploadItem.Content.openStream()` 每次调用
 必须返回一条新的、可独立关闭的输入流，使单文件处理器能够先计算上传前 SHA-256，再重新打开
 同一 multipart 内容执行存储，而不把整个文件加载到 Java 堆。
 
-`PendingUploadItemProcessor` 完成单文件状态转换：
+`UploadItemProcessor` 完成单文件状态转换：
 
 ```text
-PendingUploadItem
+UploadItem
   → 上传前计算 SHA-256
   → 生成 original 逻辑路径与业务 metadata
   → FileStorage.store
-  → StoredFileIntegrityVerifier
-  → VerifiedStoredFile
+  → FileStorage.open
+  → 存储后重新计算 SHA-256 并比较
+  → VerifiedStoredFileMetadata
 ```
 
-其中 `StoredFile` 表示已经写入存储端、尚未完成正文回读校验；`VerifiedStoredFile` 表示存储属性
-已经确认，且实际正文 SHA-256 与上传前校验和及 MinIO metadata 一致。
+其中 `StoredFile` 是存储层返回的纯存储结果；`VerifiedStoredFileMetadata` 是处理器完成正文回读校验后
+输出的文件元数据，可以安全地写入 `credential_file`。校验失败时，处理器负责删除刚写入的当前
+文件，并保留原始异常；这项业务补偿不下沉到本地或 MinIO 存储实现。
 
 ### 5.12 `FileStorage`（存储端口）
 
 定义 `store` / `open` / `delete` 三项通用能力。`store` 接收由调用方准备的逻辑路径、
 MIME 类型、长度、metadata 和内容流，不解释文件是原始文件还是转换文件。单文件处理器和
-完整性校验器依赖接口，
+后续转换流程都只依赖该接口，
 运行时通过 `credential-file.storage.type` 只激活 `LocalFileStorage` 或 `MinioFileStorage`
 中的一个实现。
 
-当前原始上传流程由 `PendingUploadItemProcessor` 调用 `StoragePath` 生成以下逻辑目录结构：
+当前原始上传流程由 `UploadItemProcessor` 调用 `StoragePath` 生成以下逻辑目录结构：
 
 ```text
 {uploadBatchId}/
@@ -236,7 +238,8 @@ MIME 类型、长度、metadata 和内容流，不解释文件是原始文件还
     └── {fileUuid}_{安全原文件名}
 ```
 
-处理器同时通过 `StoredFileMetadata` 构造 `bid-record-id`、`upload-batch-id` 和 `sha256`。
+处理器构造 `bid-record-id`、`upload-batch-id` 和 `sha256` metadata；存储层不理解这些
+字段的业务含义，只负责透传并确认存储端回读值与写入请求一致。
 本地实现将逻辑路径解释为存储根目录下的相对路径，并使用 `CREATE_NEW` 防止覆盖；MinIO
 将其解释为 object key，并在同一次 `putObject` 中透传调用方自定义的文件 metadata。
 这里的“调用方”指 Java 后端，而不是投标用户。未来保存 converted
@@ -254,31 +257,32 @@ MIME 类型、长度、metadata 和内容流，不解释文件是原始文件还
 ```text
 POST /credential-files/upload (multipart/form-data)
   ↓
-CredentialFileController
-  └─ multipart → UploadBatch + List<PendingUploadItem>
+FileUploadController
+  └─ multipart → UploadBatch + List<UploadItem>
   ↓
-UploadService
+FileUploadService
   ├─ 生成/校验 UploadBatchContext
-  └─ 按顺序遍历 PendingUploadItem
+  └─ 按顺序遍历 UploadItem
        ↓
-     PendingUploadItemProcessor
+     UploadItemProcessor
        ├─ FileChecksumCalculator → 上传前 SHA-256
-       ├─ StoragePath + StoredFileMetadata
+       ├─ StoragePath + 调用方 metadata
        ├─ FileStorage.store
        │    ├─ Local Files.copy
        │    └─ MinIO putObject + statObject
-       └─ StoredFileIntegrityVerifier
-            ├─ FileStorage.open / MinIO getObject(matchETag)
-            ├─ FileChecksumCalculator → 重算正文 SHA-256
-            └─ VerifiedStoredFile
+       ├─ FileStorage.open / MinIO getObject(matchETag)
+       ├─ FileChecksumCalculator → 存储后 SHA-256
+       ├─ 比较存前与存后校验和；不一致时删除当前文件
+       └─ VerifiedStoredFileMetadata
        ↓
 UploadResponse
        ↓
 Result.success(data, "上传成功")
 ```
 
-**当前边界**：已真实落盘并重新读取文件正文完成 SHA-256 完整性校验，但尚未插入
-`credential_file`，删除端点仍为占位，也尚未触发 Python Markdown 转换。
+**当前边界**：上传链已真实落盘、重新读取正文完成 SHA-256 比对，并写入
+`credential_file`；批次全部成功后更新为 `UPLOADED`。删除端点仍为占位，Python Markdown
+转换由独立转换入口触发。
 
 ---
 
@@ -439,10 +443,10 @@ service.sendOperationEmail(entity);
 | **bid_record 投标次数服务端生成** | bidNo = max(bid_no)+1，3 次重试防并发同号，UNIQUE 兜底 |
 | **不暴露 bid_no 给客户端** | Client 只传 invitationId / bidderName / quotePrice / bidderContact，服务端算 bidNo |
 | **请求接入与持久化分离** | `intake` 只承载请求期内部模型，`storage` 才负责本地落盘或 MinIO 对象上传 |
-| **批次与单文件流程分离** | `UploadService` 处理批次顺序和历史文件补偿，`PendingUploadItemProcessor` 处理当前文件完整流水线 |
+| **批次与单文件流程分离** | `FileUploadService` 处理批次顺序和历史文件补偿，`UploadItemProcessor` 处理当前文件完整流水线 |
 | **文件存储使用端口 + 适配器** | 单文件处理器依赖 `FileStorage`，通过配置在本地 NIO 和 MinIO SDK 实现之间切换 |
 | **校验和算法独立于存储** | `FileChecksumCalculator` 只消费输入流，SHA-256 使用 JDK 标准库封装，可复用于原文件、Markdown 与一致性校验 |
-| **状态对象明确生命周期** | `PendingUploadItem` 尚未存储，`StoredFile` 已存储待验证，`VerifiedStoredFile` 已完成正文回读校验 |
+| **状态对象明确生命周期** | `UploadItem` 是请求期输入，`StoredFile` 是纯存储结果，`VerifiedStoredFileMetadata` 是完成正文回读校验后可落库的文件元数据 |
 | **文件路径保存相对路径** | 不把 `/Users/...` 等环境根目录写入 API/数据库，切换 Linux 或 MinIO 时无需迁移历史路径 |
 
 ---

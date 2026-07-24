@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.dto;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.CredentialFileConvertStatus;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -45,6 +45,6 @@ public class UploadResponse {
 
         private String originalFilePath;
 
-        private CredentialFileConvertStatus convertStatus;
+        private ConvertStatus convertStatus;
     }
 }

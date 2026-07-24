@@ -3,6 +3,9 @@ server:
   port: 8080
 
 credential-file:
+  converter:
+    base-url: ${TO_MARKDOWN_BASE_URL:http://127.0.0.1:8081}
+
   storage:
     # 没有配置环境变量则默认使用 LOCAL
     type: ${CREDENTIAL_FILE_STORAGE_TYPE:LOCAL}

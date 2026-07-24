@@ -13,12 +13,12 @@ import java.util.Map;
  */
 public interface FileStorage {
     /**
-     * 已写入持久化存储、尚未完成正文回读校验的文件。
+     * 已写入持久化介质的纯存储结果。
      *
      * @param relativePath 相对于存储根目录的路径或对象存储 Key
      * @param fileSize 存储端确认的文件大小，字节
      * @param contentType 存储端确认的 MIME 类型，未知时可以为空
-     * @param metadata 存储端确认的业务 metadata
+     * @param metadata 存储端确认的调用方 metadata；存储层不解释字段含义
      * @param etag 对象存储 ETag；本地存储或无法提供时为空
      */
     record StoredFile(
@@ -62,7 +62,7 @@ public interface FileStorage {
      * @param relativePath 调用方确定的逻辑存储路径
      * @param contentType 文件 MIME 类型，未知时可以为空
      * @param contentLength 文件内容长度，字节
-     * @param metadata 需要随文件保存的业务 metadata
+     * @param metadata 需要随文件保存的调用方 metadata；存储层仅负责透传
      * @param input 文件内容输入流，由调用方关闭
      */
     record StoreRequest(

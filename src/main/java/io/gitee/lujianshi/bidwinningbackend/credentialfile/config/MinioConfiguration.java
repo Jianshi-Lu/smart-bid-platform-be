@@ -29,8 +29,8 @@ public class MinioConfiguration {
      * @throws IllegalArgumentException MinIO 必填配置为空
      */
     @Bean
-    public MinioClient minioClient(CredentialFileStorageProperties properties) {
-        CredentialFileStorageProperties.MinioProperties minio = properties.getMinio();
+    public MinioClient minioClient(FileStorageProperties properties) {
+        FileStorageProperties.MinioProperties minio = properties.getMinio();
 
         Assert.hasText(minio.getEndpoint(), "MinIO endpoint 不能为空");
         Assert.hasText(minio.getAccessKey(), "MinIO access key 不能为空");

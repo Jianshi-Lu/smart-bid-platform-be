@@ -1,7 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.FileIntegrityException;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -26,8 +26,8 @@ class GlobalExceptionHandlerTest {
     void shouldReturnClearMessageWithoutLeakingIntegrityDetails() {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
-        Result<Void> result = handler.handleFileIntegrity(
-                new FileIntegrityException(
+        Result<Void> result = handler.handleFileChecksumMismatch(
+                new FileChecksumMismatchException(
                         "存储对象内容完整性校验失败: internal/object/key.pdf"));
 
         assertEquals(500, result.getCode());

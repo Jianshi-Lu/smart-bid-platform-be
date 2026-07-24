@@ -1,17 +1,12 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.processor;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileChecksumCalculator;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.ItemContent;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.PendingUploadItem;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.FileIntegrityException;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.StoredFileIntegrityVerifier;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.VerifiedStoredFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoredFileMetadata;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -32,7 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class PendingUploadItemProcessorTest {
+class UploadItemProcessorTest {
+
+    private static final String SHA256_METADATA = "sha256";
 
     @TempDir
     Path tempDir;
@@ -41,17 +38,17 @@ class PendingUploadItemProcessorTest {
     void shouldCalculateChecksumBeforeStorageAndOpenItemContentTwice() throws Exception {
         RecordingLocalFileStorage storage = createRecordingStorage();
         Sha256FileChecksumCalculator calculator = new Sha256FileChecksumCalculator();
-        PendingUploadItemProcessor processor = createProcessor(calculator, storage);
+        UploadItemProcessor processor = createProcessor(calculator, storage);
         byte[] content = "first-content".getBytes(StandardCharsets.UTF_8);
         AtomicInteger openCount = new AtomicInteger();
-        ItemContent itemContent = () -> {
+        UploadItem.Content itemContent = () -> {
             openCount.incrementAndGet();
             return new ByteArrayInputStream(content);
         };
 
-        VerifiedStoredFile verifiedFile = processor.process(
+        VerifiedStoredFileMetadata verifiedMetadata = processor.process(
                 new UploadBatchContext(1001, UUID.randomUUID().toString()),
-                new PendingUploadItem(
+                new UploadItem(
                         "license.pdf",
                         "application/pdf",
                         content.length,
@@ -63,8 +60,8 @@ class PendingUploadItemProcessorTest {
         assertNotNull(storage.storeRequest);
         assertEquals(
                 expectedSha256,
-                storage.storeRequest.metadata().get(StoredFileMetadata.SHA256));
-        assertEquals(expectedSha256, verifiedFile.sha256());
+                storage.storeRequest.metadata().get(SHA256_METADATA));
+        assertEquals(expectedSha256, verifiedMetadata.sha256());
         assertEquals(1, storage.openCalls);
     }
 
@@ -82,7 +79,7 @@ class PendingUploadItemProcessorTest {
                 throw new IOException("checksum failed");
             }
         };
-        PendingUploadItemProcessor processor =
+        UploadItemProcessor processor =
                 createProcessor(failingCalculator, storage);
 
         assertThrows(
@@ -96,14 +93,14 @@ class PendingUploadItemProcessorTest {
 
     @Test
     void shouldDeleteCurrentStoredFileWhenIntegrityVerificationFails() throws Exception {
-        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
         FileStorage storage = new TamperingLocalFileStorage(properties);
-        PendingUploadItemProcessor processor =
+        UploadItemProcessor processor =
                 createProcessor(new Sha256FileChecksumCalculator(), storage);
 
         assertThrows(
-                FileIntegrityException.class,
+                FileChecksumMismatchException.class,
                 () -> processor.process(
                         new UploadBatchContext(1001, UUID.randomUUID().toString()),
                         item("license.pdf", "original-content")));
@@ -116,11 +113,11 @@ class PendingUploadItemProcessorTest {
     @Test
     void shouldDeleteStoredFileWhenUploadInputCloseFails() throws Exception {
         RecordingLocalFileStorage storage = createRecordingStorage();
-        PendingUploadItemProcessor processor =
+        UploadItemProcessor processor =
                 createProcessor(new Sha256FileChecksumCalculator(), storage);
         byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
         AtomicInteger openCount = new AtomicInteger();
-        ItemContent itemContent = () -> {
+        UploadItem.Content itemContent = () -> {
             InputStream input = new ByteArrayInputStream(content);
             if (openCount.incrementAndGet() == 2) {
                 return new FilterInputStream(input) {
@@ -138,7 +135,7 @@ class PendingUploadItemProcessorTest {
                 IOException.class,
                 () -> processor.process(
                         new UploadBatchContext(1001, UUID.randomUUID().toString()),
-                        new PendingUploadItem(
+                        new UploadItem(
                                 "license.pdf",
                                 "application/pdf",
                                 content.length,
@@ -149,29 +146,24 @@ class PendingUploadItemProcessorTest {
         }
     }
 
-    private PendingUploadItemProcessor createProcessor(
+    private UploadItemProcessor createProcessor(
             FileChecksumCalculator calculator,
             FileStorage storage) {
-        StoredFileIntegrityVerifier verifier = new StoredFileIntegrityVerifier();
-        ReflectionTestUtils.setField(verifier, "fileStorage", storage);
-        ReflectionTestUtils.setField(verifier, "fileChecksumCalculator", calculator);
-
-        PendingUploadItemProcessor processor = new PendingUploadItemProcessor();
+        UploadItemProcessor processor = new UploadItemProcessor();
         ReflectionTestUtils.setField(processor, "fileStorage", storage);
         ReflectionTestUtils.setField(processor, "fileChecksumCalculator", calculator);
-        ReflectionTestUtils.setField(processor, "storedFileIntegrityVerifier", verifier);
         return processor;
     }
 
     private RecordingLocalFileStorage createRecordingStorage() {
-        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
         return new RecordingLocalFileStorage(properties);
     }
 
-    private PendingUploadItem item(String filename, String content) {
+    private UploadItem item(String filename, String content) {
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        return new PendingUploadItem(
+        return new UploadItem(
                 filename,
                 "application/pdf",
                 bytes.length,
@@ -184,7 +176,7 @@ class PendingUploadItemProcessorTest {
         private int openCalls;
 
         private RecordingLocalFileStorage(
-                CredentialFileStorageProperties properties) {
+            FileStorageProperties properties) {
             super(properties);
         }
 
@@ -204,7 +196,7 @@ class PendingUploadItemProcessorTest {
     private static final class TamperingLocalFileStorage extends LocalFileStorage {
 
         private TamperingLocalFileStorage(
-                CredentialFileStorageProperties properties) {
+            FileStorageProperties properties) {
             super(properties);
         }
 

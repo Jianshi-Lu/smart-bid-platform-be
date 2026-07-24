@@ -59,7 +59,7 @@
 │ credential_file_batch (V22)                 │  资信文件上传批次
 │  ├─ upload_batch_id PK                       │
 │  ├─ bid_record_id / batch_no                 │
-│  └─ batch_status / file_count                │
+│  └─ status / file_count                      │
 └─────────────────────────────────────────────┘
            │ 1:N（逻辑外键 upload_batch_id）
            ▼
@@ -70,7 +70,7 @@
 │  ├─ bid_record_id (提交后回填)                │
 │  ├─ original_file_path                       │
 │  ├─ markdown_file_path                       │
-│  └─ convert_status (UPLOADED/CONVERTING/    │
+│  └─ status (UPLOADED/CONVERTING/             │
 │                    CONVERTED/FAILED)         │
 └─────────────────────────────────────────────┘
 
@@ -207,9 +207,9 @@
 
 每个原始上传文件对应一条记录；同一次上传的文件通过 `upload_batch_id` 关联到
 `credential_file_batch`。
-文件上传阶段 `bid_record_id` 保持 `NULL`，创建投标记录后再回填。
+文件上传阶段 `bid_record_id` 可先保持 `NULL`，创建投标记录后再回填。
 
-> **当前实现状态**：`POST /credential-files/upload` 已完成本地原文件落盘、SHA-256 计算和相对路径返回，但尚未执行本表 INSERT。以下字段已经由上传响应提供，下一阶段接入 `CredentialFileMapper` 后再持久化。
+> **当前实现状态**：`POST /credential-files/upload` 已完成本地原文件落盘、SHA-256 计算、`credential_file` 写入和相对路径返回。
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
@@ -224,7 +224,7 @@
 | `storage_type` | VARCHAR(20) | ✅ | 当前为 `LOCAL`，后续可扩展 `MINIO` |
 | `original_file_path` | VARCHAR(500) | ✅ | 原始文件物理存储相对路径 |
 | `markdown_file_path` | VARCHAR(500) | ❌ | 转换后的 Markdown 文件相对路径 |
-| `convert_status` | VARCHAR(20) | ✅ | `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
+| `status` | VARCHAR(20) | ✅ | `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
 | `error_message` | VARCHAR(1000) | ❌ | 转换失败原因 |
 | `created_at` | DATETIME | ✅ | 文件记录创建时间 |
 | `converted_at` | DATETIME | ❌ | Markdown 转换完成时间 |
@@ -238,9 +238,9 @@
 
 数据库中的 `original_file_path` 保存上述相对路径，存储根目录由运行环境配置，不写入数据库。`sha256` 使用 JDK `MessageDigest(SHA-256)` 对落盘后的实际内容计算。
 
-**索引**：PK（file_id）+ `idx_upload_batch_id` + `idx_bid_record_id` + `idx_convert_status`
+**索引**：PK（file_id）+ `idx_upload_batch_id` + `idx_bid_record_id` + `idx_status`
 
-**演进**：**V21**（新建资信文件表）
+**演进**：**V21**（新建资信文件表）→ **V23**（统一状态字段名）
 
 ### 2.6 `credential_file_batch`（资信文件上传批次）
 
@@ -252,7 +252,7 @@
 | `upload_batch_id` | CHAR(36) | ✅ | 批次 UUID，主键，也是 MinIO 目录名 |
 | `bid_record_id` | INT | ✅ | 逻辑外键 → `bid_record.bid_record_id` |
 | `batch_no` | INT | ✅ | 当前投标记录下的批次序号，从 1 开始 |
-| `batch_status` | VARCHAR(20) | ✅ | `UPLOADING` / `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
+| `status` | VARCHAR(20) | ✅ | `UPLOADING` / `UPLOADED` / `CONVERTING` / `CONVERTED` / `FAILED` |
 | `file_count` | INT | ✅ | 本批次原始文件数量 |
 | `converted_file_count` | INT | ✅ | 已完成 Markdown 转换的文件数量 |
 | `error_message` | VARCHAR(1000) | ❌ | 批次级失败原因 |
@@ -263,11 +263,11 @@
 | `updated_at` | DATETIME | ✅ | 最后更新时间 |
 
 **约束与索引**：PK（`upload_batch_id`）+ UNIQUE（`bid_record_id`, `batch_no`）+
-`idx_bid_record_id` + `idx_batch_status`
+`idx_bid_record_id` + `idx_status`
 
-**当前实现状态**：本版本只建立数据库表，批次 Entity、Mapper、上传时写入和转换状态更新在后续阶段实现。
+**当前实现状态**：批次 Entity、Mapper、上传时写入和转换状态更新已经接入。
 
-**演进**：**V22**（新建资信文件上传批次表）
+**演进**：**V22**（新建资信文件上传批次表）→ **V23**（统一状态字段名）
 
 ### 2.7 `invitation_for_bid_status_history`（招标公告状态变更历史）
 

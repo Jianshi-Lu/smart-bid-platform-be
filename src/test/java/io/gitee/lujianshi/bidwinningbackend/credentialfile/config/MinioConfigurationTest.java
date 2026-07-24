@@ -65,7 +65,7 @@ class MinioConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(CredentialFileStorageProperties.class)
+    @EnableConfigurationProperties(FileStorageProperties.class)
     @Import(MinioConfiguration.class)
     static class MinioTestConfiguration {
     }

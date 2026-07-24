@@ -13,7 +13,7 @@ import java.util.List;
  */
 public record UploadBatch(
         Integer bidRecordId,
-        List<PendingUploadItem> items) {
+        List<UploadItem> items) {
 
     /** 紧凑构造器
      * <p> 校验批次输入并创建文件列表的不可变副本。</p> */

@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.MinioConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -50,7 +50,7 @@ class FileStorageConditionTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(CredentialFileStorageProperties.class)
+    @EnableConfigurationProperties(FileStorageProperties.class)
     @Import({
             LocalFileStorage.class,
             MinioFileStorage.class,

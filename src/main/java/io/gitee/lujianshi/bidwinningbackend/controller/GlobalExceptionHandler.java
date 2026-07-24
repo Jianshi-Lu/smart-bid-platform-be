@@ -1,7 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.integrity.FileIntegrityException;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,9 +41,9 @@ public class GlobalExceptionHandler {
      * @return 500 + 文件完整性校验失败提示
      * @since 1.0
      */
-    @ExceptionHandler(FileIntegrityException.class)
-    public Result<Void> handleFileIntegrity(
-            FileIntegrityException e) {
+    @ExceptionHandler(FileChecksumMismatchException.class)
+    public Result<Void> handleFileChecksumMismatch(
+            FileChecksumMismatchException e) {
         return Result.error(500, "文件完整性校验失败");
     }
 

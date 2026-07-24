@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalFileStorageTest {
 
+    private static final String BID_RECORD_ID_METADATA = "bid-record-id";
+    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String SHA256_METADATA = "sha256";
     private static final String VALID_SHA256 = "0".repeat(64);
 
     @TempDir
@@ -107,7 +110,7 @@ class LocalFileStorageTest {
     }
 
     private LocalFileStorage createStorage() {
-        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
         return new LocalFileStorage(properties);
     }
@@ -127,8 +130,8 @@ class LocalFileStorageTest {
 
     private Map<String, String> metadata(String batchId) {
         return Map.of(
-                StoredFileMetadata.BID_RECORD_ID, "1001",
-                StoredFileMetadata.UPLOAD_BATCH_ID, batchId,
-                StoredFileMetadata.SHA256, VALID_SHA256);
+                BID_RECORD_ID_METADATA, "1001",
+                UPLOAD_BATCH_ID_METADATA, batchId,
+                SHA256_METADATA, VALID_SHA256);
     }
 }

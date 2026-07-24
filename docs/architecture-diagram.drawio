@@ -182,7 +182,7 @@
         <mxCell id="svc_status" value="&lt;b&gt;StatusCheckService&lt;/b&gt;&lt;br&gt;业务流不继承 BaseService&#xa;发邮件异步延迟 5s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
           <mxGeometry x="1740" y="40" width="220" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="svc_upload" value="&lt;b&gt;UploadService&lt;/b&gt;&lt;br&gt;批次 UUID + 多文件编排&#xa;Processor 单文件处理 + 两级补偿" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;" parent="lane_app" vertex="1">
+        <mxCell id="svc_upload" value="&lt;b&gt;FileUploadService&lt;/b&gt;&lt;br&gt;批次 UUID + 多文件编排&#xa;Processor 单文件处理 + 两级补偿" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=10;" parent="lane_app" vertex="1">
           <mxGeometry x="1980" y="40" width="260" height="70" as="geometry" />
         </mxCell>
         <mxCell id="svc_note" value="@Transactional(rollbackFor = Exception.class) 写方法事务&#xa;@Resource 注入 Mapper&#xa;@EnableAsync 异步" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=10;" parent="lane_app" vertex="1">
@@ -385,7 +385,7 @@
         <mxCell id="l1" value="&lt;b&gt;L1 表现层 (Presentation)&lt;/b&gt;&lt;br&gt;&lt;br&gt;5 全局 Controller + credentialfile 模块 Controller + GlobalExceptionHandler&#xa;@RestController / JSON + multipart&#xa;HTTP 入参出参 (30 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
           <mxGeometry x="100" y="100" width="1200" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="l2" value="&lt;b&gt;L2 业务层 (Application / Domain Logic)&lt;/b&gt;&lt;br&gt;&lt;br&gt;全局 CRUD Service + credentialfile 模块 UploadService 编排&#xa;业务规则: UUID / 失败补偿 / bidNo 重试 / 状态机 / AI&#xa;模块内部依赖 FileStorage 与 FileChecksumCalculator 端口" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
+        <mxCell id="l2" value="&lt;b&gt;L2 业务层 (Application / Domain Logic)&lt;/b&gt;&lt;br&gt;&lt;br&gt;全局 CRUD Service + credentialfile 模块 FileUploadService 编排&#xa;业务规则: UUID / 失败补偿 / bidNo 重试 / 状态机 / AI&#xa;模块内部依赖 FileStorage 与 FileChecksumCalculator 端口" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;spacingLeft=15;" parent="1" vertex="1">
           <mxGeometry x="100" y="220" width="1200" height="100" as="geometry" />
         </mxCell>
         <mxCell id="l3" value="&lt;b&gt;L3 基础设施层 (Infrastructure)&lt;/b&gt;&lt;br&gt;&lt;br&gt;5 全局 Mapper + 2 credentialfile Mapper / 7 XML&#xa;LocalFileStorage (Java NIO)&#xa;Sha256FileChecksumCalculator (JDK MessageDigest)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacingLeft:15;" parent="1" vertex="1">
@@ -1373,7 +1373,7 @@
         <mxCell id="t7_ctrl" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=20;fontSize=10;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="CredentialFileController" vertex="1">
           <mxGeometry height="850" width="170" x="260" y="80" as="geometry" />
         </mxCell>
-        <mxCell id="t7_svc" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=20;fontSize=10;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="UploadService&lt;br/&gt;+ ItemProcessor" vertex="1">
+        <mxCell id="t7_svc" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=20;fontSize=10;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="FileUploadService&lt;br/&gt;+ ItemProcessor" vertex="1">
           <mxGeometry height="850" width="190" x="540" y="80" as="geometry" />
         </mxCell>
         <mxCell id="t7_storage" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;size=20;fontSize=10;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="FileStorage&lt;br/&gt;Local / MinIO" vertex="1">
@@ -1418,7 +1418,7 @@
         <mxCell id="t7_m9" edge="1" parent="1" source="t7_digest" target="t7_svc" style="endArrow=open;html=1;dashed=1;fontSize=10;" value="正文 SHA-256 → 三方比较 → VerifiedStoredFile">
           <mxGeometry relative="1" y="710" as="geometry" />
         </mxCell>
-        <mxCell id="t7_fail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="两级补偿：Processor 删除当前失败文件&#xa;UploadService 逆序删除本请求此前成功文件；不动历史对象&#xa;参数错误 → 400；I/O / 完整性失败 → 500" vertex="1">
+        <mxCell id="t7_fail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;spacingLeft=8;" value="两级补偿：Processor 删除当前失败文件&#xa;FileUploadService 逆序删除本请求此前成功文件；不动历史对象&#xa;参数错误 → 400；I/O / 完整性失败 → 500" vertex="1">
           <mxGeometry height="90" width="500" x="560" y="760" as="geometry" />
         </mxCell>
         <mxCell id="t7_m10" edge="1" parent="1" source="t7_svc" target="t7_ctrl" style="endArrow=open;html=1;dashed=1;fontSize=10;" value="UploadResponse(batchId, files[path,size,sha256,...])">

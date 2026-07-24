@@ -15,9 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class UploadIntakeModelTest {
 
     @Test
-    void shouldAllowItemContentToOpenIndependentStreams() throws Exception {
+    void shouldAllowPendingItemContentToOpenIndependentStreams() throws Exception {
         byte[] content = "credential-content".getBytes(StandardCharsets.UTF_8);
-        ItemContent itemContent = () -> new ByteArrayInputStream(content);
+        UploadItem.Content itemContent =
+                () -> new ByteArrayInputStream(content);
 
         try (var first = itemContent.openStream();
              var second = itemContent.openStream()) {
@@ -28,7 +29,7 @@ class UploadIntakeModelTest {
 
     @Test
     void shouldCreateImmutableUploadBatchSnapshot() {
-        List<PendingUploadItem> source = new ArrayList<>();
+        List<UploadItem> source = new ArrayList<>();
         source.add(item("license.pdf", "content"));
 
         UploadBatch batch = new UploadBatch(1001, source);
@@ -57,9 +58,9 @@ class UploadIntakeModelTest {
         assertEquals(batchId, context.uploadBatchId());
     }
 
-    private PendingUploadItem item(String filename, String content) {
+    private UploadItem item(String filename, String content) {
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        return new PendingUploadItem(
+        return new UploadItem(
                 filename,
                 "application/pdf",
                 bytes.length,

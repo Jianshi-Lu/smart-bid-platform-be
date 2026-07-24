@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
@@ -36,7 +36,7 @@ public class MinioFileStorage implements FileStorage {
     private MinioClient minioClient;
 
     @Resource
-    private CredentialFileStorageProperties properties;
+    private FileStorageProperties properties;
 
     /**
      * 将文件上传至调用方指定的 MinIO object key 并回读对象属性。

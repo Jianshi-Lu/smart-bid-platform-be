@@ -3,8 +3,8 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.controller;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.UploadRequest;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.UploadResponse;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.UploadService;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.PendingUploadItem;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.FileUploadService;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatch;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -17,68 +17,41 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-/**
- * 资信文件上传 Controller。
- *
- * <p>上传端点负责接收 multipart 参数，具体批次处理、文件落盘与摘要计算由 Service 编排。
- * 当前阶段不操作 {@code credential_file} 表，删除端点仍为前后端联调占位实现。</p>
- */
+/** 原始资信文件上传 Controller。 */
 @RestController
-public class CredentialFileController {
+public class FileUploadController {
 
     @Resource
-    private UploadService uploadService;
+    private FileUploadService uploadService;
 
-    /**
-     * 上传一个或多个原始资信文件。
-     *
-     * @param request multipart 上传请求
-     * @return 上传批次号和文件基础信息
-     */
+    /** 上传一个或多个原始资信文件。 */
     @PostMapping("/credential-files/upload")
     public Result<UploadResponse> upload(
             @Valid @ModelAttribute UploadRequest request) {
-        UploadBatch batch = new UploadBatch(
+        UploadBatch batch = new UploadBatch(    // 将http请求转换为业务类型
                 request.getBidRecordId(),
-                toPendingItems(request.getFiles()));
+                toUploadItems(request.getFiles()));
         UploadResponse response = uploadService.upload(batch);
         return Result.success(response, "上传成功");
     }
 
-    /**
-     * 将 Spring multipart 文件转换为请求生命周期内的待上传条目。
-     *
-     * @param files Controller 接收到的 multipart 文件集合
-     * @return 后端内部待上传文件集合
-     */
-    private List<PendingUploadItem> toPendingItems(List<MultipartFile> files) {
+    /** 将 Spring multipart 文件转换为请求生命周期内的待上传条目。 */
+    private List<UploadItem> toUploadItems(List<MultipartFile> files) {
         if (files == null) {
             return null;
         }
         return files.stream()
-                .map(this::toPendingItem)
+                .map(file -> file == null
+                        ? null
+                        : new UploadItem(
+                                file.getOriginalFilename(), // 第 1 个参数 → originalFilename
+                                file.getContentType(),      // 第 2 个参数 → contentType
+                                file.getSize(),             // 第 3 个参数 → fileSize
+                                file::getInputStream))      // 第 4 个参数 → content
                 .toList();
     }
 
-    /** 将单个 MultipartFile 适配为不依赖 Spring Web 的内部文件条目。 */
-    private PendingUploadItem toPendingItem(MultipartFile file) {
-        if (file == null) {
-            return null;
-        }
-        return new PendingUploadItem(
-                file.getOriginalFilename(),
-                file.getContentType(),
-                file.getSize(),
-                file::getInputStream);
-    }
-
-    /**
-     * 删除尚未提交投标记录的资信文件。
-     *
-     * @param uploadBatchId 上传批次号
-     * @param fileId        文件记录 ID
-     * @return 删除结果
-     */
+    /** 删除尚未提交投标记录的资信文件。 */
     @DeleteMapping("/credential-files/{uploadBatchId}/files/{fileId}")
     public Result<Void> delete(
             @PathVariable String uploadBatchId,

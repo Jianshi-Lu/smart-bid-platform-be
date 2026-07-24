@@ -5,6 +5,9 @@ import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 /**
  * 资信文件上传批次 Mapper。
  *
@@ -34,5 +37,26 @@ public interface CredentialFileBatchMapper extends BaseMapper<CredentialFileBatc
     int markUploaded(
             @Param("uploadBatchId") String uploadBatchId,
             @Param("status") String status,
-            @Param("uploadedAt") java.time.LocalDateTime uploadedAt);
+            @Param("uploadedAt") LocalDateTime uploadedAt);
+
+    /** 查询指定投标记录下的全部资信文件批次。 */
+    List<CredentialFileBatch> selectByBidRecordId(
+            @Param("bidRecordId") Integer bidRecordId);
+
+    /** 按批次 ID 将批次置为转换中，供无差别转换流程使用。 */
+    int claimConverting(
+            @Param("uploadBatchId") String uploadBatchId,
+            @Param("convertingAt") LocalDateTime convertingAt);
+
+    /** 将批次标记为全部转换完成。 */
+    int markConverted(
+            @Param("uploadBatchId") String uploadBatchId,
+            @Param("convertedFileCount") int convertedFileCount,
+            @Param("convertedAt") LocalDateTime convertedAt);
+
+    /** 将批次标记为转换失败。 */
+    int markFailed(
+            @Param("uploadBatchId") String uploadBatchId,
+            @Param("convertedFileCount") int convertedFileCount,
+            @Param("errorMessage") String errorMessage);
 }

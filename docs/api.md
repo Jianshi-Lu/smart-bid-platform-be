@@ -481,8 +481,8 @@ curl -X POST http://localhost:8080/credential-files/upload \
 - API 只返回相对路径，不暴露环境绝对路径。
 - SHA-256 在落盘后重新读取实际文件计算。
 - 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；批次不会封口。
-- 全部文件成功后，后端将 `credential_file_batch.batch_status` 更新为 `UPLOADED`，当前批次不可继续追加。
-- `fileOrder` 当前只表示本次请求内顺序，全批次连续顺序待接入数据库后实现。
+- 全部文件成功后，后端将 `credential_file_batch.status` 更新为 `UPLOADED`，当前批次不可继续追加。
+- 每个文件成功验证后立即写入 `credential_file`；`fileOrder` 表示该批次内的文件顺序。
 
 **错误响应**：
 
@@ -493,9 +493,42 @@ curl -X POST http://localhost:8080/credential-files/upload \
 | 单文件超过 150MB 或请求总体超过 200MB | 400 | `文件大小超过限制` |
 | 文件系统或摘要计算失败 | 500 | `服务器内部错误` |
 
-> **当前阶段边界**：接口已经真实落盘并返回数据库所需元数据，但尚未写入 `credential_file`，也不会触发 Python Markdown 转换。
+> **当前阶段边界**：接口已经完成原始文件落盘、完整性校验和 `credential_file` 写入，但不会自动触发 Python Markdown 转换；转换由下方独立入口负责。
 
-### 5.2 `DELETE /credential-files/{uploadBatchId}/files/{fileId}`
+### 5.2 `POST /credential-files/bid-records/{bidRecordId}/convert`
+
+无差别转换指定投标记录下的全部资信文件批次。Java 按批次逐文件调用 Python
+`/convert/object`，Python 从 MinIO 读取 `original` 对象并将 Markdown 写入同级
+`converted` 路径；Java 负责更新文件、批次状态，并将已完成的 Markdown object key
+列表回写 `bid_record.credentials`。
+
+重复调用会重新转换并覆盖对应的 `converted` 对象，不根据当前状态跳过文件。
+
+```bash
+curl -X POST http://localhost:8080/credential-files/bid-records/1001/convert
+```
+
+返回结果包含投标记录级汇总状态和每个批次的转换状态：
+
+```json
+{
+  "code": 200,
+  "data": {
+    "bidRecordId": 1001,
+    "status": "ALL_CONVERTED",
+    "totalBatchCount": 1,
+    "convertedBatchCount": 1,
+    "processingBatchCount": 0,
+    "failedBatchCount": 0,
+    "batches": []
+  }
+}
+```
+
+文件转换失败时，文件和批次分别记录 `FAILED` 状态及错误信息；已经成功转换的文件
+仍保留其 `CONVERTED` 状态和 Markdown 路径。
+
+### 5.3 `DELETE /credential-files/{uploadBatchId}/files/{fileId}`
 
 当前仅用于前后端联调，打印删除成功并返回：
 

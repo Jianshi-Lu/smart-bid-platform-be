@@ -5,6 +5,7 @@ import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -22,4 +23,27 @@ public interface CredentialFileMapper extends BaseMapper<CredentialFile, Long> {
      * @return 文件列表，按 file_order、file_id 升序
      */
     List<CredentialFile> selectByUploadBatchId(@Param("uploadBatchId") String uploadBatchId);
+
+    /** 查询指定投标记录下的全部资信文件，按批次和文件顺序返回。 */
+    List<CredentialFile> selectByBidRecordId(@Param("bidRecordId") Integer bidRecordId);
+
+    /** 按文件 ID 将文件置为转换中，供无差别转换流程使用。 */
+    int markConverting(
+            @Param("fileId") Long fileId);
+
+    /** 更新单个文件的 Markdown 路径和转换状态。 */
+    int markConverted(
+            @Param("fileId") Long fileId,
+            @Param("markdownFilePath") String markdownFilePath,
+            @Param("convertedAt") LocalDateTime convertedAt);
+
+    /** 更新单个文件的失败状态。 */
+    int markFailed(
+            @Param("fileId") Long fileId,
+            @Param("errorMessage") String errorMessage);
+
+    /** 将批次中尚未完成的文件统一标记为失败。 */
+    int markFailedByUploadBatchId(
+            @Param("uploadBatchId") String uploadBatchId,
+            @Param("errorMessage") String errorMessage);
 }

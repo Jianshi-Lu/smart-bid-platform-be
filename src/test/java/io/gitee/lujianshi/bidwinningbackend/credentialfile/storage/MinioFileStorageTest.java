@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.CredentialFileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.HeadObjectResponse;
@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MinioFileStorageTest {
 
+    private static final String BID_RECORD_ID_METADATA = "bid-record-id";
+    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String SHA256_METADATA = "sha256";
     private static final String SHA256 =
             "9cd4aefcb376e737ae07795b61419408249765494085c144e2d83561de56d145";
 
@@ -213,7 +216,7 @@ class MinioFileStorageTest {
     }
 
     private MinioFileStorage createStorage(MinioClient minioClient) {
-        CredentialFileStorageProperties properties = new CredentialFileStorageProperties();
+        FileStorageProperties properties = new FileStorageProperties();
         properties.getMinio().setBucket("credential-files");
         MinioFileStorage storage = new MinioFileStorage();
         ReflectionTestUtils.setField(storage, "minioClient", minioClient);
@@ -236,9 +239,9 @@ class MinioFileStorageTest {
 
     private Map<String, String> metadata(String batchId) {
         return Map.of(
-                StoredFileMetadata.BID_RECORD_ID, "1001",
-                StoredFileMetadata.UPLOAD_BATCH_ID, batchId,
-                StoredFileMetadata.SHA256, SHA256);
+                BID_RECORD_ID_METADATA, "1001",
+                UPLOAD_BATCH_ID_METADATA, batchId,
+                SHA256_METADATA, SHA256);
     }
 
     private static final class RecordingMinioClient extends MinioClient {

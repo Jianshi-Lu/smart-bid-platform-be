@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.config;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.CredentialFileStorageType;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.FileStorageType;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -9,16 +9,16 @@ import org.springframework.mock.env.MockEnvironment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CredentialFileStoragePropertiesTest {
+class FileStoragePropertiesTest {
 
     @Test
     void shouldBindLocalStoragePropertiesAndDefaultToLocalType() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("credential-file.storage.local.root", "/tmp/credential-files");
 
-        CredentialFileStorageProperties properties = bind(environment);
+        FileStorageProperties properties = bind(environment);
 
-        assertEquals(CredentialFileStorageType.LOCAL, properties.getType());
+        assertEquals(FileStorageType.LOCAL, properties.getType());
         assertEquals("/tmp/credential-files", properties.getLocal().getRoot());
     }
 
@@ -32,9 +32,9 @@ class CredentialFileStoragePropertiesTest {
                 .withProperty("credential-file.storage.minio.bucket", "credential-files")
                 .withProperty("credential-file.storage.minio.create-bucket-if-absent", "true");
 
-        CredentialFileStorageProperties properties = bind(environment);
+        FileStorageProperties properties = bind(environment);
 
-        assertEquals(CredentialFileStorageType.MINIO, properties.getType());
+        assertEquals(FileStorageType.MINIO, properties.getType());
         assertEquals("http://10.0.0.100:9000", properties.getMinio().getEndpoint());
         assertEquals("test-access-key", properties.getMinio().getAccessKey());
         assertEquals("test-secret-key", properties.getMinio().getSecretKey());
@@ -42,11 +42,11 @@ class CredentialFileStoragePropertiesTest {
         assertTrue(properties.getMinio().isCreateBucketIfAbsent());
     }
 
-    private CredentialFileStorageProperties bind(MockEnvironment environment) {
+    private FileStorageProperties bind(MockEnvironment environment) {
         return Binder.get(environment)
                 .bind(
                         "credential-file.storage",
-                        Bindable.of(CredentialFileStorageProperties.class))
+                        Bindable.of(FileStorageProperties.class))
                 .orElseThrow(() -> new IllegalStateException("资信文件存储配置绑定失败"));
     }
 }

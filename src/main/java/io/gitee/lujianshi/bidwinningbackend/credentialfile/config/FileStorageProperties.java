@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.config;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.CredentialFileStorageType;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.FileStorageType;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -15,8 +15,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "credential-file.storage")
 @Getter
 @Setter
-public class CredentialFileStorageProperties {
-    private CredentialFileStorageType type = CredentialFileStorageType.LOCAL;
+public class FileStorageProperties {
+    private FileStorageType type = FileStorageType.LOCAL;
 
     private LocalProperties local = new LocalProperties();
 
