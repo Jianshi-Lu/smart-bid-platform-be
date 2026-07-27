@@ -110,8 +110,16 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
             throw new IllegalArgumentException(
                     "非法状态变更: " + fromStatus + " -> " + toStatus);
         }
-        entity.setStatus(toStatus);
-        mapper.updateById(entity);
+
+        int rows = mapper.updateStatusIfCurrent(
+                invitationId,
+                fromStatus,
+                toStatus);
+        if (rows != 1) {
+            throw new InvitationStatusChangeConflictException(
+                    invitationId,
+                    fromStatus);
+        }
 
         InvitationForBidStatusHistory history = new InvitationForBidStatusHistory();
         history.setInvitationId(invitationId);
@@ -120,6 +128,7 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
         history.setRemark(remark);
         historyMapper.insert(history);
 
+        entity.setStatus(toStatus);
         return entity;
     }
 }

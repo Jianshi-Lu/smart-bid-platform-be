@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
 import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisInProgressException;
+import io.gitee.lujianshi.bidwinningbackend.service.InvitationStatusChangeConflictException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -52,6 +53,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RiskAnalysisInProgressException.class)
     public Result<Void> handleRiskAnalysisInProgress(
             RiskAnalysisInProgressException e) {
+        return Result.error(409, e.getMessage());
+    }
+
+    /** 处理招标公告状态已被其他请求抢先修改的并发冲突。 */
+    @ExceptionHandler(InvitationStatusChangeConflictException.class)
+    public Result<Void> handleInvitationStatusChangeConflict(
+            InvitationStatusChangeConflictException e) {
         return Result.error(409, e.getMessage());
     }
 

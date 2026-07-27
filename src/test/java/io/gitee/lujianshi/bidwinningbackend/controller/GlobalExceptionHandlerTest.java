@@ -2,6 +2,8 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
+import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.service.InvitationStatusChangeConflictException;
 import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisInProgressException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -45,6 +47,20 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(409, result.getCode());
         assertEquals("该投标记录正在进行风险分析，请稍后再试: 8", result.getMessage());
+        assertNull(result.getData());
+    }
+
+    @Test
+    void shouldReturnConflictCodeWhenInvitationStatusHasChanged() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        Result<Void> result = handler.handleInvitationStatusChangeConflict(
+                new InvitationStatusChangeConflictException(8, BidNoticeStatus.DRAFT));
+
+        assertEquals(409, result.getCode());
+        assertEquals(
+                "招标公告状态已发生变化，请刷新后重试: invitationId=8, expectedStatus=DRAFT",
+                result.getMessage());
         assertNull(result.getData());
     }
 }

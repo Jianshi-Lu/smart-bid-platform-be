@@ -72,6 +72,13 @@
         WHERE invitation_id = #{invitationId}
     </update>
 
+    <update id="updateStatusIfCurrent">
+        UPDATE invitation_for_bid
+        SET status = #{toStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
+        WHERE invitation_id = #{invitationId}
+          AND status = #{fromStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
+    </update>
+
     <delete id="deleteById" parameterType="java.lang.Integer">
         DELETE FROM invitation_for_bid WHERE invitation_id = #{invitationId}
     </delete>

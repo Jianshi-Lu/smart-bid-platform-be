@@ -1,7 +1,9 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 招标公告 Mapper 接口 — 继承 {@link BaseMapper}，绑定 {@code InvitationForBidMapper.xml}（V18 重命名自 TenderNoticeMapper）。
@@ -11,4 +13,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface InvitationForBidMapper extends BaseMapper<InvitationForBid, Integer> {
+
+    /** 仅当公告仍处于预期原状态时，原子更新为目标状态。 */
+    int updateStatusIfCurrent(
+            @Param("invitationId") Integer invitationId,
+            @Param("fromStatus") BidNoticeStatus fromStatus,
+            @Param("toStatus") BidNoticeStatus toStatus);
 }
