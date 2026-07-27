@@ -90,6 +90,9 @@ public interface FileStorage {
     /**
      * 将文件保存到调用方指定的逻辑路径。
      *
+     * <p>如果目标路径已经存在，存储实现应以新内容替换旧对象；这用于覆盖投标记录级派生的
+     * 汇总 Markdown。原始文件路径由上层使用 UUID 保证唯一。</p>
+     *
      * @param request 通用文件保存请求
      * @return 存储端确认的文件结果
      * @throws IOException 文件写入或存储属性读取失败

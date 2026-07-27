@@ -60,6 +60,7 @@ public class UploadItemProcessor {
         }
         StoragePath.OriginalFilePath storagePath =
                 StoragePath.createOriginalFilePath(
+                        context.bidRecordId(),
                         context.uploadBatchId(), item.originalFilename());
         FileStorage.StoredFile storedFile = null;
         try {

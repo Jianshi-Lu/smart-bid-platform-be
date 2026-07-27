@@ -19,6 +19,10 @@ credential-file:
       secret-key: ${MINIO_SECRET_KEY:}
       bucket: ${MINIO_BUCKET:credential-files}
 
+risk-analysis:
+  # 当前按字符数近似控制汇总 Markdown 的上下文长度，默认约 128K 字符。
+  max-merged-markdown-chars: ${RISK_ANALYSIS_MAX_MERGED_MARKDOWN_CHARS:131072}
+
 spring:
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://10.0.0.100:3306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}

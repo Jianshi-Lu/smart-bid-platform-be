@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalFileStorageTest {
 
+    private static final int BID_RECORD_ID = 1001;
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
     private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
     private static final String SHA256_METADATA = "sha256";
@@ -41,7 +42,8 @@ class LocalFileStorageTest {
 
         assertEquals(content.length, storedFile.fileSize());
         assertEquals(metadata(batchId), storedFile.metadata());
-        assertTrue(storedFile.relativePath().startsWith(batchId + "/original/"));
+        assertTrue(storedFile.relativePath().startsWith(
+                "bid-records/" + BID_RECORD_ID + "/batches/" + batchId + "/original/"));
         assertFalse(storedFile.relativePath().startsWith(tempDir.toString()));
         assertTrue(Files.isRegularFile(tempDir.resolve(storedFile.relativePath())));
         try (InputStream input = storage.open(storedFile.relativePath())) {
@@ -68,6 +70,23 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void shouldReplaceExistingDerivedFileAtSamePath() throws Exception {
+        LocalFileStorage storage = createStorage();
+        String path = StoragePath.createMergedMarkdownPath(BID_RECORD_ID);
+
+        storage.store(new FileStorage.StoreRequest(
+                path, "text/markdown", 3, Map.of(),
+                new ByteArrayInputStream("old".getBytes(StandardCharsets.UTF_8))));
+        storage.store(new FileStorage.StoreRequest(
+                path, "text/markdown", 3, Map.of(),
+                new ByteArrayInputStream("new".getBytes(StandardCharsets.UTF_8))));
+
+        try (InputStream input = storage.open(path)) {
+            assertEquals("new", new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
     void shouldRejectPathOutsideStorageRoot() {
         LocalFileStorage storage = createStorage();
 
@@ -80,7 +99,7 @@ class LocalFileStorageTest {
         byte[] content = "content".getBytes(StandardCharsets.UTF_8);
         String batchId = UUID.randomUUID().toString();
         StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(batchId, "license.pdf");
+                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, "license.pdf");
         FileStorage.StoreRequest request =
                 new FileStorage.StoreRequest(
                         storagePath.relativePath(),
@@ -121,7 +140,7 @@ class LocalFileStorageTest {
             String contentType,
             byte[] content) {
         return new FileStorage.StoreRequest(
-                StoragePath.createOriginalFilePath(batchId, filename).relativePath(),
+                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, filename).relativePath(),
                 contentType,
                 content.length,
                 metadata(batchId),

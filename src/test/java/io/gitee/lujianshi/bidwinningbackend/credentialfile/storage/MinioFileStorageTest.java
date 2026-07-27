@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MinioFileStorageTest {
 
+    private static final int BID_RECORD_ID = 1001;
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
     private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
     private static final String SHA256_METADATA = "sha256";
@@ -47,7 +48,7 @@ class MinioFileStorageTest {
         minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
 
         StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(batchId, "../营业执照.pdf");
+                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, "../营业执照.pdf");
         FileStorage.StoredFile storedFile = storage.store(new FileStorage.StoreRequest(
                 storagePath.relativePath(),
                 "application/pdf",
@@ -70,7 +71,8 @@ class MinioFileStorageTest {
         assertEquals("application/pdf", storedFile.contentType());
         assertEquals(metadata(batchId), storedFile.metadata());
         assertEquals("etag-1", storedFile.etag());
-        assertTrue(storedFile.relativePath().startsWith(batchId + "/original/"));
+        assertTrue(storedFile.relativePath().startsWith(
+                "bid-records/" + BID_RECORD_ID + "/batches/" + batchId + "/original/"));
     }
 
     @Test
@@ -230,7 +232,7 @@ class MinioFileStorageTest {
             String contentType,
             byte[] content) {
         return new FileStorage.StoreRequest(
-                StoragePath.createOriginalFilePath(batchId, filename).relativePath(),
+                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, filename).relativePath(),
                 contentType,
                 content.length,
                 metadata(batchId),

@@ -30,7 +30,6 @@ public class BidRecordLoader {
         sb.append("- 投标人名称：").append(record.getBidderName() != null ? record.getBidderName() : "未知").append("\n");
         sb.append("- 报价：").append(record.getQuotePrice() != null ? record.getQuotePrice() : "未知").append("元\n");
         sb.append("- 联系方式：").append(record.getBidderContact() != null ? record.getBidderContact() : "未知").append("\n");
-        sb.append("- 资信材料：").append(record.getCredentials() != null ? record.getCredentials() : "未提供").append("\n");
         sb.append("- 投标次序：第").append(record.getBidNo()).append("次\n");
         return sb.toString();
     }

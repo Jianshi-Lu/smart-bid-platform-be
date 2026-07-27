@@ -80,9 +80,11 @@ class FileUploadServiceTest {
 
         assertNotEquals(first.getUploadBatchId(), second.getUploadBatchId());
         assertTrue(first.getFiles().getFirst().getOriginalFilePath()
-                .startsWith(first.getUploadBatchId() + "/original/"));
+                .startsWith("bid-records/1001/batches/"
+                        + first.getUploadBatchId() + "/original/"));
         assertTrue(second.getFiles().getFirst().getOriginalFilePath()
-                .startsWith(second.getUploadBatchId() + "/original/"));
+                .startsWith("bid-records/1001/batches/"
+                        + second.getUploadBatchId() + "/original/"));
     }
 
     @Test

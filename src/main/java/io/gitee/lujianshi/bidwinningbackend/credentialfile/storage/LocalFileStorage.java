@@ -9,12 +9,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 
 /**
  * 基于本地文件系统的资信文件存储实现。
  *
- * <p>调用方负责提供逻辑相对路径，本实现只负责安全解析、目录创建、写入和大小确认。</p>
+ * <p>调用方负责提供逻辑相对路径，本实现只负责安全解析、目录创建、写入、替换和大小确认。</p>
  *
  * @since 1.0
  */
@@ -55,17 +56,32 @@ public class LocalFileStorage implements FileStorage {
         Path targetPath = resolveSafely(relativePath);
 
         Files.createDirectories(targetPath.getParent());
-        boolean targetCreated = false;
+        Path temporaryPath = Files.createTempFile(
+                targetPath.getParent(),
+                "." + targetPath.getFileName() + ".",
+                ".uploading");
         try {
             try (OutputStream output = Files.newOutputStream(
-                    targetPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
-                targetCreated = true;
+                    temporaryPath, StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE)) {
                 request.input().transferTo(output);
             }
 
-            long actualFileSize = Files.size(targetPath);
+            long actualFileSize = Files.size(temporaryPath);
             if (actualFileSize != request.contentLength()) {
                 throw new IOException("文件实际大小与声明长度不一致");
+            }
+            try {
+                Files.move(
+                        temporaryPath,
+                        targetPath,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(
+                        temporaryPath,
+                        targetPath,
+                        StandardCopyOption.REPLACE_EXISTING);
             }
             return new StoredFile(
                     relativePath,
@@ -74,9 +90,7 @@ public class LocalFileStorage implements FileStorage {
                     request.metadata(),
                     null);
         } catch (IOException e) {
-            if (targetCreated) {
-                Files.deleteIfExists(targetPath);
-            }
+            Files.deleteIfExists(temporaryPath);
             throw e;
         }
     }

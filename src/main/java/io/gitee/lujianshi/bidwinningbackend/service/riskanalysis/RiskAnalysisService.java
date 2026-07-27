@@ -6,6 +6,8 @@ import com.alibaba.fastjson2.JSONObject;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.CredentialMarkdownAggregationService;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
@@ -30,6 +32,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -89,6 +94,12 @@ public class RiskAnalysisService {
     private BidRecordMapper bidRecordMapper;
 
     @Resource
+    private CredentialMarkdownAggregationService markdownAggregationService;
+
+    @Resource
+    private FileStorage fileStorage;
+
+    @Resource
     private PromptFiller promptFiller;
 
     /**
@@ -124,18 +135,17 @@ public class RiskAnalysisService {
             throw new IllegalArgumentException("投标记录不存在: " + bidRecordId);
         }
 
-        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={} credentials={}",
-                record.getBidderName(), record.getQuotePrice(), record.getBidderContact(), record.getCredentials());
+        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
+                record.getBidderName(), record.getQuotePrice(), record.getBidderContact());
 
+        String mergedMarkdownPath = markdownAggregationService.aggregate(bidRecordId);
+        String mergedMarkdown = readMergedMarkdown(mergedMarkdownPath);
         String detailInfo = loader.loadDetail(bidRecordId);
         Map<String, String> vars = Map.of(
                 "bidderName", record.getBidderName() != null ? record.getBidderName() : "",
                 "quotePrice", record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
                 "bidderContact", record.getBidderContact() != null ? record.getBidderContact() : "",
-                // 当前阶段仅做 List<String> 类型兼容；多文件读取与内容拼接留待风险分析功能改造时实现。
-                "credentials", record.getCredentials() != null
-                        ? JSON.toJSONString(record.getCredentials())
-                        : "未提供",
+                "credentials", mergedMarkdown,
                 "detail", detailInfo
         );
 
@@ -165,6 +175,15 @@ public class RiskAnalysisService {
         RiskAnalysis saved = self.persist(analysis);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
+    }
+
+    /** 读取汇总服务写入的投标记录级 Markdown，作为本次唯一的资信材料输入。 */
+    private String readMergedMarkdown(String mergedMarkdownPath) {
+        try (InputStream input = fileStorage.open(mergedMarkdownPath)) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("资信材料汇总文件读取失败", e);
+        }
     }
 
     /**

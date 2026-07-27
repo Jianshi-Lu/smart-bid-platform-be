@@ -8,9 +8,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
-import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
-import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -18,9 +16,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 投标记录 Controller。8 端点（6 标准 CRUD + 1 按公告过滤 + 1 AI 风险分析）。
+ * 投标记录 Controller。7 端点（6 标准 CRUD + 1 按公告过滤）。
  *
- * <p>风险分析历史查询已拆分到 {@link RiskAnalysisController}，本 Controller 仅保留触发分析的写入口。</p>
+ * <p>风险分析查询和触发入口已拆分到 {@link RiskAnalysisController}。</p>
  *
  * @since V18
  */
@@ -29,9 +27,6 @@ public class BidRecordController {
 
     @Resource
     private BidRecordService service;
-
-    @Resource
-    private RiskAnalysisService riskAnalysisService;
 
     /**
      * 创建投标记录。Service 自动计算 {@code bidNo}（同公告+同投标人下递增）和 {@code bidAt}（当前时间）。
@@ -157,14 +152,4 @@ public class BidRecordController {
         return Result.success(service.listByInvitationId(invitationId), "查询成功");
     }
 
-    /**
-     * 触发 AI 风险分析。同步调用 OpenAI 兼容 LM Studio，Structured Output 约束 schema 后解析 JSON 落库。
-     *
-     * @param id 投标记录 ID
-     * @return 含 analysisId 的完整 RiskAnalysis
-     */
-    @PostMapping("/bid-record/analyze-risk/{id}")
-    public Result<RiskAnalysis> analyzeRisk(@PathVariable Integer id) {
-        return Result.success(riskAnalysisService.analyzeRisk(id), "分析完成");
-    }
 }
