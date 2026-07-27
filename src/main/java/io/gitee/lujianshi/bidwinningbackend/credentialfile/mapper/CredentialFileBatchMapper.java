@@ -43,7 +43,12 @@ public interface CredentialFileBatchMapper extends BaseMapper<CredentialFileBatc
     List<CredentialFileBatch> selectByBidRecordId(
             @Param("bidRecordId") Integer bidRecordId);
 
-    /** 按批次 ID 将批次置为转换中，供无差别转换流程使用。 */
+    /**
+     * 按批次 ID 原子抢占转换权，供无差别转换流程使用。
+     *
+     * <p>只有已上传、转换失败或已转换的批次可以重新进入转换中；
+     * 已处于转换中的批次不会被并发请求再次抢占。</p>
+     */
     int claimConverting(
             @Param("uploadBatchId") String uploadBatchId,
             @Param("convertingAt") LocalDateTime convertingAt);
