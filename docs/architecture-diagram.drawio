@@ -134,10 +134,10 @@
         <mxCell id="ctrl_if" value="&lt;b&gt;InvitationForBidController&lt;/b&gt;&lt;br&gt;/invitation-for-bid/* (8 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="260" y="40" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ctrl_br" value="&lt;b&gt;BidRecordController&lt;/b&gt;&lt;br&gt;/bid-record/* (7 业务端点 + 1 AI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+        <mxCell id="ctrl_br" value="&lt;b&gt;BidRecordController&lt;/b&gt;&lt;br&gt;/bid-record/* (7 业务端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="500" y="40" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ctrl_ra" value="&lt;b&gt;RiskAnalysisController&lt;/b&gt;&lt;br&gt;GET /risk-analysis&#xa;GET /risk-analysis/by-bid-record/{id}&#xa;(2 端点 · 只读)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
+        <mxCell id="ctrl_ra" value="&lt;b&gt;RiskAnalysisController&lt;/b&gt;&lt;br&gt;POST /bid-record/analyze-risk/{id}&#xa;GET /risk-analysis&#xa;GET /risk-analysis/by-bid-record/{id}&#xa;(3 端点)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">
           <mxGeometry x="740" y="40" width="220" height="60" as="geometry" />
         </mxCell>
         <mxCell id="ctrl_sc" value="&lt;b&gt;StatusCheckController&lt;/b&gt;&lt;br&gt;/service-status + /send-email + /send-notification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" parent="lane_pres" vertex="1">

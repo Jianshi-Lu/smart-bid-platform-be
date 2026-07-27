@@ -26,7 +26,7 @@
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
 | 资信文件 (CredentialFile) | 2 | `/credential-files/...` |
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
-| **AI 风险分析**（v0.1+，含在 BidRecord 内） | 1 | `/bid-record/{action}/{id}` |
+| **AI 风险分析**（v0.1+） | 1 | `/bid-record/analyze-risk/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
 
 > **v18 命名变更**：招标方相关表统一使用 World Bank 术语"Invitation for Bids"；经办人使用"bid handler"。详见 [database.md §1](database.md#1-表结构总览)。
@@ -35,7 +35,7 @@
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/bid-record/analyze-risk/{id}` | 同步调 OpenAI 兼容 LM Studio，Structured Output 约束 schema，解析 JSON，落库，返全字段 `RiskAnalysis` |
+| POST | `/bid-record/analyze-risk/{id}` | 校验资信批次和文件均已转换，汇总 Markdown 后同步调 OpenAI 兼容 LM Studio，解析 JSON，落库，返全字段 `RiskAnalysis` |
 
 ---
 
@@ -466,7 +466,7 @@ curl -X POST http://localhost:8080/credential-files/upload \
         "contentType": "application/pdf",
         "fileSize": 102400,
         "sha256": "64位小写十六进制摘要",
-        "originalFilePath": "550e8400-e29b-41d4-a716-446655440000/original/文件UUID_license.pdf",
+        "originalFilePath": "bid-records/8/batches/550e8400-e29b-41d4-a716-446655440000/original/文件UUID_license.pdf",
         "convertStatus": "UPLOADED"
       }
     ]
@@ -477,7 +477,7 @@ curl -X POST http://localhost:8080/credential-files/upload \
 **存储行为**：
 
 - 开发环境根目录默认为 `/Users/lujianshi/Desktop/projects/MinIO`，可用 `CREDENTIAL_FILE_LOCAL_ROOT` 覆盖。
-- 物理目录为 `{root}/{uploadBatchId}/original/`，文件名为 `{fileUuid}_{安全原文件名}`。
+- 物理目录为 `{root}/bid-records/{bidRecordId}/batches/{uploadBatchId}/original/`，文件名为 `{fileUuid}_{安全原文件名}`。
 - API 只返回相对路径，不暴露环境绝对路径。
 - SHA-256 在落盘后重新读取实际文件计算。
 - 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；批次不会封口。
@@ -641,7 +641,10 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 
 ### 6.8 `POST /bid-record/analyze-risk/{id}`
 
-**同步调用 OpenAI 兼容 LM Studio**，Structured Output 约束 schema，解析 JSON，落库 risk_analysis 表。
+**同步调用 OpenAI 兼容 LM Studio**。服务端先联查并校验当前投标记录下的所有批次和文件均为
+`CONVERTED`，再按 `batch_no`、`file_order` 顺序读取 converted Markdown，合并并写入
+`bid-records/{bidRecordId}/merged/credentials.md`，最后将汇总文本一次性提交给大模型，解析 JSON，落库
+`risk_analysis` 表。
 
 **响应**：`Result<RiskAnalysis>`（含 9 字段：analysisId / bidRecordId / bidderName / riskLevel / summary / suggestions / rawResponse / promptVersion / analyzedAt）。
 
@@ -653,10 +656,11 @@ curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 
 ## 7. 风险分析记录查询（RiskAnalysis）
 
-对应表 `risk_analysis`，主键 `analysis_id`。**敏感数据，只读入口**：不暴露 DELETE / PATCH / POST 写端点，新增与删除仅在数据库手工操作。
+对应表 `risk_analysis`，主键 `analysis_id`。**敏感数据**：历史查询为只读，风险分析触发由
+`RiskAnalysisController` 暴露单独的 POST 入口。
 
 > **写操作权限边界**：
-> - 新增路径：`BidRecordController.analyzeRisk`（AI 触发）→ `RiskAnalysisService.persist` → `risk_analysis` 表
+> - 新增路径：`RiskAnalysisController.analyzeRisk`（状态校验、Markdown 汇总、AI 触发）→ `RiskAnalysisService.persist` → `risk_analysis` 表
 > - 删除路径：禁止通过本系统，改走数据库手工操作
 > - 修改路径：禁止通过本系统（同上）
 

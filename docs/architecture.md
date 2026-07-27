@@ -45,10 +45,10 @@
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java       # Spring Boot 启动入口
 ├── controller/                             # 5 其他业务 Controller + GlobalExceptionHandler
-│   ├── BidRecordController.java            # 投标记录（8 端点：6 标准 CRUD + 1 按公告查询 + 1 AI 风险分析触发）
+│   ├── BidRecordController.java            # 投标记录（7 端点：6 标准 CRUD + 1 按公告查询）
 │   ├── BidHandlerInfoController.java       # 招标经办人（7 端点：6 标准 CRUD + 1 批量新增）
 │   ├── InvitationForBidController.java     # 招标公告（8 端点：6 标准 CRUD + 1 批量新增 + 1 状态变更）
-│   ├── RiskAnalysisController.java         # 风险分析记录只读查询（2 端点）
+│   ├── RiskAnalysisController.java         # 风险分析触发 + 历史查询（3 端点）
 │   ├── StatusCheckController.java          # 服务状态 + 邮件测试（3 端点）
 │   └── GlobalExceptionHandler.java         # 全局异常 → Result 包装
 ├── credentialfile/                         # 资信文件普通业务模块（同一 Spring Boot 应用内的垂直切片）
@@ -58,7 +58,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── enums/                              # 文件状态、存储类型枚举
 │   ├── mapper/                             # CredentialFileMapper / CredentialFileBatchMapper
 │   ├── config/                             # 存储配置模型与 MinIO 客户端配置
-│   ├── service/                            # FileUploadService / FileConvertService
+│   ├── service/                            # FileUploadService / FileConvertService / CredentialMarkdownAggregationService
 │   ├── intake/                             # multipart 转换后的请求期内部模型
 │   ├── processor/                          # 单文件存储与验证流水线
 │   ├── checksum/                           # 文件校验和计算端口与 SHA-256 实现
@@ -79,8 +79,8 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── InvitationForBidService.java
 │   ├── mail/MailService.java               # SMTP 发送
 │   ├── riskanalysis/                       # AI 风险分析 + 历史查询
-│   │   ├── BidRecordLoader.java            # analyzeRisk 时加载上下文
-│   │   └── RiskAnalysisService.java        # OpenAiChatModel + ChatClient.defaultOptions（Structured Output），content/reasoningContent 双路径抽取
+│   │   ├── BidRecordLoader.java            # analyzeRisk 时加载投标人基本信息
+│   │   └── RiskAnalysisService.java        # 汇总 Markdown 后调用一次模型并落库
 │   └── statuscheck/StatusCheckService.java # 中标通知书邮件（异步延迟）
 └── utils/                                  # AsyncTaskManager / PromptFiller / ResourceSearcher
 ```
@@ -179,7 +179,9 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 同步调 OpenAI 兼容 LM Studio、抽取 `content`（为空时降级读取 `metadata["reasoningContent"]`）、JSON 解析、通过 Spring 代理调用 `persist` 落库。`RiskAnalysisController` 只读暴露 `listAll` 与 `getHistory`，不提供修改/删除入口。
+构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 先调用 `CredentialMarkdownAggregationService` 校验批次/文件状态并按顺序生成投标记录级汇总 Markdown，再同步调 OpenAI 兼容 LM Studio、抽取 `content`（为空时降级读取 `metadata["reasoningContent"]`）、JSON 解析、通过 Spring 代理调用 `persist` 落库。
+
+`CredentialMarkdownAggregationService` 不调用大模型，只负责读取 `credential_file` 中已转换的 Markdown，将其合并写入 `bid-records/{bidRecordId}/merged/credentials.md`；汇总文本默认限制为 131072 字符，由 `risk-analysis.max-merged-markdown-chars` 配置。
 
 ### 5.9 `BidRecordService`（重试逻辑）
 
