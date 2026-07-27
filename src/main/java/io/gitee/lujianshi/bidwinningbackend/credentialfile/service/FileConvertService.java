@@ -118,26 +118,16 @@ public class FileConvertService {
             for (CredentialFile file : files) {
                 int fileClaimed = fileMapper.markConverting(file.getFileId());
                 if (fileClaimed != 1) {
-                    throw new IllegalStateException(
-                            "资信文件状态抢占失败: " + file.getFileId());
+                    // 没有获得文件处理权不代表转换失败，不能触发批次级失败处理。
+                    // 循环结束后通过最新数据库状态决定批次是否仍在处理中。
+                    continue;
                 }
 
-                boolean converted = false;
+                PythonFileConvertResponse response;
                 try {
-                    PythonFileConvertResponse response =
+                    response =
                             toMarkdownClient.convertObject(file.getOriginalFilePath());
                     validateFileResponse(file, response);
-
-                    int rows = fileMapper.markConverted(
-                            file.getFileId(),
-                            response.convertedObjectKey(),
-                            LocalDateTime.now());
-                    if (rows != 1) {
-                        throw new IllegalStateException(
-                                "资信文件完成状态更新失败: " + file.getFileId());
-                    }
-                    convertedFileCount++;
-                    converted = true;
                 } catch (RuntimeException failure) {
                     String message = toErrorMessage(failure);
                     int rows = fileMapper.markFailed(file.getFileId(), message);
@@ -147,29 +137,25 @@ public class FileConvertService {
                                 failure);
                     }
                     failures.add(file.getOriginalFilename() + ": " + message);
+                    continue;
                 }
 
-                if (converted) {
-                    // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
-                    // 回写失败属于批次编排失败，不再把已经转换成功的文件改记为 FAILED。
-                    syncBidRecordCredentials(batch.getBidRecordId());
-                }
-            }
-
-            if (failures.isEmpty()) {
-                int rows = batchMapper.markConverted(
-                        batch.getUploadBatchId(),
-                        convertedFileCount,
+                int rows = fileMapper.markConverted(
+                        file.getFileId(),
+                        response.convertedObjectKey(),
                         LocalDateTime.now());
                 if (rows != 1) {
-                    throw new IllegalStateException("资信文件批次完成状态更新失败");
+                    throw new IllegalStateException(
+                            "资信文件完成状态更新失败: " + file.getFileId());
                 }
-            } else {
-                markBatchFailed(
-                        batch.getUploadBatchId(),
-                        convertedFileCount,
-                        String.join("; ", failures));
+                convertedFileCount++;
+
+                // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
+                // 回写失败属于批次编排失败，不再把已经转换成功的文件改记为 FAILED。
+                syncBidRecordCredentials(batch.getBidRecordId());
             }
+
+            finalizeBatch(batch, failures);
         } catch (RuntimeException failure) {
             fileMapper.markFailedByUploadBatchId(
                     batch.getUploadBatchId(),
@@ -178,6 +164,60 @@ public class FileConvertService {
                     batch.getUploadBatchId(),
                     convertedFileCount,
                     failure.getMessage());
+        }
+    }
+
+    /** 根据文件的最新状态收敛批次状态，避免使用本次请求的局部计数作判断。 */
+    private void finalizeBatch(
+            CredentialFileBatch batch,
+            List<String> failures) {
+        List<CredentialFile> latestFiles = fileMapper.selectByUploadBatchId(
+                batch.getUploadBatchId());
+        if (latestFiles == null || latestFiles.size() != batch.getFileCount()) {
+            throw new IllegalStateException("资信文件批次明细数量不一致");
+        }
+
+        int convertedFileCount = (int) latestFiles.stream()
+                .filter(file -> file.getStatus() == ConvertStatus.CONVERTED)
+                .count();
+        boolean hasFailed = latestFiles.stream()
+                .anyMatch(file -> file.getStatus() == ConvertStatus.FAILED);
+        boolean hasProcessing = latestFiles.stream()
+                .anyMatch(file -> file.getStatus() == ConvertStatus.UPLOADING
+                        || file.getStatus() == ConvertStatus.UPLOADED
+                        || file.getStatus() == ConvertStatus.CONVERTING);
+
+        if (hasFailed) {
+            String message = failures.isEmpty()
+                    ? latestFiles.stream()
+                    .filter(file -> file.getStatus() == ConvertStatus.FAILED)
+                    .map(file -> file.getOriginalFilename() + ": "
+                            + toErrorMessage(file.getErrorMessage()))
+                    .reduce((left, right) -> left + "; " + right)
+                    .orElse("资信文件转换失败")
+                    : String.join("; ", failures);
+            markBatchFailed(
+                    batch.getUploadBatchId(),
+                    convertedFileCount,
+                    message);
+            return;
+        }
+
+        if (hasProcessing) {
+            // 仍有文件由其他任务处理，保留批次 CONVERTING 状态。
+            return;
+        }
+
+        if (convertedFileCount != batch.getFileCount()) {
+            throw new IllegalStateException("资信文件批次状态不一致");
+        }
+
+        int rows = batchMapper.markConverted(
+                batch.getUploadBatchId(),
+                convertedFileCount,
+                LocalDateTime.now());
+        if (rows != 1) {
+            throw new IllegalStateException("资信文件批次完成状态更新失败");
         }
     }
 

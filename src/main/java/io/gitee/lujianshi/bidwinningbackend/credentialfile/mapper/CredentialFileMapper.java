@@ -27,7 +27,12 @@ public interface CredentialFileMapper extends BaseMapper<CredentialFile, Long> {
     /** 查询指定投标记录下的全部资信文件，按批次和文件顺序返回。 */
     List<CredentialFile> selectByBidRecordId(@Param("bidRecordId") Integer bidRecordId);
 
-    /** 按文件 ID 将文件置为转换中，供无差别转换流程使用。 */
+    /**
+     * 按文件 ID 原子抢占转换权，供无差别转换流程使用。
+     *
+     * <p>只有已上传、转换失败或已转换的文件可以重新进入转换中；
+     * 已处于转换中的文件不会被并发请求再次抢占。</p>
+     */
     int markConverting(
             @Param("fileId") Long fileId);
 
