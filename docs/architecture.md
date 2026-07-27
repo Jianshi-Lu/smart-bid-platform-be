@@ -179,7 +179,7 @@ public static void execute(Runnable task, long delayMillis)
 
 ### 5.8 `RiskAnalysisService`（AI 风险分析）
 
-构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 先调用 `CredentialMarkdownAggregationService` 校验批次/文件状态并按顺序生成投标记录级汇总 Markdown，再同步调 OpenAI 兼容 LM Studio、抽取 `content`（为空时降级读取 `metadata["reasoningContent"]`）、JSON 解析、通过 Spring 代理调用 `persist` 落库。
+构造器注入 `OpenAiChatModel`，构造器里用 `ChatClient.builder(model).defaultOptions(opts).build()` 装载 Structured Output JSON Schema 后缓存为 `final` 字段。`analyzeRisk(Integer bidRecordId)` 先通过 `bid_record.risk_analysis_status` 原子抢占分析权，抢占失败返回业务码 409；成功后调用 `CredentialMarkdownAggregationService` 校验批次/文件状态并按顺序生成投标记录级汇总 Markdown，再同步调 OpenAI 兼容 LM Studio、抽取 `content`（为空时降级读取 `metadata["reasoningContent"]`）、JSON 解析、通过 Spring 代理调用 `persistAndComplete` 落库并更新完成状态。
 
 `CredentialMarkdownAggregationService` 不调用大模型，只负责读取 `credential_file` 中已转换的 Markdown，将其合并写入 `bid-records/{bidRecordId}/merged/credentials.md`；汇总文本默认限制为 131072 字符，由 `risk-analysis.max-merged-markdown-chars` 配置。
 

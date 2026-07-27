@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -50,4 +51,10 @@ public class BidRecord {
     private String bidderContact;
 
     private List<String> credentials;
+
+    private RiskAnalysisStatus riskAnalysisStatus;
+
+    private LocalDateTime riskAnalysisStartedAt;
+
+    private String riskAnalysisError;
 }

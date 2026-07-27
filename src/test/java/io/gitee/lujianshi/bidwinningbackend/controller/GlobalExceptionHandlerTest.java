@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
+import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisInProgressException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -32,6 +33,18 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(500, result.getCode());
         assertEquals("文件完整性校验失败", result.getMessage());
+        assertNull(result.getData());
+    }
+
+    @Test
+    void shouldReturnConflictCodeWhenRiskAnalysisIsAlreadyRunning() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        Result<Void> result = handler.handleRiskAnalysisInProgress(
+                new RiskAnalysisInProgressException(8));
+
+        assertEquals(409, result.getCode());
+        assertEquals("该投标记录正在进行风险分析，请稍后再试: 8", result.getMessage());
         assertNull(result.getData());
     }
 }

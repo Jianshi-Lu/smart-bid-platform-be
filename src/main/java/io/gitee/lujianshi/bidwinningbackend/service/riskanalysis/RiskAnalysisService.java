@@ -42,8 +42,9 @@ import java.util.Map;
  * 风险分析业务服务。同步调用 OpenAI 兼容 LM Studio，通过 Structured Output JSON Schema 约束输出，
  * 再解析并落库风险分析结果。
  *
- * <p>写入 {@code risk_analysis} 表时通过 {@link #self} 走 Spring 代理调用 {@link #persist(RiskAnalysis)}，
- * 避免同类自调用导致事务注解失效。</p>
+ * <p>风险分析开始前先通过 {@code bid_record.risk_analysis_status} 原子抢占分析权；
+ * 写入 {@code risk_analysis} 和将投标记录标记为完成时通过 {@link #self} 走 Spring 代理，
+ * 保证两次数据库写入处于同一事务。</p>
  *
  * @since V18
  */
@@ -75,9 +76,7 @@ public class RiskAnalysisService {
     private final ChatClient chatClient;
 
     /**
-     * 自注入 Spring 代理,用于绕过 {@code @Transactional} 同类自调失效。
-     * {@link #persist(RiskAnalysis)} 标了 {@code @Transactional(rollbackFor = Exception.class)},
-     * 但 {@code analyzeRisk} 同类内调它时事务代理不会触发,得走 self 走代理。
+     * 自注入 Spring 代理，用于绕过 {@code @Transactional} 同类自调失效。
      * <p>{@code @Lazy} 避免循环依赖(Spring 实例化本 Bean 时尚无代理可用,需延后注入)。</p>
      */
     @Resource
@@ -135,6 +134,23 @@ public class RiskAnalysisService {
             throw new IllegalArgumentException("投标记录不存在: " + bidRecordId);
         }
 
+        if (bidRecordMapper.claimRiskAnalysis(
+                bidRecordId,
+                LocalDateTime.now()) != 1) {
+            throw new RiskAnalysisInProgressException(bidRecordId);
+        }
+
+        try {
+            return doAnalyzeRisk(bidRecordId, record);
+        } catch (RuntimeException failure) {
+            markRiskAnalysisFailed(bidRecordId, failure);
+            throw failure;
+        }
+    }
+
+    /** 执行已经成功抢占分析权后的汇总、模型调用和结果落库流程。 */
+    private RiskAnalysis doAnalyzeRisk(Integer bidRecordId, BidRecord record) {
+
         log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
                 record.getBidderName(), record.getQuotePrice(), record.getBidderContact());
 
@@ -172,9 +188,26 @@ public class RiskAnalysisService {
 
         RiskAnalysis analysis = parseAndBuild(bidRecordId, record.getBidderName(), raw, analyzedAt);
 
-        RiskAnalysis saved = self.persist(analysis);
+        RiskAnalysis saved = self.persistAndComplete(analysis, bidRecordId);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
+    }
+
+    /** 将当前风险分析标记为失败，失败状态允许后续请求重试。 */
+    private void markRiskAnalysisFailed(
+            Integer bidRecordId,
+            RuntimeException failure) {
+        String message = failure.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "风险分析失败";
+        }
+        if (message.length() > 1000) {
+            message = message.substring(0, 1000);
+        }
+        int rows = bidRecordMapper.markRiskAnalysisFailed(bidRecordId, message);
+        if (rows != 1) {
+            log.warn("[风险分析] 失败状态回写失败 bidRecordId={}", bidRecordId);
+        }
     }
 
     /** 读取汇总服务写入的投标记录级 Markdown，作为本次唯一的资信材料输入。 */
@@ -301,14 +334,21 @@ public class RiskAnalysisService {
     }
 
     /**
-     * 落库风险分析记录。analysisId 通过 useGeneratedKeys 回填。
+     * 落库风险分析记录，并将投标记录标记为完成。analysisId 通过 useGeneratedKeys 回填。
      *
-     * @param analysis 待落库的风险分析实体
+     * @param analysis    待落库的风险分析实体
+     * @param bidRecordId 投标记录 ID
      * @return 已落库实体（含回填后的 analysisId）
      */
     @Transactional(rollbackFor = Exception.class)
-    public RiskAnalysis persist(RiskAnalysis analysis) {
+    public RiskAnalysis persistAndComplete(
+            RiskAnalysis analysis,
+            Integer bidRecordId) {
         mapper.insert(analysis);
+        int rows = bidRecordMapper.markRiskAnalysisCompleted(bidRecordId);
+        if (rows != 1) {
+            throw new IllegalStateException("风险分析完成状态更新失败");
+        }
         return analysis;
     }
 

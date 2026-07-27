@@ -644,7 +644,8 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 **同步调用 OpenAI 兼容 LM Studio**。服务端先联查并校验当前投标记录下的所有批次和文件均为
 `CONVERTED`，再按 `batch_no`、`file_order` 顺序读取 converted Markdown，合并并写入
 `bid-records/{bidRecordId}/merged/credentials.md`，最后将汇总文本一次性提交给大模型，解析 JSON，落库
-`risk_analysis` 表。
+`risk_analysis` 表。分析开始前会原子抢占 `bid_record` 的分析状态；同一投标记录已有分析处于执行中时，
+不会再次调用大模型，返回业务状态码 `409`。分析完成后允许再次手动分析，并保留历史记录。
 
 **响应**：`Result<RiskAnalysis>`（含 9 字段：analysisId / bidRecordId / bidderName / riskLevel / summary / suggestions / rawResponse / promptVersion / analyzedAt）。
 
@@ -660,7 +661,7 @@ curl -X POST http://{host}:{port}/bid-record/analyze-risk/1
 `RiskAnalysisController` 暴露单独的 POST 入口。
 
 > **写操作权限边界**：
-> - 新增路径：`RiskAnalysisController.analyzeRisk`（状态校验、Markdown 汇总、AI 触发）→ `RiskAnalysisService.persist` → `risk_analysis` 表
+> - 新增路径：`RiskAnalysisController.analyzeRisk`（状态抢占、状态校验、Markdown 汇总、AI 触发）→ `RiskAnalysisService.persistAndComplete` → `risk_analysis` 表
 > - 删除路径：禁止通过本系统，改走数据库手工操作
 > - 修改路径：禁止通过本系统（同上）
 

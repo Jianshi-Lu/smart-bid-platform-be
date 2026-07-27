@@ -13,6 +13,9 @@
         <result column="bidder_contact"  property="bidderContact"/>
         <result column="credentials"     property="credentials"
                 typeHandler="com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler"/>
+        <result column="risk_analysis_status" property="riskAnalysisStatus"/>
+        <result column="risk_analysis_started_at" property="riskAnalysisStartedAt"/>
+        <result column="risk_analysis_error" property="riskAnalysisError"/>
     </resultMap>
 
     <insert id="insert"
@@ -50,14 +53,16 @@
 
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials
+               bidder_name, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id = #{bidRecordId}
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials
+               bidder_name, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
     </select>
 
@@ -71,7 +76,8 @@
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials
+               bidder_name, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id IN
         <foreach collection="ids" item="id" open="(" close=")" separator=",">
@@ -98,10 +104,36 @@
     -->
     <select id="selectByInvitationId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials
+               bidder_name, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE invitation_id = #{invitationId}
         ORDER BY bid_at ASC
     </select>
+
+    <update id="claimRiskAnalysis">
+        UPDATE bid_record
+        SET risk_analysis_status = 'ANALYZING',
+            risk_analysis_started_at = #{startedAt},
+            risk_analysis_error = NULL
+        WHERE bid_record_id = #{bidRecordId}
+          AND risk_analysis_status IN ('IDLE', 'COMPLETED', 'FAILED')
+    </update>
+
+    <update id="markRiskAnalysisCompleted">
+        UPDATE bid_record
+        SET risk_analysis_status = 'COMPLETED',
+            risk_analysis_error = NULL
+        WHERE bid_record_id = #{bidRecordId}
+          AND risk_analysis_status = 'ANALYZING'
+    </update>
+
+    <update id="markRiskAnalysisFailed">
+        UPDATE bid_record
+        SET risk_analysis_status = 'FAILED',
+            risk_analysis_error = #{errorMessage}
+        WHERE bid_record_id = #{bidRecordId}
+          AND risk_analysis_status = 'ANALYZING'
+    </update>
 
 </mapper>

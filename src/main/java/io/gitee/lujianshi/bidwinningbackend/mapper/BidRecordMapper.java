@@ -4,6 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -35,4 +36,17 @@ public interface BidRecordMapper extends BaseMapper<BidRecord, Integer> {
      * @return 投标记录列表；无记录时返回空列表
      */
     List<BidRecord> selectByInvitationId(@Param("invitationId") Integer invitationId);
+
+    /** 原子抢占投标记录的风险分析权。 */
+    int claimRiskAnalysis(
+            @Param("bidRecordId") Integer bidRecordId,
+            @Param("startedAt") LocalDateTime startedAt);
+
+    /** 将当前风险分析标记为完成。 */
+    int markRiskAnalysisCompleted(@Param("bidRecordId") Integer bidRecordId);
+
+    /** 将当前风险分析标记为失败并记录原因。 */
+    int markRiskAnalysisFailed(
+            @Param("bidRecordId") Integer bidRecordId,
+            @Param("errorMessage") String errorMessage);
 }

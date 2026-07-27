@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
+import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisInProgressException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -45,6 +46,13 @@ public class GlobalExceptionHandler {
     public Result<Void> handleFileChecksumMismatch(
             FileChecksumMismatchException e) {
         return Result.error(500, "文件完整性校验失败");
+    }
+
+    /** 处理同一投标记录被重复发起的风险分析请求。 */
+    @ExceptionHandler(RiskAnalysisInProgressException.class)
+    public Result<Void> handleRiskAnalysisInProgress(
+            RiskAnalysisInProgressException e) {
+        return Result.error(409, e.getMessage());
     }
 
     /**
