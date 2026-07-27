@@ -11,9 +11,12 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
 import jakarta.annotation.Resource;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -37,6 +40,14 @@ public class FileConvertService {
 
     @Resource
     private BidRecordService bidRecordService;
+
+    @Resource
+    private BidRecordMapper bidRecordMapper;
+
+    /** 通过 Spring 代理开启路径汇总事务，避免同类调用绕过事务注解。 */
+    @Resource
+    @Lazy
+    private FileConvertService self;
 
     /**
      * 无差别重新处理指定投标记录下的全部批次，并返回批次级汇总状态。
@@ -152,7 +163,7 @@ public class FileConvertService {
 
                 // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
                 // 回写失败属于批次编排失败，不再把已经转换成功的文件改记为 FAILED。
-                syncBidRecordCredentials(batch.getBidRecordId());
+                self.syncBidRecordCredentials(batch.getBidRecordId());
             }
 
             finalizeBatch(batch, failures);
@@ -260,8 +271,18 @@ public class FileConvertService {
         return message;
     }
 
-    /** 将当前投标记录下已完成文件的 Markdown object key 列表写回 bid_record。 */
-    private void syncBidRecordCredentials(Integer bidRecordId) {
+    /**
+     * 将当前投标记录下已完成文件的 Markdown object key 列表写回 bid_record。
+     *
+     * <p>先锁定 bid_record 行，再查询文件路径并整体更新 JSON，避免两个批次并发转换时发生
+     * 读改写覆盖。事务只包含数据库查询和更新，不包含 Python 调用。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void syncBidRecordCredentials(Integer bidRecordId) {
+        if (bidRecordMapper.selectByIdForUpdate(bidRecordId) == null) {
+            throw new IllegalStateException("投标记录不存在: " + bidRecordId);
+        }
+
         List<CredentialFile> files = fileMapper.selectByBidRecordId(bidRecordId);
         if (files == null || files.isEmpty()) {
             return;
@@ -282,7 +303,7 @@ public class FileConvertService {
         BidRecord patch = new BidRecord();
         patch.setBidRecordId(bidRecordId);
         patch.setCredentials(markdownPaths);
-        if (bidRecordService.update(patch) != 1) {
+        if (bidRecordMapper.updateById(patch) != 1) {
             throw new IllegalStateException("投标记录资信材料路径更新失败");
         }
     }

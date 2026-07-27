@@ -59,6 +59,15 @@
         WHERE bid_record_id = #{bidRecordId}
     </select>
 
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
+        FROM bid_record
+        WHERE bid_record_id = #{bidRecordId}
+        FOR UPDATE
+    </select>
+
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, quote_price, bidder_contact, credentials,

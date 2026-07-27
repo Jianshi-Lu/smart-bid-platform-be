@@ -37,6 +37,9 @@ public interface BidRecordMapper extends BaseMapper<BidRecord, Integer> {
      */
     List<BidRecord> selectByInvitationId(@Param("invitationId") Integer invitationId);
 
+    /** 在事务中锁定指定投标记录，供资信路径汇总的读改写操作使用。 */
+    BidRecord selectByIdForUpdate(@Param("bidRecordId") Integer bidRecordId);
+
     /** 原子抢占投标记录的风险分析权。 */
     int claimRiskAnalysis(
             @Param("bidRecordId") Integer bidRecordId,
