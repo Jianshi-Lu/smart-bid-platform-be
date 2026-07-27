@@ -4,6 +4,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
 import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBidStatusHistory;
 import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidStatusHistoryMapper;
@@ -97,17 +99,26 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
      * @param toStatus     目标状态
      * @param remark       变更备注
      * @return 变更后的实体
-     * @throws IllegalArgumentException 记录不存在或状态跳转非法
+     * @throws AppException 记录不存在、状态跳转非法或并发状态更新失败
      */
     @Transactional(rollbackFor = Exception.class)
     public InvitationForBid transitionStatus(Integer invitationId, BidNoticeStatus toStatus, String remark) {
         InvitationForBid entity = mapper.selectById(invitationId);
         if (entity == null) {
-            throw new IllegalArgumentException("记录不存在: " + invitationId);
+            throw new AppException(
+                    AppErrorCode.INVITATION_NOT_FOUND,
+                    "invitation",
+                    "STATUS_UPDATE",
+                    "LOAD_INVITATION",
+                    "招标公告不存在: " + invitationId);
         }
         BidNoticeStatus fromStatus = entity.getStatus();
         if (!fromStatus.canTransitionTo(toStatus)) {
-            throw new IllegalArgumentException(
+            throw new AppException(
+                    AppErrorCode.INVITATION_INVALID_STATUS_TRANSITION,
+                    "invitation",
+                    "STATUS_UPDATE",
+                    "VALIDATE_TRANSITION",
                     "非法状态变更: " + fromStatus + " -> " + toStatus);
         }
 
@@ -116,9 +127,13 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
                 fromStatus,
                 toStatus);
         if (rows != 1) {
-            throw new InvitationStatusChangeConflictException(
-                    invitationId,
-                    fromStatus);
+            throw new AppException(
+                    AppErrorCode.INVITATION_STATUS_CONFLICT,
+                    "invitation",
+                    "STATUS_UPDATE",
+                    "UPDATE_STATUS",
+                    "招标公告状态已发生变化，请刷新后重试: invitationId="
+                            + invitationId + ", expectedStatus=" + fromStatus);
         }
 
         InvitationForBidStatusHistory history = new InvitationForBidStatusHistory();

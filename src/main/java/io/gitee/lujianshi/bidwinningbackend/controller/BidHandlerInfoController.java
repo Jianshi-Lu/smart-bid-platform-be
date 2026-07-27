@@ -9,6 +9,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidhandler.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -65,9 +67,10 @@ public class BidHandlerInfoController {
     @GetMapping("/bid-handler-info/{id}")
     public Result<BidHandlerInfo> getByIdBidHandlerInfo(@PathVariable Integer id) {
         BidHandlerInfo entity = service.getById(id);
-        return entity != null
-                ? Result.success(entity, "查询成功")
-                : Result.error(404, "记录不存在");
+        if (entity == null) {
+            throw bidHandlerNotFound("READ", "LOAD_RECORD", id);
+        }
+        return Result.success(entity, "查询成功");
     }
 
     /**
@@ -83,7 +86,7 @@ public class BidHandlerInfoController {
             @Valid @RequestBody UpdateRequest request) {
         BidHandlerInfo before = service.getById(id);
         if (before == null) {
-            return Result.error(404, "记录不存在");
+            throw bidHandlerNotFound("UPDATE", "LOAD_RECORD", id);
         }
         BidHandlerInfo after = new BidHandlerInfo();
         after.setBidHandlerId(id);
@@ -93,7 +96,7 @@ public class BidHandlerInfoController {
         after.setTargetEmail(request.getTargetEmail());
         int rows = service.update(after);
         if (rows == 0) {
-            return Result.error(404, "记录不存在");
+            throw bidHandlerNotFound("UPDATE", "UPDATE_RECORD", id);
         }
         return Result.success(new Diff<>(before, after), "更新成功");
     }
@@ -107,9 +110,10 @@ public class BidHandlerInfoController {
     @DeleteMapping("/bid-handler-info/{id}")
     public Result<Void> deleteBidHandlerInfo(@PathVariable Integer id) {
         int rows = service.delete(id);
-        return rows > 0
-                ? Result.success(null, "删除成功")
-                : Result.error(404, "记录不存在");
+        if (rows == 0) {
+            throw bidHandlerNotFound("DELETE", "DELETE_RECORD", id);
+        }
+        return Result.success(null, "删除成功");
     }
 
     /**
@@ -130,8 +134,6 @@ public class BidHandlerInfoController {
             PageHelper.startPage(page, pageSize, sort);
             List<BidHandlerInfo> list = service.listAll();
             return Result.success(new PageInfo<>(list), "查询成功");
-        } catch (Exception e) {
-            return Result.error(400, "分页查询参数错误: " + e.getMessage());
         } finally {
             PageHelper.clearPage();
         }
@@ -147,5 +149,18 @@ public class BidHandlerInfoController {
     public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody DeleteRequest request) {
         List<BidHandlerInfo> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
+    }
+
+    /** 构造招标经办人不存在异常，统一交给全局异常处理器返回。 */
+    private AppException bidHandlerNotFound(
+            String operation,
+            String stage,
+            Integer id) {
+        return new AppException(
+                AppErrorCode.BID_HANDLER_NOT_FOUND,
+                "bid-handler",
+                operation,
+                stage,
+                "招标经办人不存在: " + id);
     }
 }

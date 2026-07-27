@@ -8,6 +8,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -55,9 +57,10 @@ public class BidRecordController {
     @GetMapping("/bid-record/{id}")
     public Result<BidRecord> getBidRecord(@PathVariable Integer id) {
         BidRecord entity = service.getById(id);
-        return entity != null
-                ? Result.success(entity, "查询成功")
-                : Result.error(404, "记录不存在");
+        if (entity == null) {
+            throw bidRecordNotFound("READ", "LOAD_RECORD", id);
+        }
+        return Result.success(entity, "查询成功");
     }
 
     /**
@@ -74,7 +77,7 @@ public class BidRecordController {
             @Valid @RequestBody UpdateRequest request) {
         BidRecord before = service.getById(id);
         if (before == null) {
-            return Result.error(404, "记录不存在");
+            throw bidRecordNotFound("UPDATE", "LOAD_RECORD", id);
         }
         BidRecord after = new BidRecord();
         after.setBidRecordId(id);
@@ -84,7 +87,7 @@ public class BidRecordController {
         after.setCredentials(request.getCredentials());
         int rows = service.update(after);
         if (rows == 0) {
-            return Result.error(404, "记录不存在");
+            throw bidRecordNotFound("UPDATE", "UPDATE_RECORD", id);
         }
         return Result.success(new Diff<>(before, after), "更新成功");
     }
@@ -98,9 +101,10 @@ public class BidRecordController {
     @DeleteMapping("/bid-record/{id}")
     public Result<Void> deleteBidRecord(@PathVariable Integer id) {
         int rows = service.delete(id);
-        return rows > 0
-                ? Result.success(null, "删除成功")
-                : Result.error(404, "记录不存在");
+        if (rows == 0) {
+            throw bidRecordNotFound("DELETE", "DELETE_RECORD", id);
+        }
+        return Result.success(null, "删除成功");
     }
 
     /**
@@ -122,8 +126,6 @@ public class BidRecordController {
             List<BidRecord> list = service.listAll();
             PageInfo<BidRecord> pageInfo = new PageInfo<>(list);
             return Result.success(pageInfo, "查询成功");
-        } catch (Exception e) {
-            return Result.error(400, "分页查询参数错误");
         } finally {
             PageHelper.clearPage();
         }
@@ -150,6 +152,19 @@ public class BidRecordController {
     @GetMapping("/bid-record/by-invitation/{invitationId}")
     public Result<List<BidRecord>> listByInvitation(@PathVariable Integer invitationId) {
         return Result.success(service.listByInvitationId(invitationId), "查询成功");
+    }
+
+    /** 构造投标记录不存在异常，统一交给全局异常处理器返回。 */
+    private AppException bidRecordNotFound(
+            String operation,
+            String stage,
+            Integer id) {
+        return new AppException(
+                AppErrorCode.BID_RECORD_NOT_FOUND,
+                "bid-record",
+                operation,
+                stage,
+                "投标记录不存在: " + id);
     }
 
 }

@@ -13,6 +13,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.UploadItemProcessor;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -131,13 +133,16 @@ class FileUploadServiceTest {
         };
         FileUploadService service = createService(failingCalculator);
 
-        assertThrows(
-                IllegalStateException.class,
+        AppException exception = assertThrows(
+                AppException.class,
                 () -> service.upload(new UploadBatch(
                         1001,
                         List.of(
                                 item("first.pdf", "first-content"),
                                 item("second.pdf", "second-content")))));
+        assertEquals(
+                AppErrorCode.CREDENTIAL_FILE_STORAGE_FAILED,
+                exception.getErrorCode());
 
         try (var paths = Files.walk(tempDir)) {
             assertFalse(paths.anyMatch(Files::isRegularFile));

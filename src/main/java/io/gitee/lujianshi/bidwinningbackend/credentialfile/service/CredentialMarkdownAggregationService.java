@@ -8,6 +8,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +60,7 @@ public class CredentialMarkdownAggregationService {
 
         List<CredentialFileBatch> batches = batchMapper.selectByBidRecordId(bidRecordId);
         if (batches == null || batches.isEmpty()) {
-            throw new IllegalArgumentException("该投标记录暂无资信材料，不能进行风险分析");
+            throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
         }
 
         List<OrderedCredentialFile> orderedFiles = loadReadyFiles(bidRecordId, batches);
@@ -81,8 +83,12 @@ public class CredentialMarkdownAggregationService {
                         input));
             }
             return mergedPath;
+        } catch (AppException e) {
+            throw e;
         } catch (IOException e) {
-            throw new IllegalStateException("资信材料 Markdown 汇总失败", e);
+            throw markdownAggregationFailed("资信材料 Markdown 汇总失败", e);
+        } catch (RuntimeException e) {
+            throw markdownAggregationFailed("资信材料 Markdown 汇总失败", e);
         } finally {
             if (temporaryPath != null) {
                 try {
@@ -102,7 +108,7 @@ public class CredentialMarkdownAggregationService {
         for (CredentialFileBatch batch : batches) {
             if (batch == null || batch.getStatus() != ConvertStatus.CONVERTED) {
                 String batchId = batch == null ? "未知" : batch.getUploadBatchId();
-                throw new IllegalArgumentException(
+                throw inputNotReady(
                         "资信材料尚未全部转换完成，批次状态不满足要求: " + batchId);
             }
 
@@ -110,7 +116,7 @@ public class CredentialMarkdownAggregationService {
                     batch.getUploadBatchId());
             int expectedCount = batch.getFileCount() == null ? 0 : batch.getFileCount();
             if (files == null || files.size() != expectedCount) {
-                throw new IllegalArgumentException(
+                throw inputNotReady(
                         "资信材料批次文件数量不一致: " + batch.getUploadBatchId());
             }
 
@@ -120,18 +126,18 @@ public class CredentialMarkdownAggregationService {
                         || file.getMarkdownFilePath() == null
                         || file.getMarkdownFilePath().isBlank()) {
                     String filename = file == null ? "未知" : file.getOriginalFilename();
-                    throw new IllegalArgumentException(
+                    throw inputNotReady(
                             "资信材料尚未全部转换完成，文件状态不满足要求: " + filename);
                 }
                 if (!Objects.equals(file.getBidRecordId(), bidRecordId)) {
-                    throw new IllegalArgumentException("资信文件与投标记录归属不一致");
+                    throw inputNotReady("资信文件与投标记录归属不一致");
                 }
                 orderedFiles.add(new OrderedCredentialFile(file, batch.getBatchNo()));
             }
         }
 
         if (orderedFiles.isEmpty()) {
-            throw new IllegalArgumentException("该投标记录没有可汇总的资信材料");
+            throw inputNotReady("该投标记录没有可汇总的资信材料");
         }
         return orderedFiles;
     }
@@ -194,10 +200,15 @@ public class CredentialMarkdownAggregationService {
         long nextCharacterCount = currentCharacterCount + text.length();
         int maxCharacters = riskAnalysisProperties.getMaxMergedMarkdownChars();
         if (maxCharacters <= 0) {
-            throw new IllegalStateException("风险分析 Markdown 长度配置必须大于 0");
+            throw new AppException(
+                    AppErrorCode.SYSTEM_INTERNAL_ERROR,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "VALIDATE_MERGED_MARKDOWN_CONFIG",
+                    "风险分析 Markdown 长度配置必须大于 0");
         }
         if (nextCharacterCount > maxCharacters) {
-            throw new IllegalArgumentException(
+            throw inputNotReady(
                     "汇总后的资信材料超过风险分析上下文限制（" + maxCharacters + " 字符）");
         }
         writer.write(text);
@@ -206,8 +217,36 @@ public class CredentialMarkdownAggregationService {
 
     private void validateBidRecordId(Integer bidRecordId) {
         if (bidRecordId == null || bidRecordId <= 0) {
-            throw new IllegalArgumentException("投标记录 ID 不正确");
+            throw new AppException(
+                    AppErrorCode.COMMON_INVALID_ARGUMENT,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "VALIDATE_BID_RECORD",
+                    "投标记录 ID 不正确");
         }
+    }
+
+    /** 创建风险分析输入未准备完成异常。 */
+    private AppException inputNotReady(String message) {
+        return new AppException(
+                AppErrorCode.RISK_ANALYSIS_INPUT_NOT_READY,
+                "risk-analysis",
+                "ANALYZE_RISK",
+                "VALIDATE_INPUT",
+                message);
+    }
+
+    /** 创建 Markdown 汇总失败异常，并保留底层原因供日志排查。 */
+    private AppException markdownAggregationFailed(
+            String message,
+            Throwable cause) {
+        return new AppException(
+                AppErrorCode.RISK_ANALYSIS_MARKDOWN_AGGREGATION_FAILED,
+                "risk-analysis",
+                "ANALYZE_RISK",
+                "AGGREGATE_MARKDOWN",
+                message,
+                cause);
     }
 
     /** 保留数据库排序得到的文件及其业务批次号，避免从 object key 反推批次。 */

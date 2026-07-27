@@ -10,6 +10,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.BatchDeleteRequ
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.StatusUpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -80,9 +82,10 @@ public class InvitationForBidController {
     @GetMapping("/invitation-for-bid/{id}")
     public Result<InvitationForBid> getByIdInvitationForBid(@PathVariable Integer id) {
         InvitationForBid entity = service.getById(id);
-        return entity != null
-                ? Result.success(entity, "查询成功")
-                : Result.error(404, "记录不存在");
+        if (entity == null) {
+            throw invitationNotFound("READ", "LOAD_RECORD", id);
+        }
+        return Result.success(entity, "查询成功");
     }
 
     /**
@@ -99,7 +102,7 @@ public class InvitationForBidController {
             @Valid @RequestBody UpdateRequest request) {
         InvitationForBid before = service.getById(id);
         if (before == null) {
-            return Result.error(404, "记录不存在");
+            throw invitationNotFound("UPDATE", "LOAD_RECORD", id);
         }
         InvitationForBid after = new InvitationForBid();
         after.setInvitationId(id);
@@ -123,7 +126,7 @@ public class InvitationForBidController {
         after.setTenderingParty(request.getTenderingParty());
         int rows = service.update(after);
         if (rows == 0) {
-            return Result.error(404, "记录不存在");
+            throw invitationNotFound("UPDATE", "UPDATE_RECORD", id);
         }
         return Result.success(new Diff<>(before, after), "更新成功");
     }
@@ -137,9 +140,10 @@ public class InvitationForBidController {
     @DeleteMapping("/invitation-for-bid/{id}")
     public Result<Void> deleteInvitationForBid(@PathVariable Integer id) {
         int rows = service.delete(id);
-        return rows > 0
-                ? Result.success(null, "删除成功")
-                : Result.error(404, "记录不存在");
+        if (rows == 0) {
+            throw invitationNotFound("DELETE", "DELETE_RECORD", id);
+        }
+        return Result.success(null, "删除成功");
     }
 
     /**
@@ -161,8 +165,6 @@ public class InvitationForBidController {
             List<InvitationForBid> list = service.listAll();
             PageInfo<InvitationForBid> pageInfo = new PageInfo<>(list);
             return Result.success(pageInfo, "查询成功");
-        } catch (Exception e) {
-            return Result.error(400, "分页查询参数错误");
         } finally {
             PageHelper.clearPage();
         }
@@ -189,12 +191,21 @@ public class InvitationForBidController {
     @PostMapping("/invitation-for-bid/status-update")
     public Result<InvitationForBid> updateInvitationForBidStatus(
             @Valid @RequestBody StatusUpdateRequest request) {
-        try {
-            InvitationForBid updated = service.transitionStatus(
-                    request.getInvitationId(), request.getStatus(), request.getRemark());
-            return Result.success(updated, "状态变更成功");
-        } catch (IllegalArgumentException e) {
-            return Result.error(400, e.getMessage());
-        }
+        InvitationForBid updated = service.transitionStatus(
+                request.getInvitationId(), request.getStatus(), request.getRemark());
+        return Result.success(updated, "状态变更成功");
+    }
+
+    /** 构造招标公告不存在异常，统一交给全局异常处理器返回。 */
+    private AppException invitationNotFound(
+            String operation,
+            String stage,
+            Integer id) {
+        return new AppException(
+                AppErrorCode.INVITATION_NOT_FOUND,
+                "invitation",
+                operation,
+                stage,
+                "招标公告不存在: " + id);
     }
 }

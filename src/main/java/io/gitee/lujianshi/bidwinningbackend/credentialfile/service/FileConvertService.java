@@ -11,6 +11,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
 import jakarta.annotation.Resource;
@@ -122,7 +124,7 @@ public class FileConvertService {
             List<CredentialFile> files = fileMapper.selectByUploadBatchId(
                     batch.getUploadBatchId());
             if (files == null || files.size() != batch.getFileCount()) {
-                throw new IllegalStateException("资信文件批次明细数量不一致");
+                throw conversionDataInconsistent("资信文件批次明细数量不一致");
             }
 
             List<String> failures = new ArrayList<>();
@@ -143,7 +145,8 @@ public class FileConvertService {
                     String message = toErrorMessage(failure);
                     int rows = fileMapper.markFailed(file.getFileId(), message);
                     if (rows != 1) {
-                        throw new IllegalStateException(
+                        throw persistenceFailure(
+                                "MARK_FILE_FAILED",
                                 "资信文件失败状态更新失败: " + file.getFileId(),
                                 failure);
                     }
@@ -156,8 +159,10 @@ public class FileConvertService {
                         response.convertedObjectKey(),
                         LocalDateTime.now());
                 if (rows != 1) {
-                    throw new IllegalStateException(
-                            "资信文件完成状态更新失败: " + file.getFileId());
+                    throw persistenceFailure(
+                            "MARK_FILE_CONVERTED",
+                            "资信文件完成状态更新失败: " + file.getFileId(),
+                            null);
                 }
                 convertedFileCount++;
 
@@ -185,7 +190,7 @@ public class FileConvertService {
         List<CredentialFile> latestFiles = fileMapper.selectByUploadBatchId(
                 batch.getUploadBatchId());
         if (latestFiles == null || latestFiles.size() != batch.getFileCount()) {
-            throw new IllegalStateException("资信文件批次明细数量不一致");
+            throw conversionDataInconsistent("资信文件批次明细数量不一致");
         }
 
         int convertedFileCount = (int) latestFiles.stream()
@@ -220,7 +225,7 @@ public class FileConvertService {
         }
 
         if (convertedFileCount != batch.getFileCount()) {
-            throw new IllegalStateException("资信文件批次状态不一致");
+            throw conversionDataInconsistent("资信文件批次状态不一致");
         }
 
         int rows = batchMapper.markConverted(
@@ -228,23 +233,29 @@ public class FileConvertService {
                 convertedFileCount,
                 LocalDateTime.now());
         if (rows != 1) {
-            throw new IllegalStateException("资信文件批次完成状态更新失败");
+            throw persistenceFailure(
+                    "MARK_BATCH_CONVERTED",
+                    "资信文件批次完成状态更新失败",
+                    null);
         }
     }
 
     /** 校验 Python 返回的单文件转换结果。 */
     private void validateFileResponse(
             CredentialFile file,
-            PythonFileConvertResponse response) {
+        PythonFileConvertResponse response) {
         if (response == null) {
-            throw new IllegalStateException("Python 转换响应为空");
+            throw conversionFailure("PYTHON_RESPONSE", "Python 转换响应为空", null);
         }
         if (!PYTHON_FILE_COMPLETED.equals(response.status())
                 || response.originalObjectKey() == null
                 || !response.originalObjectKey().equals(file.getOriginalFilePath())
                 || response.convertedObjectKey() == null
                 || response.convertedObjectKey().isBlank()) {
-            throw new IllegalStateException("Python 单文件转换未完成");
+            throw conversionFailure(
+                    "VALIDATE_PYTHON_RESPONSE",
+                    "Python 单文件转换未完成",
+                    null);
         }
     }
 
@@ -280,7 +291,12 @@ public class FileConvertService {
     @Transactional(rollbackFor = Exception.class)
     public void syncBidRecordCredentials(Integer bidRecordId) {
         if (bidRecordMapper.selectByIdForUpdate(bidRecordId) == null) {
-            throw new IllegalStateException("投标记录不存在: " + bidRecordId);
+            throw new AppException(
+                    AppErrorCode.BID_RECORD_NOT_FOUND,
+                    "credential-file",
+                    "CONVERT",
+                    "SYNC_CREDENTIALS",
+                    "投标记录不存在: " + bidRecordId);
         }
 
         List<CredentialFile> files = fileMapper.selectByBidRecordId(bidRecordId);
@@ -304,17 +320,68 @@ public class FileConvertService {
         patch.setBidRecordId(bidRecordId);
         patch.setCredentials(markdownPaths);
         if (bidRecordMapper.updateById(patch) != 1) {
-            throw new IllegalStateException("投标记录资信材料路径更新失败");
+            throw persistenceFailure(
+                    "SYNC_CREDENTIALS",
+                    "投标记录资信材料路径更新失败",
+                    null);
         }
     }
 
     private void validateBidRecord(Integer bidRecordId) {
         if (bidRecordId == null || bidRecordId <= 0) {
-            throw new IllegalArgumentException("投标记录 ID 不正确");
+            throw new AppException(
+                    AppErrorCode.COMMON_INVALID_ARGUMENT,
+                    "credential-file",
+                    "CONVERT",
+                    "VALIDATE_BID_RECORD",
+                    "投标记录 ID 不正确");
         }
         if (bidRecordService.getById(bidRecordId) == null) {
-            throw new IllegalArgumentException("投标记录不存在");
+            throw new AppException(
+                    AppErrorCode.BID_RECORD_NOT_FOUND,
+                    "credential-file",
+                    "CONVERT",
+                    "VALIDATE_BID_RECORD",
+                    "投标记录不存在");
         }
+    }
+
+    /** 创建转换数据不一致异常。 */
+    private AppException conversionDataInconsistent(String message) {
+        return new AppException(
+                AppErrorCode.CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT,
+                "credential-file",
+                "CONVERT",
+                "VALIDATE_CONVERSION_DATA",
+                message);
+    }
+
+    /** 创建转换失败异常。 */
+    private AppException conversionFailure(
+            String stage,
+            String message,
+            Throwable cause) {
+        return new AppException(
+                AppErrorCode.CREDENTIAL_FILE_CONVERSION_FAILED,
+                "credential-file",
+                "CONVERT",
+                stage,
+                message,
+                cause);
+    }
+
+    /** 创建文件持久化失败异常。 */
+    private AppException persistenceFailure(
+            String stage,
+            String message,
+            Throwable cause) {
+        return new AppException(
+                AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                "credential-file",
+                "CONVERT",
+                stage,
+                message,
+                cause);
     }
 
     private int countByStatus(

@@ -51,8 +51,6 @@ public class RiskAnalysisController {
             PageHelper.startPage(page, pageSize, sort);
             List<RiskAnalysis> list = service.listAll();
             return Result.success(new PageInfo<>(list), "查询成功");
-        } catch (Exception e) {
-            return Result.error(400, "分页查询参数错误: " + e.getMessage());
         } finally {
             PageHelper.clearPage();
         }

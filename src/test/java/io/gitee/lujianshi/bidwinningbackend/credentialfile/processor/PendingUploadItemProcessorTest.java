@@ -6,6 +6,7 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileCh
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -100,7 +101,7 @@ class UploadItemProcessorTest {
                 createProcessor(new Sha256FileChecksumCalculator(), storage);
 
         assertThrows(
-                FileChecksumMismatchException.class,
+                AppException.class,
                 () -> processor.process(
                         new UploadBatchContext(1001, UUID.randomUUID().toString()),
                         item("license.pdf", "original-content")));

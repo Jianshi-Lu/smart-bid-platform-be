@@ -48,7 +48,8 @@ class FileUploadControllerTest {
 
         Result<UploadResponse> result = controller.upload(request);
 
-        assertEquals(200, result.getCode());
+        assertEquals("SUCCESS", result.getCode());
+        assertEquals(true, result.isSuccess());
         assertEquals("上传成功", result.getMessage());
         assertNotNull(result.getData());
         assertEquals(1, result.getData().getFiles().size());
@@ -65,7 +66,8 @@ class FileUploadControllerTest {
                         .file(file())
                         .param("bidRecordId", "1001"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("上传成功"))
                 .andExpect(jsonPath("$.data.files[0].originalFilename")
                         .value("credential.pdf"));
@@ -79,8 +81,9 @@ class FileUploadControllerTest {
                 .build();
 
         mockMvc.perform(multipart("/credential-files/upload").file(file()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON.INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("投标记录 ID 不能为空"));
     }
 

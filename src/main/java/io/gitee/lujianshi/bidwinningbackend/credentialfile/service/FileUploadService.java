@@ -9,10 +9,11 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.FileChecksumMismatchException;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.UploadItemProcessor;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.VerifiedStoredFileMetadata;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -60,14 +61,17 @@ public class FileUploadService {
      *
      * @param batch Controller 转换后的内部上传任务
      * @return 上传批次号和文件持久化结果
-     * @throws IllegalArgumentException 批次、文件或批次号格式不正确
-     * @throws FileChecksumMismatchException 已存储正文完整性校验失败
-     * @throws IllegalStateException 文件读写或校验和计算失败
+     * @throws AppException 上传请求、存储、完整性校验或数据库持久化失败
      */
     @Transactional(rollbackFor = Exception.class)
     public UploadResponse upload(UploadBatch batch) {
         if (batch == null) {
-            throw new IllegalArgumentException("上传批次不能为空");
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_UPLOAD_REQUEST,
+                    "credential-file",
+                    "UPLOAD",
+                    "VALIDATE_REQUEST",
+                    "上传批次不能为空");
         }
         CredentialFileBatch batchRecord = createUploadingBatch(
                 batch.bidRecordId(), batch.items().size());
@@ -93,12 +97,36 @@ public class FileUploadService {
                 responseItems.add(toResponseItem(index, item, verifiedMetadata));
             }
             markUploaded(context.uploadBatchId());
-        } catch (IllegalArgumentException | FileChecksumMismatchException failure) {
+        } catch (AppException failure) {
             cleanup(processedPaths, failure);
             throw failure;
-        } catch (IOException | RuntimeException failure) {
+        } catch (IllegalArgumentException failure) {
             cleanup(processedPaths, failure);
-            throw new IllegalStateException("资信文件上传失败", failure);
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_FILE,
+                    "credential-file",
+                    "UPLOAD",
+                    "VALIDATE_FILE",
+                    "上传文件不合法",
+                    failure);
+        } catch (IOException failure) {
+            cleanup(processedPaths, failure);
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_STORAGE_FAILED,
+                    "credential-file",
+                    "UPLOAD",
+                    "STORE_ORIGINAL",
+                    "资信文件存储失败",
+                    failure);
+        } catch (RuntimeException failure) {
+            cleanup(processedPaths, failure);
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                    "credential-file",
+                    "UPLOAD",
+                    "PERSIST_FILE_RECORD",
+                    "资信文件保存失败",
+                    failure);
         }
 
         return new UploadResponse(context.uploadBatchId(), responseItems);
@@ -107,12 +135,22 @@ public class FileUploadService {
     /** 创建本次上传对应的批次记录，并分配投标记录下的批次序号。 */
     private CredentialFileBatch createUploadingBatch(
             Integer bidRecordId,
-            int fileCount) {
+        int fileCount) {
         if (bidRecordId == null || bidRecordId <= 0) {
-            throw new IllegalArgumentException("投标记录 ID 不正确");
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_UPLOAD_REQUEST,
+                    "credential-file",
+                    "UPLOAD",
+                    "VALIDATE_REQUEST",
+                    "投标记录 ID 不正确");
         }
         if (fileCount <= 0) {
-            throw new IllegalArgumentException("上传文件不能为空");
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_UPLOAD_REQUEST,
+                    "credential-file",
+                    "UPLOAD",
+                    "VALIDATE_REQUEST",
+                    "上传文件不能为空");
         }
 
         for (int attempt = 1; attempt <= MAX_BATCH_NO_RETRY; attempt++) {
@@ -131,29 +169,55 @@ public class FileUploadService {
             try {
                 int rows = credentialFileBatchMapper.insert(batch);
                 if (rows != 1) {
-                    throw new IllegalStateException("资信文件上传批次创建失败");
+                    throw new AppException(
+                            AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                            "credential-file",
+                            "UPLOAD",
+                            "CREATE_BATCH",
+                            "资信文件上传批次创建失败");
                 }
                 return batch;
             } catch (DuplicateKeyException exception) {
                 if (attempt == MAX_BATCH_NO_RETRY) {
-                    throw exception;
+                    throw new AppException(
+                            AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                            "credential-file",
+                            "UPLOAD",
+                            "CREATE_BATCH",
+                            "资信文件上传批次创建失败",
+                            exception);
                 }
             }
         }
-        throw new IllegalStateException("资信文件上传批次创建失败");
+        throw new AppException(
+                AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                "credential-file",
+                "UPLOAD",
+                "CREATE_BATCH",
+                "资信文件上传批次创建失败");
     }
 
     /** 全部原始文件成功落库后，将批次封口为已上传。 */
     private void markUploaded(String uploadBatchId) {
         if (uploadBatchId == null || uploadBatchId.isBlank()) {
-            throw new IllegalArgumentException("上传批次号不能为空");
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_UPLOAD_REQUEST,
+                    "credential-file",
+                    "UPLOAD",
+                    "MARK_UPLOADED",
+                    "上传批次号不能为空");
         }
         int rows = credentialFileBatchMapper.markUploaded(
                 uploadBatchId,
                 ConvertStatus.UPLOADED.name(),
                 LocalDateTime.now());
         if (rows != 1) {
-            throw new IllegalStateException("资信文件上传批次封口失败");
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_PERSISTENCE_FAILED,
+                    "credential-file",
+                    "UPLOAD",
+                    "MARK_UPLOADED",
+                    "资信文件上传批次封口失败");
         }
     }
 

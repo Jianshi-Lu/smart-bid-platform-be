@@ -2,6 +2,8 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.client;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonFileConvertRequest;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonFileConvertResponse;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileConverterProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.http.MediaType;
@@ -32,11 +34,22 @@ public class ToMarkdownClient {
                     .retrieve()
                     .body(PythonFileConvertResponse.class);
             if (response == null) {
-                throw new IllegalStateException("Python 转换服务返回为空");
+                throw new AppException(
+                        AppErrorCode.CREDENTIAL_FILE_CONVERSION_FAILED,
+                        "credential-file",
+                        "CONVERT",
+                        "PYTHON_RESPONSE",
+                        "资信文件转换服务返回为空");
             }
             return response;
         } catch (RestClientException e) {
-            throw new IllegalStateException("调用 Python 转换服务失败", e);
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_CONVERSION_FAILED,
+                    "credential-file",
+                    "CONVERT",
+                    "PYTHON_CALL",
+                    "资信文件转换服务调用失败",
+                    e);
         }
     }
 }

@@ -5,6 +5,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -58,10 +60,20 @@ public class UploadItemProcessor {
         try (InputStream inputStream = item.content().openStream()) {
             expectedSha256 = fileChecksumCalculator.calculate(inputStream);
         }
-        StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(
-                        context.bidRecordId(),
-                        context.uploadBatchId(), item.originalFilename());
+        StoragePath.OriginalFilePath storagePath;
+        try {
+            storagePath = StoragePath.createOriginalFilePath(
+                    context.bidRecordId(),
+                    context.uploadBatchId(), item.originalFilename());
+        } catch (IllegalArgumentException failure) {
+            throw new AppException(
+                    AppErrorCode.CREDENTIAL_FILE_INVALID_PATH,
+                    "credential-file",
+                    "UPLOAD",
+                    "BUILD_STORAGE_PATH",
+                    "资信文件存储路径不合法",
+                    failure);
+        }
         FileStorage.StoredFile storedFile = null;
         try {
             // 开启文件流存储文件，并写入首次计算的checksum
@@ -87,8 +99,12 @@ public class UploadItemProcessor {
                 actualSha256 = fileChecksumCalculator.calculate(inputStream);
             }
             if (!expectedSha256.equals(actualSha256)) {
-                throw new FileChecksumMismatchException(
-                        "存储对象内容完整性校验失败: " + storedFile.relativePath());
+                throw new AppException(
+                        AppErrorCode.CREDENTIAL_FILE_INTEGRITY_CHECK_FAILED,
+                        "credential-file",
+                        "UPLOAD",
+                        "VERIFY_STORED_FILE",
+                        "文件完整性校验失败");
             }
             return VerifiedStoredFileMetadata.extractMetadata(
                     storedFile,

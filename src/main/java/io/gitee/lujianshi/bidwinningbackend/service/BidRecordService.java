@@ -1,6 +1,8 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import jakarta.annotation.Resource;
@@ -52,7 +54,7 @@ public class BidRecordService extends BaseService<BidRecord> {
      *
      * @param entity 待新增的实体（不含 bidNo / bidAt，Service 会自动计算）
      * @return 影响行数
-     * @throws DuplicateKeyException 重试 3 次仍冲突时抛出
+     * @throws AppException 重试 3 次仍发生投标序号冲突
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -67,11 +69,22 @@ public class BidRecordService extends BaseService<BidRecord> {
                 return super.add(entity);
             } catch (DuplicateKeyException e) {
                 if (attempt == MAX_RETRY) {
-                    throw e;
+                    throw new AppException(
+                            AppErrorCode.BID_RECORD_BID_NO_CONFLICT,
+                            "bid-record",
+                            "CREATE",
+                            "GENERATE_BID_NO",
+                            "投标序号生成发生冲突，请稍后重试",
+                            e);
                 }
             }
         }
-        throw new IllegalStateException("unreachable: retry loop terminated abnormally");
+        throw new AppException(
+                AppErrorCode.BID_RECORD_BID_NO_CONFLICT,
+                "bid-record",
+                "CREATE",
+                "GENERATE_BID_NO",
+                "投标序号生成发生冲突");
     }
 
     /**

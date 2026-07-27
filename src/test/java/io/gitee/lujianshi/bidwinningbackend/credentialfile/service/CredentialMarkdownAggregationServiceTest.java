@@ -8,6 +8,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -82,8 +84,11 @@ class CredentialMarkdownAggregationServiceTest {
         CredentialMarkdownAggregationService service = createService(
                 createStorage(), batchMapper, mock(CredentialFileMapper.class), 131_072);
 
-        assertThrows(IllegalArgumentException.class,
+        AppException exception = assertThrows(AppException.class,
                 () -> service.aggregate(BID_RECORD_ID));
+
+        assertEquals(AppErrorCode.RISK_ANALYSIS_INPUT_NOT_READY,
+                exception.getErrorCode());
     }
 
     @Test
@@ -101,8 +106,11 @@ class CredentialMarkdownAggregationServiceTest {
         CredentialMarkdownAggregationService service = createService(
                 storage, batchMapper, fileMapper, 1);
 
-        assertThrows(IllegalArgumentException.class,
+        AppException exception = assertThrows(AppException.class,
                 () -> service.aggregate(BID_RECORD_ID));
+
+        assertEquals(AppErrorCode.RISK_ANALYSIS_INPUT_NOT_READY,
+                exception.getErrorCode());
     }
 
     private CredentialMarkdownAggregationService createService(

@@ -6,8 +6,18 @@ import com.alibaba.fastjson2.JSONObject;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.CredentialMarkdownAggregationService;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.FileConvertService;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
@@ -96,6 +106,15 @@ public class RiskAnalysisService {
     private CredentialMarkdownAggregationService markdownAggregationService;
 
     @Resource
+    private FileConvertService fileConvertService;
+
+    @Resource
+    private CredentialFileBatchMapper credentialFileBatchMapper;
+
+    @Resource
+    private CredentialFileMapper credentialFileMapper;
+
+    @Resource
     private FileStorage fileStorage;
 
     @Resource
@@ -123,7 +142,7 @@ public class RiskAnalysisService {
      *
      * @param bidRecordId 投标记录 ID
      * @return 含 analysisId 的完整 RiskAnalysis
-     * @throws IllegalArgumentException 投标记录不存在
+     * @throws AppException 投标记录不存在、模型调用失败或模型响应不合法
      */
     public RiskAnalysis analyzeRisk(Integer bidRecordId) {
         log.info(">>> [风险分析] 开始 bidRecordId={}", bidRecordId);
@@ -131,13 +150,23 @@ public class RiskAnalysisService {
         BidRecord record = bidRecordMapper.selectById(bidRecordId);
         if (record == null) {
             log.warn("<<< [风险分析] 投标记录不存在 bidRecordId={}", bidRecordId);
-            throw new IllegalArgumentException("投标记录不存在: " + bidRecordId);
+            throw new AppException(
+                    AppErrorCode.BID_RECORD_NOT_FOUND,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "LOAD_BID_RECORD",
+                    "投标记录不存在: " + bidRecordId);
         }
 
         if (bidRecordMapper.claimRiskAnalysis(
                 bidRecordId,
                 LocalDateTime.now()) != 1) {
-            throw new RiskAnalysisInProgressException(bidRecordId);
+            throw new AppException(
+                    AppErrorCode.RISK_ANALYSIS_IN_PROGRESS,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "CLAIM_ANALYSIS",
+                    "该投标记录正在进行风险分析，请稍后再试: " + bidRecordId);
         }
 
         try {
@@ -154,6 +183,7 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
                 record.getBidderName(), record.getQuotePrice(), record.getBidderContact());
 
+        ensureCredentialFilesConverted(bidRecordId);
         String mergedMarkdownPath = markdownAggregationService.aggregate(bidRecordId);
         String mergedMarkdown = readMergedMarkdown(mergedMarkdownPath);
         String detailInfo = loader.loadDetail(bidRecordId);
@@ -173,11 +203,22 @@ public class RiskAnalysisService {
         long startNs = System.nanoTime();
 
         // 调用模型,获取完整 ChatResponse(防止内容回复从 content 落入 reasoningContent,见 extractRawContent JavaDoc)
-        ChatResponse chatResponse = chatClient.prompt()
-                .system(systemPrompt)
-                .user(userPrompt)
-                .call()
-                .chatResponse();
+        ChatResponse chatResponse;
+        try {
+            chatResponse = chatClient.prompt()
+                    .system(systemPrompt)
+                    .user(userPrompt)
+                    .call()
+                    .chatResponse();
+        } catch (RuntimeException e) {
+            throw new AppException(
+                    AppErrorCode.RISK_ANALYSIS_LLM_CALL_FAILED,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "LLM_CALL",
+                    "风险分析模型调用失败",
+                    e);
+        }
         String raw = extractRawContent(chatResponse);
         long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
 
@@ -191,6 +232,69 @@ public class RiskAnalysisService {
         RiskAnalysis saved = self.persistAndComplete(analysis, bidRecordId);
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
+    }
+
+    /**
+     * 风险分析入口的资信材料准备判断。
+     *
+     * <p>前端只调用风险分析入口。若当前投标记录存在尚未转换完成的批次或文件，
+     * 由 Java 直接调用现有无差别转换流程；转换后重新查询数据库，只有全部文件完成
+     * 转换后才允许继续汇总和调用大模型。</p>
+     */
+    private void ensureCredentialFilesConverted(Integer bidRecordId) {
+        List<CredentialFileBatch> batches =
+                credentialFileBatchMapper.selectByBidRecordId(bidRecordId);
+        if (batches == null || batches.isEmpty()) {
+            throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
+        }
+
+        if (areCredentialFilesConverted(bidRecordId, batches)) {
+            return;
+        }
+
+        log.info("[风险分析] 资信材料未全部转换，自动发起转换 bidRecordId={}",
+                bidRecordId);
+        FileConvertResponse response =
+                fileConvertService.convertAllBatches(bidRecordId);
+
+        // 转换服务返回的是批次汇总结果，仍需重新查询文件状态，避免只依据响应快照继续分析。
+        List<CredentialFileBatch> latestBatches =
+                credentialFileBatchMapper.selectByBidRecordId(bidRecordId);
+        if (response == null
+                || response.status() != BidRecordCredentialConversionStatus.ALL_CONVERTED
+                || !areCredentialFilesConverted(bidRecordId, latestBatches)) {
+            throw inputNotReady("资信材料尚未全部转换完成，暂不能进行风险分析");
+        }
+    }
+
+    /** 判断指定投标记录下的批次和文件是否都已经具备可分析的 Markdown。 */
+    private boolean areCredentialFilesConverted(
+            Integer bidRecordId,
+            List<CredentialFileBatch> batches) {
+        if (batches == null || batches.isEmpty()
+                || batches.stream().anyMatch(batch -> batch == null
+                || batch.getStatus() != ConvertStatus.CONVERTED)) {
+            return false;
+        }
+
+        List<CredentialFile> files =
+                credentialFileMapper.selectByBidRecordId(bidRecordId);
+        return files != null
+                && !files.isEmpty()
+                && files.stream().allMatch(file -> file != null
+                && file.getStatus() == ConvertStatus.CONVERTED
+                && file.getMarkdownFilePath() != null
+                && !file.getMarkdownFilePath().isBlank());
+    }
+
+    /** 构造风险分析输入未准备完成异常。 */
+    private AppException inputNotReady(String message) {
+        return new AppException(
+                AppErrorCode.RISK_ANALYSIS_INPUT_NOT_READY,
+                "risk-analysis",
+                "ANALYZE_RISK",
+                "PREPARE_CREDENTIAL_FILES",
+                message);
     }
 
     /** 将当前风险分析标记为失败，失败状态允许后续请求重试。 */
@@ -215,7 +319,13 @@ public class RiskAnalysisService {
         try (InputStream input = fileStorage.open(mergedMarkdownPath)) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("资信材料汇总文件读取失败", e);
+            throw new AppException(
+                    AppErrorCode.RISK_ANALYSIS_MARKDOWN_AGGREGATION_FAILED,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "READ_MERGED_MARKDOWN",
+                    "资信材料汇总文件读取失败",
+                    e);
         }
     }
 
@@ -275,6 +385,9 @@ public class RiskAnalysisService {
             return "";
         }
         AssistantMessage msg = gen.getOutput();
+        if (msg == null) {
+            return "";
+        }
         // 取 content 字段
         String content = msg.getText();
         if (content != null && !content.isBlank()) {
@@ -284,6 +397,9 @@ public class RiskAnalysisService {
         // 取 AssistantMessage.metadata 是因为 spring-ai-openai 2.0 内 OpenAiChatModel
         // 已把 reasoning_content 字段透传到这里,key="reasoningContent"(camelCase)。
         Map<String, Object> metadata = msg.getMetadata();
+        if (metadata == null) {
+            return "";
+        }
         Object reasoning = metadata.get("reasoningContent");
         // 取 reasoning_content 字段
         if (reasoning != null && !reasoning.toString().isBlank()) {
@@ -296,7 +412,8 @@ public class RiskAnalysisService {
 
     /**
      * 解析 AI 原始 JSON 响应，构造 RiskAnalysis 实体。
-     * <p>JSON 解析失败时 riskLevel/summary/suggestions 字段保持 null，rawResponse 始终保留。</p>
+     * <p>响应为空、JSON 无法解析、必填字段缺失或 riskLevel 不符合约定时，直接抛出
+     * {@code RISK_ANALYSIS.INVALID_LLM_RESPONSE}，不进入数据库落库。</p>
      *
      * @param bidRecordId 投标记录 ID
      * @param bidderName  投标人名称
@@ -305,21 +422,37 @@ public class RiskAnalysisService {
      * @return RiskAnalysis 实体（未落库）
      */
     private RiskAnalysis parseAndBuild(Integer bidRecordId, String bidderName, String raw, LocalDateTime analyzedAt) {
-        String riskLevel = null;
-        String summary = null;
-        String suggestions = null;
-
-        if (raw != null && !raw.isBlank()) {
-            try {
-                JSONObject obj = JSON.parseObject(raw);
-                riskLevel = obj.getString("riskLevel");
-                summary = obj.getString("summary");
-                suggestions = obj.getString("suggestions");
-                log.info(">>> [风险分析] JSON 解析成功 riskLevel={}", riskLevel);
-            } catch (JSONException e) {
-                log.warn("[风险分析] AI 响应 JSON 解析失败: {}", e.getMessage());
-            }
+        if (raw == null || raw.isBlank()) {
+            throw invalidLlmResponse("EMPTY_RESPONSE", "风险分析模型返回内容为空", null);
         }
+
+        final JSONObject obj;
+        try {
+            obj = JSON.parseObject(raw);
+        } catch (JSONException e) {
+            throw invalidLlmResponse("PARSE_RESPONSE", "风险分析模型返回内容不是有效 JSON", e);
+        }
+        if (obj == null) {
+            throw invalidLlmResponse("PARSE_RESPONSE", "风险分析模型返回内容为空对象", null);
+        }
+
+        String riskLevel = obj.getString("riskLevel");
+        String summary = obj.getString("summary");
+        String suggestions = obj.getString("suggestions");
+        if (isBlank(riskLevel) || isBlank(summary) || isBlank(suggestions)) {
+            throw invalidLlmResponse(
+                    "VALIDATE_RESPONSE",
+                    "风险分析模型返回内容缺少必要字段",
+                    null);
+        }
+        if (!isSupportedRiskLevel(riskLevel)) {
+            throw invalidLlmResponse(
+                    "VALIDATE_RESPONSE",
+                    "风险分析模型返回的风险等级不合法",
+                    null);
+        }
+
+        log.info(">>> [风险分析] JSON 解析成功 riskLevel={}", riskLevel);
 
         RiskAnalysis a = new RiskAnalysis();
         a.setBidRecordId(bidRecordId);
@@ -333,6 +466,33 @@ public class RiskAnalysisService {
         return a;
     }
 
+    /** 判断模型输出是否包含风险分析协议约定的必填文本。 */
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    /** 校验模型输出的风险等级枚举。 */
+    private boolean isSupportedRiskLevel(String riskLevel) {
+        return "LOW".equals(riskLevel)
+                || "MEDIUM".equals(riskLevel)
+                || "HIGH".equals(riskLevel)
+                || "CRITICAL".equals(riskLevel);
+    }
+
+    /** 构造模型响应不合法异常，禁止无效结果进入数据库。 */
+    private AppException invalidLlmResponse(
+            String stage,
+            String message,
+            Throwable cause) {
+        return new AppException(
+                AppErrorCode.RISK_ANALYSIS_INVALID_LLM_RESPONSE,
+                "risk-analysis",
+                "ANALYZE_RISK",
+                stage,
+                message,
+                cause);
+    }
+
     /**
      * 落库风险分析记录，并将投标记录标记为完成。analysisId 通过 useGeneratedKeys 回填。
      *
@@ -344,12 +504,29 @@ public class RiskAnalysisService {
     public RiskAnalysis persistAndComplete(
             RiskAnalysis analysis,
             Integer bidRecordId) {
-        mapper.insert(analysis);
-        int rows = bidRecordMapper.markRiskAnalysisCompleted(bidRecordId);
-        if (rows != 1) {
-            throw new IllegalStateException("风险分析完成状态更新失败");
+        try {
+            mapper.insert(analysis);
+            int rows = bidRecordMapper.markRiskAnalysisCompleted(bidRecordId);
+            if (rows != 1) {
+                throw new AppException(
+                        AppErrorCode.RISK_ANALYSIS_PERSISTENCE_FAILED,
+                        "risk-analysis",
+                        "ANALYZE_RISK",
+                        "MARK_COMPLETED",
+                        "风险分析完成状态更新失败");
+            }
+            return analysis;
+        } catch (AppException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new AppException(
+                    AppErrorCode.RISK_ANALYSIS_PERSISTENCE_FAILED,
+                    "risk-analysis",
+                    "ANALYZE_RISK",
+                    "PERSIST_RESULT",
+                    "风险分析结果保存失败",
+                    e);
         }
-        return analysis;
     }
 
     /**

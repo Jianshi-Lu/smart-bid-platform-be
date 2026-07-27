@@ -8,6 +8,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatch;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
+import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,14 +43,32 @@ public class FileUploadController {
             return null;
         }
         return files.stream()
-                .map(file -> file == null
-                        ? null
-                        : new UploadItem(
+                .map(file -> {
+                    if (file == null) {
+                        throw invalidFile("上传文件不能为空", null);
+                    }
+                    try {
+                        return new UploadItem(
                                 file.getOriginalFilename(), // 第 1 个参数 → originalFilename
                                 file.getContentType(),      // 第 2 个参数 → contentType
                                 file.getSize(),             // 第 3 个参数 → fileSize
-                                file::getInputStream))      // 第 4 个参数 → content
+                                file::getInputStream);      // 第 4 个参数 → content
+                    } catch (IllegalArgumentException e) {
+                        throw invalidFile("上传文件不合法", e);
+                    }
+                })
                 .toList();
+    }
+
+    /** 将上传文件边界校验失败转换为资信文件模块错误。 */
+    private AppException invalidFile(String message, Throwable cause) {
+        return new AppException(
+                AppErrorCode.CREDENTIAL_FILE_INVALID_FILE,
+                "credential-file",
+                "UPLOAD",
+                "VALIDATE_FILE",
+                message,
+                cause);
     }
 
     /** 删除尚未提交投标记录的资信文件。 */
