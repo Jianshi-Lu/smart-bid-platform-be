@@ -124,6 +124,12 @@ public enum AppErrorCode {
     CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT(
             "CREDENTIAL_FILE.CONVERSION_DATA_INCONSISTENT", 500, "资信文件转换数据不一致", false),
 
+    // ==================== POLICY_FETCHER：政策资讯采集 ====================
+
+    /** POLICY_FETCHER：政策资讯采集服务调用失败。 */
+    POLICY_FETCHER_PYTHON_CALL_FAILED(
+            "POLICY_FETCHER.PYTHON_CALL_FAILED", 502, "政策资讯采集服务调用失败", true),
+
     // ==================== RISK_ANALYSIS：风险分析 ====================
 
     /** RISK_ANALYSIS：风险分析输入材料未准备完成。 */
