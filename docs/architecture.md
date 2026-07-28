@@ -1,6 +1,6 @@
 # smart-bid-platform-be 架构文档
 
-> 本文档以 2026-07-27 当前工作区源码为准，描述 Java 后端的实际组织方式、模块职责、抽象关系、外部依赖和关键运行边界。
+> 本文档以 2026-07-28 当前工作区源码为准，描述 Java 后端的实际组织方式、模块职责、抽象关系、外部依赖和关键运行边界。
 >
 > 业务端点与逐步流程见 [business-process.md](business-process.md)，数据库关系与字段字典见 [database.md](database.md)。
 
@@ -10,7 +10,7 @@
 
 - 经办人、招标公告、投标记录使用 `Controller → Service → Mapper/XML → MySQL` 的通用 CRUD 分层。
 - 资信文件模块按业务能力内聚了上传接入、校验和、存储、Python 转换、状态编排与 Markdown 汇总。
-- 风险分析模块以 `bid_record` 为聚合入口，读取已转换文件，生成投标记录级汇总 Markdown，再同步调用 OpenAI 兼容模型并落库。
+- 风险分析模块以 `bid_record` 为聚合入口，检查并按需完成文件转换后，读取 converted 文件生成投标记录级汇总 Markdown，再同步调用 OpenAI 兼容模型并落库。
 - 文件正文不写入 MySQL。MySQL 保存文件元数据、状态和对象路径；正文由本地文件系统或 MinIO 保存。
 - 数据库关系全部是逻辑外键，没有数据库级 `FOREIGN KEY`、级联删除或父记录存在性保障。
 - 统一异常出口已经采用 `AppException + AppErrorCode + GlobalExceptionHandler + Result`；但异步任务失败和转换批次内部的单文件失败存在独立处理边界。
@@ -146,7 +146,7 @@ flowchart TD
 | 资信上传 | `FileUploadService`、`UploadItemProcessor` | `UploadBatch` | original 文件、批次和文件元数据 | Markdown 转换 |
 | 资信转换 | `FileConvertService`、`ToMarkdownClient` | `bidRecordId` | Python 转换、文件/批次状态、`credentials` 路径 | 风险分析 |
 | Markdown 汇总 | `CredentialMarkdownAggregationService` | `bidRecordId` | 固定路径 `merged/credentials.md` | 调用大模型 |
-| 风险分析 | `RiskAnalysisService` | `bidRecordId` | 汇总、LLM 调用、`risk_analysis` | 自动触发文件转换 |
+| 风险分析 | `RiskAnalysisService` | `bidRecordId` | 检查/按需转换、汇总、LLM 调用、`risk_analysis` | 文件上传和文件状态持久化 |
 | 文件存储 | `FileStorage` 及实现 | 路径、流、metadata | 保存、读取、删除对象 | 业务状态与数据库 |
 | 异常出口 | `GlobalExceptionHandler` | 未解决异常 | HTTP 状态 + `Result` | 业务补偿与状态修复 |
 | 邮件 | `MailService`、`StatusCheckService` | 邮件 DTO | SMTP 发送 | 保证异步投递成功 |
@@ -457,8 +457,8 @@ flowchart TD
 | 数据库外键 | 只有逻辑关系 | 可产生孤儿数据，删除不会级联 |
 | 上传父记录校验 | 上传服务不查询 `bid_record` 是否存在 | 可写入不存在 `bidRecordId` 的元数据和对象路径 |
 | 文件删除 | 删除端点是占位实现 | 返回成功但不删除对象和数据库行 |
-| 转换触发 | 上传后不会自动转换 | 必须显式调用转换端点 |
-| 风险分析前置 | 不自动转换 | 任一批次/文件非 `CONVERTED` 即拒绝分析 |
+| 转换触发 | 上传请求不会自动转换；风险分析入口会按需调用无差别转换流程 | 可手动调用转换端点，也可由风险分析入口自动触发 |
+| 风险分析前置 | 先检查批次和文件；必要时自动转换并重新查询状态 | 只有全部批次和文件最终为 `CONVERTED` 才会继续汇总和调用大模型 |
 | 转换无批次 | 返回 `ALL_CONVERTED` 成功 | “没有材料”与“全部完成”在转换接口语义上相同 |
 | 汇总覆盖 | 固定 merged object key | 重复分析不会累加文件，但会覆盖上次汇总 |
 | Prompt 加载 | 读取失败返回空字符串 | 不会立即报模板缺失，可能导致模型输入质量下降 |

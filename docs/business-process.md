@@ -1,6 +1,6 @@
 # smart-bid-platform-be 业务流程文档
 
-> 本文档以 2026-07-27 当前工作区源码为准，覆盖 31 个显式 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点。
+> 本文档以 2026-07-28 当前工作区源码为准，覆盖 31 个显式 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点。
 >
 > 系统分层见 [architecture.md](architecture.md)，表关系见 [database.md](database.md)。
 
@@ -502,7 +502,12 @@ Python 生成 converted 路径并写入存储；Java 不接收 Markdown 正文�
 
 ### 10.2 `POST /bid-record/analyze-risk/{id}`
 
-当前风险分析不会自动调用文件转换。所有批次和文件必须事先为 `CONVERTED`。
+前端只调用风险分析入口，不需要先调用转换端点。服务端先检查当前投标记录的批次和文件状态：
+
+1. 如果全部批次和文件已经是 `CONVERTED`，直接进入 Markdown 汇总和大模型分析。
+2. 如果存在 `UPLOADED`、`FAILED` 或其他未完成状态，调用 `FileConvertService.convertAllBatches(bidRecordId)` 无差别执行转换。
+3. 转换结束后重新查询数据库；只有所有批次和文件最终为 `CONVERTED` 才继续分析。
+4. 如果仍未全部完成，返回 `RISK_ANALYSIS.INPUT_NOT_READY`，不调用大模型。
 
 ```mermaid
 sequenceDiagram
@@ -521,6 +526,11 @@ sequenceDiagram
     else 未抢占到分析权
         R-->>FE: RISK_ANALYSIS.IN_PROGRESS
     else 抢占成功
+        R->>DB: 检查批次和文件转换状态
+        alt 存在未完成转换
+            R->>R: 调用 FileConvertService.convertAllBatches(bidRecordId)
+            R->>DB: 重新查询批次和文件状态
+        end
         R->>A: aggregate(bidRecordId)
         A->>DB: 查询全部批次和文件
         A->>A: 校验全部 CONVERTED
@@ -647,11 +657,10 @@ bid-records/{bidRecordId}/merged/credentials.md
 
 ## 13. 当前业务限制
 
-- 上传、转换、风险分析是三个独立入口：上传后不会自动转换，转换后不会自动分析。
-- 风险分析只接受全部批次和文件均为 `CONVERTED` 的投标记录。
+- 上传、转换、风险分析仍是三个独立入口：上传请求不会自动转换；风险分析入口会在需要时自动调用转换，但转换成功后不会在其他请求中自动分析。
+- 风险分析在自动转换并重新查询后，只接受全部批次和文件均为 `CONVERTED` 的投标记录。
 - 文件删除端点尚未实现真实删除。
 - 所有业务关联是逻辑外键；父记录存在性、级联删除和孤儿清理需由应用层保障，但当前部分入口尚未实现。
 - 没有鉴权与租户隔离。
 - 风险分析和手动重新转换没有互斥；同一投标记录应避免并行执行二者。
 - `PromptFiller` 读取 Prompt 失败时返回空字符串，不会抛结构化异常。
-- `api.md` 中的旧 `code: 200` 响应示例可能与当前结构化 `Result` 不一致；本文件以当前源码为准。

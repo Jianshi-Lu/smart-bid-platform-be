@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 30 端点（含 2 个资信文件端点、1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 31 个显式业务端点（含 3 个资信文件端点、1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -24,7 +24,7 @@
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 招标经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
-| 资信文件 (CredentialFile) | 2 | `/credential-files/...` |
+| 资信文件 (CredentialFile) | 3 | `/credential-files/...` |
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+） | 1 | `/bid-record/analyze-risk/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
@@ -35,7 +35,7 @@
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/bid-record/analyze-risk/{id}` | 校验资信批次和文件均已转换，汇总 Markdown 后同步调 OpenAI 兼容 LM Studio，解析 JSON，落库，返全字段 `RiskAnalysis` |
+| POST | `/bid-record/analyze-risk/{id}` | 检查资信批次和文件状态，必要时自动转换；全部完成后汇总 Markdown，同步调用 OpenAI 兼容模型，解析 JSON，落库并返回 `RiskAnalysis` |
 
 ---
 
@@ -47,7 +47,8 @@
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "message": "操作成功",
   "data": <T>
 }
@@ -55,9 +56,12 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `code` | Integer | 业务状态码（见 §1.2） |
+| `success` | Boolean | 是否成功；前端优先使用该字段判断 |
+| `code` | String | 成功为 `SUCCESS`，失败为模块化错误码（见 §1.2） |
 | `message` | String | 文字消息 |
 | `data` | T | 业务数据，无数据时为 `null` |
+
+失败响应还可能包含 `service`、`module`、`operation`、`stage`、`retryable`、`errorId` 和 `details`；不返回堆栈、SQL、内部地址等敏感信息。当前阶段不生成或透传 `traceId`。
 
 `data` 类型与端点对应：
 
@@ -72,14 +76,20 @@
 
 **邮件端点**（`/send-email`、`/send-notification`）**不**返回 `Result<T>`，直接返回字符串。
 
-### 1.2 业务状态码
+### 1.2 HTTP 状态与业务错误码
 
-| code | 含义 | 触发场景 |
-|------|------|----------|
-| 200 | 成功 | 业务正常完成 |
-| 400 | 参数错误 | 分页参数错误 / `@Valid` 校验失败 |
-| 404 | 资源不存在 | 按主键查询/更新/删除时记录不存在 |
-| 500 | 服务器内部错误 | 异常未捕获（`GlobalExceptionHandler` 统一处理） |
+成功响应使用 HTTP 200 和 `success=true, code="SUCCESS"`。失败响应由
+`GlobalExceptionHandler` 统一转换为结构化 `Result`，HTTP 状态表达协议层结果，`code`
+表达稳定的模块业务语义；前端不应再把 `code` 当作数字状态码解析。
+
+| HTTP 状态 | 示例业务码 | 含义 |
+|-----------|------------|------|
+| 400 | `COMMON.INVALID_ARGUMENT`、`RISK_ANALYSIS.INPUT_NOT_READY` | 请求参数或业务前置条件不满足 |
+| 404 | `BID_RECORD.NOT_FOUND`、`INVITATION.NOT_FOUND` | 目标资源不存在 |
+| 409 | `RISK_ANALYSIS.IN_PROGRESS`、`DATABASE.DUPLICATE_KEY` | 状态或并发/唯一约束冲突 |
+| 413 | `COMMON.FILE_TOO_LARGE` | 上传内容超过限制 |
+| 500 | `SYSTEM.INTERNAL_ERROR`、`DATABASE.OPERATION_FAILED` | 服务端内部或数据库操作失败 |
+| 502/503/504 | `CREDENTIAL_FILE.CONVERSION_FAILED`、`CREDENTIAL_FILE.STORAGE_FAILED` 等 | 外部转换、存储或依赖服务失败 |
 
 ### 1.3 PATCH 语义
 
@@ -111,7 +121,7 @@
 `GET /{resource}`：
 - Query 参数：`page`（默认 1）、`pageSize`（默认 10）、`sort`（默认见各端点）
 - `sort` 格式：PageHelper 原生（空格分隔），例 `"invitation_id desc"`
-- 参数错误返 `code=400, message="分页查询参数错误"`
+- 参数错误返回 HTTP 400 和 `code="COMMON.INVALID_ARGUMENT"`。
 
 **PageInfo 结构**（`data` 字段）：
 ```json
@@ -455,7 +465,8 @@ curl -X POST http://localhost:8080/credential-files/upload \
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "message": "上传成功",
   "data": {
     "uploadBatchId": "550e8400-e29b-41d4-a716-446655440000",
@@ -486,14 +497,16 @@ curl -X POST http://localhost:8080/credential-files/upload \
 
 **错误响应**：
 
-| 场景 | code | message |
+| 场景 | HTTP 状态 / code | message |
 |------|:---:|---------|
-| 文件集合为空、空文件 | 400 | `上传文件不能为空` |
-| 原始文件名为空 | 400 | `原始文件名不能为空` |
-| 单文件超过 150MB 或请求总体超过 200MB | 400 | `文件大小超过限制` |
-| 文件系统或摘要计算失败 | 500 | `服务器内部错误` |
+| 文件集合为空、空文件 | 400 / `CREDENTIAL_FILE.INVALID_UPLOAD_REQUEST` | `资信文件上传请求不合法` |
+| 原始文件名为空或文件不合法 | 400 / `CREDENTIAL_FILE.INVALID_FILE` | `上传文件不合法` |
+| 单文件超过 150MB 或请求总体超过 200MB | 413 / `COMMON.FILE_TOO_LARGE` | `文件大小超过限制` |
+| 文件存储失败 | 503 / `CREDENTIAL_FILE.STORAGE_FAILED` | `资信文件存储失败` |
+| 文件完整性校验失败 | 500 / `CREDENTIAL_FILE.INTEGRITY_CHECK_FAILED` | `文件完整性校验失败` |
+| 文件元数据落库失败 | 500 / `CREDENTIAL_FILE.PERSISTENCE_FAILED` | `资信文件保存失败` |
 
-> **当前阶段边界**：接口已经完成原始文件落盘、完整性校验和 `credential_file` 写入，但不会自动触发 Python Markdown 转换；转换由下方独立入口负责。
+> **当前阶段边界**：上传请求只负责原始文件落盘、完整性校验和 `credential_file` 写入，不在同一请求内自动转换。转换可以通过下方独立入口手动触发，也会在风险分析入口检测到未完成材料时按需触发。
 
 ### 5.2 `POST /credential-files/bid-records/{bidRecordId}/convert`
 
@@ -512,7 +525,8 @@ curl -X POST http://localhost:8080/credential-files/bid-records/1001/convert
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "data": {
     "bidRecordId": 1001,
     "status": "ALL_CONVERTED",
@@ -534,7 +548,8 @@ curl -X POST http://localhost:8080/credential-files/bid-records/1001/convert
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "message": "删除成功（占位）",
   "data": null
 }
@@ -641,11 +656,13 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 
 ### 6.8 `POST /bid-record/analyze-risk/{id}`
 
-**同步调用 OpenAI 兼容 LM Studio**。服务端先联查并校验当前投标记录下的所有批次和文件均为
-`CONVERTED`，再按 `batch_no`、`file_order` 顺序读取 converted Markdown，合并并写入
+**同步调用 OpenAI 兼容 LM Studio**。服务端先联查当前投标记录下的所有批次和文件；如果存在未完成批次或文件，
+入口会先调用 `FileConvertService.convertAllBatches`，再重新查询数据库；
+只有重新查询后全部为 `CONVERTED` 才会按 `batch_no`、`file_order` 顺序读取 converted Markdown，合并并写入
 `bid-records/{bidRecordId}/merged/credentials.md`，最后将汇总文本一次性提交给大模型，解析 JSON，落库
-`risk_analysis` 表。分析开始前会原子抢占 `bid_record` 的分析状态；同一投标记录已有分析处于执行中时，
-不会再次调用大模型，返回业务状态码 `409`。分析完成后允许再次手动分析，并保留历史记录。
+`risk_analysis` 表。若转换后仍未完成，返回 `RISK_ANALYSIS.INPUT_NOT_READY`，不调用大模型。分析开始前会原子抢占
+`bid_record` 的分析状态；同一投标记录已有分析处于执行中时，不会再次调用大模型，返回 HTTP 409 和
+`RISK_ANALYSIS.IN_PROGRESS`。分析完成后允许再次手动分析，并保留历史记录。
 
 **响应**：`Result<RiskAnalysis>`（含 9 字段：analysisId / bidRecordId / bidderName / riskLevel / summary / suggestions / rawResponse / promptVersion / analyzedAt）。
 
@@ -719,7 +736,8 @@ curl "http://{host}:{port}/risk-analysis?page=1&pageSize=10&sort=analysis_id%20d
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "message": "查询成功",
   "data": {
     "pageNum": 1,
@@ -762,7 +780,8 @@ curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
 
 ```json
 {
-  "code": 200,
+  "success": true,
+  "code": "SUCCESS",
   "message": "查询成功",
   "data": [
     {
@@ -784,14 +803,26 @@ curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
 
 ---
 
-## 附录 A：业务码速查
+## 附录 A：业务错误码速查
 
-| code | 触发条件 |
-|------|----------|
-| 200 | 业务正常完成 |
-| 400 | 参数校验失败 / 分页参数错误 |
-| 404 | 按主键查询/更新/删除时记录不存在 |
-| 500 | 异常未捕获（`GlobalExceptionHandler` 统一处理） |
+| code | 典型触发条件 |
+|------|--------------|
+| `SUCCESS` | 业务正常完成 |
+| `COMMON.INVALID_ARGUMENT` | 参数校验失败、分页参数错误 |
+| `COMMON.FILE_TOO_LARGE` | 上传文件超过服务配置限制 |
+| `BID_RECORD.NOT_FOUND` | 投标记录不存在 |
+| `INVITATION.NOT_FOUND` | 招标公告不存在 |
+| `CREDENTIAL_FILE.INVALID_FILE` | 上传文件不合法 |
+| `CREDENTIAL_FILE.STORAGE_FAILED` | 原始/转换文件存储失败 |
+| `CREDENTIAL_FILE.CONVERSION_FAILED` | Python 转换服务调用失败 |
+| `CREDENTIAL_FILE.PERSISTENCE_FAILED` | 资信文件元数据落库失败 |
+| `RISK_ANALYSIS.INPUT_NOT_READY` | 自动转换后仍有批次或文件未完成 |
+| `RISK_ANALYSIS.IN_PROGRESS` | 同一投标记录已有风险分析正在执行 |
+| `RISK_ANALYSIS.LLM_CALL_FAILED` | 大模型服务调用失败 |
+| `RISK_ANALYSIS.INVALID_LLM_RESPONSE` | 大模型返回内容无法解析/校验 |
+| `RISK_ANALYSIS.PERSISTENCE_FAILED` | 风险分析结果落库失败 |
+| `DATABASE.OPERATION_FAILED` | 未归属具体模块的数据库操作失败 |
+| `SYSTEM.INTERNAL_ERROR` | 未分类系统异常 |
 
 ## 附录 B：v18 命名变更摘要
 
