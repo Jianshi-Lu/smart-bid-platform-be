@@ -1,9 +1,9 @@
-package io.gitee.lujianshi.bidwinningbackend.policyfetcher.client.dto;
+package io.gitee.lujianshi.bidwinningbackend.knowledgeingestionagent.client.dto;
 
 import java.util.List;
 
 /** Python返回的政策资讯采集任务状态或最终结果。 */
-public record IngestionJobResponse(
+public record KnowledgeIngestionJobResponse(
         String jobId,
         String status,
         String stage,
@@ -13,7 +13,7 @@ public record IngestionJobResponse(
         Integer failedCount,
         List<Document> documents) {
 
-    public IngestionJobResponse {
+    public KnowledgeIngestionJobResponse {
         documents = documents == null ? List.of() : List.copyOf(documents);
     }
 

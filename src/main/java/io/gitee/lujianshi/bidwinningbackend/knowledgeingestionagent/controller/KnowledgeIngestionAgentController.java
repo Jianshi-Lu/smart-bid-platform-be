@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.policyfetcher.controller;
+package io.gitee.lujianshi.bidwinningbackend.knowledgeingestionagent.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 政策资讯采集入口。 */
 @RestController
-@RequestMapping("/policy-fetcher")
-public class PolicyFetcherController {
+@RequestMapping("/knowledge-ingestion-agent")
+public class KnowledgeIngestionAgentController {
 
     /**
      * 手动触发一次政策资讯采集任务。

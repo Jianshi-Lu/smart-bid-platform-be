@@ -124,11 +124,11 @@ public enum AppErrorCode {
     CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT(
             "CREDENTIAL_FILE.CONVERSION_DATA_INCONSISTENT", 500, "资信文件转换数据不一致", false),
 
-    // ==================== POLICY_FETCHER：政策资讯采集 ====================
+    // ==================== KNOWLEDGE_INGESTION_AGENT：知识采集 ====================
 
-    /** POLICY_FETCHER：政策资讯采集服务调用失败。 */
-    POLICY_FETCHER_PYTHON_CALL_FAILED(
-            "POLICY_FETCHER.PYTHON_CALL_FAILED", 502, "政策资讯采集服务调用失败", true),
+    /** KNOWLEDGE_INGESTION_AGENT：知识采集服务调用失败。 */
+    KNOWLEDGE_INGESTION_AGENT_PYTHON_CALL_FAILED(
+            "KNOWLEDGE_INGESTION_AGENT.PYTHON_CALL_FAILED", 502, "知识采集服务调用失败", true),
 
     // ==================== RISK_ANALYSIS：风险分析 ====================
 

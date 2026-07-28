@@ -55,8 +55,8 @@ spring:
             enable: true
             required: true
 
-policy-fetcher:
-  python-base-url: ${POLICY_FETCHER_PYTHON_BASE_URL:http://127.0.0.1}
+knowledge-ingestion-agent:
+  python-base-url: ${KNOWLEDGE_INGESTION_AGENT_PYTHON_BASE_URL:http://127.0.0.1}
 
 logging:
   file:
