@@ -1,6 +1,6 @@
 # smart-bid-platform-be 架构文档
 
-> 本文档以 2026-07-28 当前工作区源码为准，描述 Java 后端的实际组织方式、模块职责、抽象关系、外部依赖和关键运行边界。
+> 本文档以 2026-07-30 当前工作区源码为准，描述 Java 后端的实际组织方式、模块职责、抽象关系、外部依赖和关键运行边界。
 >
 > 业务端点与逐步流程见 [business-process.md](business-process.md)，数据库关系与字段字典见 [database.md](database.md)。
 
@@ -34,8 +34,8 @@ flowchart LR
     JAVA --> STORE
     STORE -->|"type=LOCAL"| LOCAL
     STORE -->|"type=MINIO"| MINIO
-    JAVA -->|"POST /convert/object"| PY
-    PY -->|"读取 original、写入 converted"| MINIO
+    JAVA -->|"multipart POST /convert<br/>原文件流"| PY
+    PY -->|"text/markdown<br/>Markdown 文件"| JAVA
     JAVA -->|"Spring AI / OpenAI API"| LLM
     JAVA -->|"JavaMail"| SMTP
 ```
@@ -44,8 +44,9 @@ flowchart LR
 
 - 本仓库只实现 Java 服务。
 - 前端、Python 转换服务、MySQL、MinIO/本地文件系统、大模型服务和 SMTP 都是外部运行依赖。
-- Java 与 Python 之间传递的是对象路径，不是 Markdown 正文。Python 必须能够访问与 Java 一致的对象命名空间；生产形态应使用双方都可访问的 MinIO。
-- `LOCAL` 存储适合单机联调。若 Python 与 Java 不共享同一文件系统，单纯配置本地目录无法完成转换。
+- Java 独占文件存储职责：读取 original、生成 converted 路径、上传 Markdown、回读校验和数据库状态更新都在 Java 完成。
+- Python 只接收 multipart 文件流并返回 `text/markdown`，不需要 MinIO 地址、bucket、object key 或存储凭据。
+- `LOCAL` 与 `MINIO` 都可完成转换；生产使用 `MINIO` 时由 `MinioFileStorage` 调用 MinIO SDK。
 
 ## 3. 技术栈
 
@@ -144,7 +145,7 @@ flowchart TD
 | 招标公告 | `InvitationForBidController/Service` | 公告 CRUD、状态变更 | `invitation_for_bid`、状态历史 | 校验经办人是否存在 |
 | 投标记录 | `BidRecordController/Service` | 投标 CRUD | 自动生成 `bid_no`，写 `bid_record` | 上传/转换正文 |
 | 资信上传 | `FileUploadService`、`UploadItemProcessor` | `UploadBatch` | original 文件、批次和文件元数据 | Markdown 转换 |
-| 资信转换 | `FileConvertService`、`ToMarkdownClient` | `bidRecordId` | Python 转换、文件/批次状态、`credentials` 路径 | 风险分析 |
+| 资信转换 | `FileConvertService`、`ToMarkdownClient` | `bidRecordId` | Java 存储闭环、Python 内容转换、文件/批次状态、`credentials` 路径 | 风险分析 |
 | Markdown 汇总 | `CredentialMarkdownAggregationService` | `bidRecordId` | 固定路径 `merged/credentials.md` | 调用大模型 |
 | 风险分析 | `RiskAnalysisService` | `bidRecordId` | 检查/按需转换、汇总、LLM 调用、`risk_analysis` | 文件上传和文件状态持久化 |
 | 文件存储 | `FileStorage` 及实现 | 路径、流、metadata | 保存、读取、删除对象 | 业务状态与数据库 |
@@ -222,7 +223,7 @@ classDiagram
 |---|---|---|---|
 | `BaseMapper<T, ID>` | 5 个核心 Mapper 及 2 个文件 Mapper | 统一 7 个基础 SQL 方法签名 | SQL 仍由每个 XML 重复定义 |
 | `BaseService<T>` | 经办人、公告、投标记录 Service | 统一基础 CRUD、批量删除、事务和邮件辅助 | 主键类型固定为 `Integer`，不适合 `Long/String` 文件主键 |
-| `FileStorage` | `LocalFileStorage`、`MinioFileStorage` | 上层不感知物理介质 | Python 转换实际上更适合共享 MinIO |
+| `FileStorage` | `LocalFileStorage`、`MinioFileStorage` | 上层不感知物理介质 | Java 独占 original/converted/merged 的存取职责 |
 | `FileChecksumCalculator` | `Sha256FileChecksumCalculator` | 算法与文件来源解耦 | 当前只注册 SHA-256 |
 | `AppException` | 当前直接实例化，暂未增加业务子类 | 承载稳定错误码和业务上下文 | 补偿仍由业务 Service 完成 |
 | `PlainTextMailRequest` | `BidWinningMailRequest` | 复用收件人、主题、正文等字段 | DTO 继承不影响数据库 |
@@ -290,12 +291,12 @@ flowchart LR
 bid-records/{bidRecordId}/
 ├── batches/{uploadBatchId}/
 │   ├── original/{uuid}_{safeOriginalFilename}
-│   └── converted/{converter-defined-name}.md
+│   └── converted/{original-basename}.md
 └── merged/credentials.md
 ```
 
 - original 路径由 Java 的 `StoragePath` 生成。
-- converted 路径由 Python 转换服务生成，Java 校验响应后写入 `credential_file.markdown_file_path`。
+- converted 路径由 Java 的 `StoragePath.createConvertedMarkdownPath` 根据 original 路径稳定生成。
 - merged 路径由 Java 固定为 `bid-records/{bidRecordId}/merged/credentials.md`，每次风险分析前覆盖。
 - `bid_record.credentials` 是已转换文件路径的 JSON 投影，不存正文，也不是风险分析的唯一事实来源。
 

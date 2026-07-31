@@ -510,10 +510,11 @@ curl -X POST http://localhost:8080/credential-files/upload \
 
 ### 5.2 `POST /credential-files/bid-records/{bidRecordId}/convert`
 
-无差别转换指定投标记录下的全部资信文件批次。Java 按批次逐文件调用 Python
-`/convert/object`，Python 从 MinIO 读取 `original` 对象并将 Markdown 写入同级
-`converted` 路径；Java 负责更新文件、批次状态，并将已完成的 Markdown object key
-列表回写 `bid_record.credentials`。
+无差别转换指定投标记录下的全部资信文件批次。Java 按批次逐文件从当前
+`FileStorage` 读取 `original`，使用 multipart 调用 Python `/convert`，接收
+`text/markdown` 文件，再由 Java 生成同级 `converted` 路径、上传并回读校验。
+完成后 Java 更新文件、批次状态，并将 Markdown object key 列表回写
+`bid_record.credentials`。
 
 重复调用会重新转换并覆盖对应的 `converted` 对象，不根据当前状态跳过文件。
 

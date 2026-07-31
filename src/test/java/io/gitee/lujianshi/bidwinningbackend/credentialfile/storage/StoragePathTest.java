@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StoragePathTest {
@@ -33,5 +34,25 @@ class StoragePathTest {
         assertEquals(
                 "bid-records/1001/merged/credentials.md",
                 StoragePath.createMergedMarkdownPath(BID_RECORD_ID));
+    }
+
+    @Test
+    void shouldMapOriginalObjectToStableConvertedMarkdownPath() {
+        String batchId = UUID.randomUUID().toString();
+        String originalPath = "bid-records/1001/batches/" + batchId
+                + "/original/file.v2.pdf";
+
+        assertEquals(
+                "bid-records/1001/batches/" + batchId
+                        + "/converted/file.v2.md",
+                StoragePath.createConvertedMarkdownPath(originalPath));
+    }
+
+    @Test
+    void shouldRejectConvertedPathBuiltFromNonOriginalObject() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> StoragePath.createConvertedMarkdownPath(
+                        "bid-records/1001/merged/credentials.md"));
     }
 }

@@ -46,6 +46,35 @@ public final class StoragePath {
     }
 
     /**
+     * 根据 original 逻辑路径生成同一批次下稳定的 converted Markdown 路径。
+     *
+     * <p>路径只做确定性映射，不访问存储。重复转换同一个原文件会得到同一个目标路径，
+     * 因而由存储实现覆盖旧的派生 Markdown。</p>
+     *
+     * @param originalFilePath 已落库的 original 相对路径或 MinIO object key
+     * @return 同批次 converted 目录下、后缀为 {@code .md} 的逻辑路径
+     * @throws IllegalArgumentException 路径不合法或不位于 original 目录
+     */
+    public static String createConvertedMarkdownPath(String originalFilePath) {
+        String normalizedPath = normalizeRelativePath(originalFilePath);
+        String marker = "/original/";
+        int markerIndex = normalizedPath.indexOf(marker);
+        if (markerIndex < 0) {
+            throw new IllegalArgumentException("原始文件路径必须位于 original 目录");
+        }
+
+        String relativeFilename = normalizedPath.substring(
+                markerIndex + marker.length());
+        int lastSlash = relativeFilename.lastIndexOf('/');
+        int lastDot = relativeFilename.lastIndexOf('.');
+        String markdownFilename = lastDot > lastSlash + 1
+                ? relativeFilename.substring(0, lastDot) + ".md"
+                : relativeFilename + ".md";
+        return normalizedPath.substring(0, markerIndex)
+                + "/converted/" + markdownFilename;
+    }
+
+    /**
      * 生成投标记录级汇总 Markdown 的固定逻辑路径。
      *
      * <p>该路径是派生文件路径，不对应任何 {@code credential_file} 明细记录；每次风险分析

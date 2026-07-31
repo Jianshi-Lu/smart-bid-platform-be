@@ -12,7 +12,7 @@ Collection：`credential-file-flow.postman_collection.json`
    CREDENTIAL_FILE_STORAGE_TYPE=MINIO
    ```
 
-4. Java、Python 使用同一个 MinIO endpoint、bucket 和凭证。
+4. 只需 Java 配置 MinIO endpoint、bucket 和凭证；Python 不访问 MinIO。
 5. `bidRecordId` 已经存在。
 6. 修改 collection 变量：
 
@@ -56,6 +56,7 @@ Collection：`credential-file-flow.postman_collection.json`
 - 大模型返回结构化风险结果；
 - 返回的 `analysisId` 已经可以在 `risk_analysis` 历史接口中查询到。
 
-原始文件能否被 Python 读取、转换并写入 MinIO，是通过第二条链路间接验证的；汇总文件本身没有单独的下载接口，
-其写入是否成功由风险分析接口能否读取并完成模型分析来验证。也可以根据 collection 变量
-`mergedMarkdownPath` 到 MinIO 中手工检查对象。
+第二条链路会间接验证 Java 能否从 MinIO 读取 original、multipart 调用 Python、
+接收 Markdown、上传 converted 并回读校验。汇总文件本身没有单独的下载接口，
+其写入是否成功由风险分析接口能否读取并完成模型分析来验证。也可以根据
+collection 变量 `mergedMarkdownPath` 到 MinIO 中手工检查对象。

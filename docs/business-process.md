@@ -1,6 +1,6 @@
 # smart-bid-platform-be 业务流程文档
 
-> 本文档以 2026-07-28 当前工作区源码为准，覆盖 31 个显式 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点。
+> 本文档以 2026-07-30 当前工作区源码为准，覆盖 31 个显式 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点。
 >
 > 系统分层见 [architecture.md](architecture.md)，表关系见 [database.md](database.md)。
 
@@ -412,7 +412,8 @@ sequenceDiagram
 - `UPLOADED`、`FAILED`、`CONVERTED` 批次都允许再次抢占转换。
 - `UPLOADING` 或已经由其他请求占有的 `CONVERTING` 批次会被跳过。
 - 文件层采用同样的条件抢占。
-- Python 只转换单个对象；循环、数据库状态和批次收敛全部由 Java 负责。
+- Python 只完成单个文件流到 Markdown 的内容转换；Java 负责存储读取、完整性
+  校验、multipart 调用、converted 上传、回读校验、循环和数据库状态收敛。
 
 ```mermaid
 flowchart TD
@@ -424,52 +425,64 @@ flowchart TD
     F{"抢占成功"}
     G["查询批次文件，file_order ASC"]
     H["逐文件 claim CONVERTING"]
-    I["调用 Python /convert/object"]
-    J{"响应 COMPLETED<br/>路径与请求匹配"}
-    K["markConverted + 保存 markdown path"]
-    L["锁 bid_record 并重算 credentials JSON"]
-    M["markFailed 并记录原因"]
-    N["按文件最新状态收敛批次"]
-    O["重新查询所有批次并返回汇总"]
+    I["FileStorage.open original"]
+    J["multipart POST Python /convert"]
+    K{"响应为非空<br/>text/markdown 文件"}
+    L["校验 original SHA-256"]
+    M["Java 生成 converted 路径"]
+    N["FileStorage.store + 属性校验"]
+    O["重新 open 并校验 Markdown SHA-256"]
+    P["markConverted + 保存 markdown path"]
+    Q["锁 bid_record 并重算 credentials JSON"]
+    R["markFailed 并记录原因"]
+    S["按文件最新状态收敛批次"]
+    T["重新查询所有批次并返回汇总"]
 
     A --> B --> C
     C -->|"否"| D
     C -->|"是"| E --> F
-    F -->|"否，其他任务处理或状态不可抢占"| O
-    F -->|"是"| G --> H --> I --> J
-    J -->|"是"| K --> L --> N
-    J -->|"否"| M --> N
-    N --> O
+    F -->|"否，其他任务处理或状态不可抢占"| T
+    F -->|"是"| G --> H --> I --> J --> K
+    K -->|"是"| L --> M --> N --> O --> P --> Q --> S
+    K -->|"否"| R --> S
+    L -->|"校验失败"| R
+    N -->|"上传或属性校验失败"| R
+    O -->|"回读校验失败"| R
+    S --> T
 ```
 
 ### 9.2 Python 协议
 
-Java 请求：
+Java 使用 `multipart/form-data` 调用：
 
-```json
-{
-  "originalObjectKey": "bid-records/9/batches/{uuid}/original/{uuid}_file.pdf"
-}
+```http
+POST /convert
+Content-Type: multipart/form-data
+
+file=<original 文件流>
 ```
 
-Java要求响应至少满足：
+Python 成功响应必须满足：
 
-```json
-{
-  "originalObjectKey": "与请求完全相同",
-  "convertedObjectKey": "非空 Markdown object key",
-  "status": "COMPLETED"
-}
+```http
+HTTP/1.1 200 OK
+Content-Type: text/markdown; charset=utf-8
+Content-Disposition: attachment; filename="file.md"
+
+# Markdown 正文
 ```
 
-Python 生成 converted 路径并写入存储；Java 不接收 Markdown 正文，只保存 `convertedObjectKey`。
+Java 拒绝 JSON envelope、空正文、非 Markdown Content-Type、缺少 `.md` 文件名或
+Content-Length 不一致的成功响应。Python 不接触 object key 和任何存储系统。
 
 ### 9.3 转换结果与异常
 
 | 情况 | 对数据库的处理 | 对 HTTP 的处理 |
 |---|---|---|
-| 单文件成功 | 文件 `CONVERTED`，保存路径和时间；重算 `bid_record.credentials` | 继续处理 |
+| 单文件成功 | Java 上传并回读验证 Markdown；文件 `CONVERTED`，保存路径和时间；重算 `bid_record.credentials` | 继续处理 |
 | Python 调用失败或响应非法 | 文件 `FAILED`，记录错误 | 继续处理同批次其他文件 |
+| original SHA-256 不一致 | 文件 `FAILED`，不保存 Python 返回正文 | 继续处理同批次其他文件 |
+| converted 上传、属性或回读 SHA-256 校验失败 | 删除本次未确认的 converted 对象，文件 `FAILED` | 继续处理同批次其他文件 |
 | 批次存在失败文件 | 批次 `FAILED`，保存已完成数和汇总错误 | 最终通常 HTTP 200 + `PARTIAL_FAILED` |
 | 全部文件完成 | 批次 `CONVERTED` | 最终可能 `ALL_CONVERTED` |
 | 仍有其他任务处理的文件 | 批次保持 `CONVERTING` | 最终 `PROCESSING` |
