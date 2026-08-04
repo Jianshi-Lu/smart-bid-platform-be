@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 31 个显式业务端点（含 3 个资信文件端点、1 个 AI 风险分析触发端点 + 2 个风险记录只读查询端点）。
+> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 32 个显式业务端点（含 3 个资信文件端点、1 个 AI 风险分析触发端点、2 个风险记录只读查询端点和 1 个 chat-agent 问答端点）。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -28,6 +28,7 @@
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+） | 1 | `/bid-record/analyze-risk/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
+| **chat-agent 单轮问答**（最小接入） | 1 | `/chat-agent/chat` |
 
 > **v18 命名变更**：招标方相关表统一使用 World Bank 术语"Invitation for Bids"；经办人使用"bid handler"。详见 [database.md §1](database.md#1-表结构总览)。
 
@@ -804,6 +805,43 @@ curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
 
 ---
 
+## 8. chat-agent 单轮问答
+
+Java 平台通过 Controller 同步代理 Python `chat-agent` 的 `POST /chat`，前端只调用
+Java 端点，不直接连接 Python。当前仅支持单轮问答，不保存会话历史，也不提供流式输出。
+
+### 8.1 `POST /chat-agent/chat`
+
+**请求体**（`ChatRequest`）：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|:---:|------|
+| `question` | String | ✅ | 用户问题，不能为空 |
+
+**成功响应**：`Result<ChatResponse>`。
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "知识问答完成",
+  "data": {
+    "answer": "这是 chat-agent 返回的回答。"
+  }
+}
+```
+
+```bash
+curl -X POST http://localhost:8080/chat-agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"请概括当前投标项目的资信要求"}'
+```
+
+Java 端通过 `chat-agent.python-base-url` 配置 Python 服务基础地址，默认值为
+`http://127.0.0.1:8082`；Java 启动时在 `RestClientConfig` 中构造绑定该地址的单例
+`RestClient`。调用失败或 Python 返回空回答时，统一返回
+`CHAT_AGENT.PYTHON_CALL_FAILED`。
+
 ## 附录 A：业务错误码速查
 
 | code | 典型触发条件 |
@@ -817,6 +855,7 @@ curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
 | `CREDENTIAL_FILE.STORAGE_FAILED` | 原始/转换文件存储失败 |
 | `CREDENTIAL_FILE.CONVERSION_FAILED` | Python 转换服务调用失败 |
 | `CREDENTIAL_FILE.PERSISTENCE_FAILED` | 资信文件元数据落库失败 |
+| `CHAT_AGENT.PYTHON_CALL_FAILED` | chat-agent Python 服务调用失败或返回空回答 |
 | `RISK_ANALYSIS.INPUT_NOT_READY` | 自动转换后仍有批次或文件未完成 |
 | `RISK_ANALYSIS.IN_PROGRESS` | 同一投标记录已有风险分析正在执行 |
 | `RISK_ANALYSIS.LLM_CALL_FAILED` | 大模型服务调用失败 |

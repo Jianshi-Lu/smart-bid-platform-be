@@ -1,7 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.client;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileConverterProperties;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -97,8 +96,7 @@ class ToMarkdownClientTest {
     }
 
     private ToMarkdownClient createClient(RestClient.Builder builder) {
-        FileConverterProperties properties = new FileConverterProperties();
-        properties.setBaseUrl("http://127.0.0.1:8081");
-        return new ToMarkdownClient(builder, properties);
+        return new ToMarkdownClient(
+                builder.baseUrl("http://127.0.0.1:8081").build());
     }
 }

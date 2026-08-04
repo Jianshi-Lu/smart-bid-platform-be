@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.chatagent.mapper.ChatConversationMapper">
+
+    <resultMap id="BaseResultMap"
+               type="io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatConversation">
+        <id     column="conversation_id"  property="conversationId"/>
+        <result column="user_id"           property="userId"/>
+        <result column="title"             property="title"/>
+        <result column="next_sequence_no"  property="nextSequenceNo"/>
+        <result column="status"            property="status"/>
+        <result column="last_message_at"   property="lastMessageAt"/>
+        <result column="created_at"        property="createdAt"/>
+        <result column="updated_at"        property="updatedAt"/>
+        <result column="deleted_at"        property="deletedAt"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatConversation">
+        INSERT INTO chat_conversation
+            (conversation_id, user_id, title, next_sequence_no, status,
+             last_message_at, deleted_at)
+        VALUES
+            (#{conversationId}, #{userId}, #{title}, #{nextSequenceNo}, #{status},
+             #{lastMessageAt}, #{deletedAt})
+    </insert>
+
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatConversation">
+        UPDATE chat_conversation
+        <set>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="title != null">title = #{title},</if>
+            <if test="nextSequenceNo != null">next_sequence_no = #{nextSequenceNo},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="lastMessageAt != null">last_message_at = #{lastMessageAt},</if>
+            <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+        </set>
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.String">
+        DELETE FROM chat_conversation
+        WHERE conversation_id = #{conversationId}
+    </delete>
+
+    <select id="selectById" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT conversation_id, user_id, title, next_sequence_no, status,
+               last_message_at, created_at, updated_at, deleted_at
+        FROM chat_conversation
+        WHERE conversation_id = #{conversationId}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT conversation_id, user_id, title, next_sequence_no, status,
+               last_message_at, created_at, updated_at, deleted_at
+        FROM chat_conversation
+    </select>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM chat_conversation
+        WHERE conversation_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT conversation_id, user_id, title, next_sequence_no, status,
+               last_message_at, created_at, updated_at, deleted_at
+        FROM chat_conversation
+        WHERE conversation_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT conversation_id, user_id, title, next_sequence_no, status,
+               last_message_at, created_at, updated_at, deleted_at
+        FROM chat_conversation
+        WHERE user_id = #{userId}
+          AND status &lt;&gt; 'DELETED'
+        ORDER BY last_message_at IS NULL ASC,
+                 last_message_at DESC,
+                 conversation_id ASC
+    </select>
+
+</mapper>

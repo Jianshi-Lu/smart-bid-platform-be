@@ -26,6 +26,7 @@ flowchart LR
     LOCAL[("Linux / 本地目录")]
     MINIO[("MinIO Bucket")]
     PY["to-markdown Python 服务"]
+    CHAT["chat-agent Python 服务"]
     LLM["OpenAI 兼容大模型服务"]
     SMTP["SMTP 邮件服务"]
 
@@ -36,6 +37,7 @@ flowchart LR
     STORE -->|"type=MINIO"| MINIO
     JAVA -->|"multipart POST /convert<br/>原文件流"| PY
     PY -->|"text/markdown<br/>Markdown 文件"| JAVA
+    JAVA -->|"JSON POST /chat"| CHAT
     JAVA -->|"Spring AI / OpenAI API"| LLM
     JAVA -->|"JavaMail"| SMTP
 ```
@@ -45,7 +47,8 @@ flowchart LR
 - 本仓库只实现 Java 服务。
 - 前端、Python 转换服务、MySQL、MinIO/本地文件系统、大模型服务和 SMTP 都是外部运行依赖。
 - Java 独占文件存储职责：读取 original、生成 converted 路径、上传 Markdown、回读校验和数据库状态更新都在 Java 完成。
-- Python 只接收 multipart 文件流并返回 `text/markdown`，不需要 MinIO 地址、bucket、object key 或存储凭据。
+- `to-markdown` Python 服务只接收 multipart 文件流并返回 `text/markdown`，不需要 MinIO 地址、bucket、object key 或存储凭据。
+- `chat-agent` Python 服务只接收单轮 JSON 问题并返回回答；当前不保存会话历史、不提供流式输出。前端通过 Java Controller 访问，不直连 Python。
 - `LOCAL` 与 `MINIO` 都可完成转换；生产使用 `MINIO` 时由 `MinioFileStorage` 调用 MinIO SDK。
 
 ## 3. 技术栈
@@ -62,7 +65,7 @@ flowchart LR
 | 文件存储 | Java NIO / MinIO SDK 9.0.3 | 原始文件、转换文件和汇总 Markdown |
 | 大模型 | Spring AI 2.0.0 OpenAI Starter | Structured Output 风险分析 |
 | 邮件 | Spring Mail + Thymeleaf | 纯文本邮件和 HTML 通知 |
-| 配置 | `@ConfigurationPropertiesScan` | 类型化绑定存储、转换和风险分析配置 |
+| 配置 | `@ConfigurationPropertiesScan` | 类型化绑定 chat-agent、存储、转换和风险分析配置 |
 
 ## 4. 源码组织
 
@@ -114,7 +117,7 @@ flowchart TD
     SVC["Service<br/>业务规则、事务、状态编排"]
     DOMAIN["Entity / Enum / Intake Model"]
     PORT["抽象端口<br/>BaseMapper / FileStorage / Checksum"]
-    ADAPTER["基础设施适配<br/>MyBatis XML / Local / MinIO / Python Client / Spring AI"]
+    ADAPTER["基础设施适配<br/>MyBatis XML / Local / MinIO / Python Client / RestClient / Spring AI"]
     EXT["MySQL / 文件系统 / Python / LLM / SMTP"]
     EX["GlobalExceptionHandler"]
 
@@ -133,6 +136,8 @@ flowchart TD
 依赖原则是上层依赖能力接口或业务服务，基础设施不反向调用 Controller。例外和当前限制如下：
 
 - `ToMarkdownClient` 是业务模块内的基础设施客户端，直接被 `FileConvertService` 使用。
+- `RestClientConfig` 在应用启动时分别构造绑定 `chat-agent` 和 `to-markdown` 基础地址的单例 `RestClient`；`ChatAgentController` 直接使用前者，`ToMarkdownClient` 复用后者。
+- `ChatAgentController` 是当前 chat-agent 的最小同步代理入口，没有额外 Service 或 Java 客户端包。
 - `RiskAnalysisService` 直接依赖 Spring AI 的 `ChatClient`，目前没有再抽象模型网关接口。
 - `BaseService` 同时承载 CRUD 和邮件辅助能力，职责并不完全单一。
 - `AsyncTaskManager` 使用原生 `new Thread()`，没有使用 Spring 线程池。
@@ -146,6 +151,7 @@ flowchart TD
 | 投标记录 | `BidRecordController/Service` | 投标 CRUD | 自动生成 `bid_no`，写 `bid_record` | 上传/转换正文 |
 | 资信上传 | `FileUploadService`、`UploadItemProcessor` | `UploadBatch` | original 文件、批次和文件元数据 | Markdown 转换 |
 | 资信转换 | `FileConvertService`、`ToMarkdownClient` | `bidRecordId` | Java 存储闭环、Python 内容转换、文件/批次状态、`credentials` 路径 | 风险分析 |
+| chat-agent 问答 | `ChatAgentController`、`ChatRequest/ChatResponse` | 单轮问题 | 转发 JSON、包装为 `Result<ChatResponse>` | 会话历史、流式输出、业务编排 |
 | Markdown 汇总 | `CredentialMarkdownAggregationService` | `bidRecordId` | 固定路径 `merged/credentials.md` | 调用大模型 |
 | 风险分析 | `RiskAnalysisService` | `bidRecordId` | 检查/按需转换、汇总、LLM 调用、`risk_analysis` | 文件上传和文件状态持久化 |
 | 文件存储 | `FileStorage` 及实现 | 路径、流、metadata | 保存、读取、删除对象 | 业务状态与数据库 |
@@ -437,6 +443,7 @@ flowchart TD
 
 | YAML 前缀 | 配置类 | 消费者 |
 |---|---|---|
+| `chat-agent` | `ChatAgentProperties` | `ChatAgentController` 使用 `chatAgentRestClient` |
 | `credential-file.converter` | `FileConverterProperties` | `ToMarkdownClient` |
 | `credential-file.storage` | `FileStorageProperties` | Local/MinIO 存储及 MinIO 配置 |
 | `risk-analysis` | `RiskAnalysisProperties` | Markdown 汇总长度校验 |
@@ -447,7 +454,7 @@ flowchart TD
 当前配置分布：
 
 - `application.yml`：服务端口、multipart 限制、默认 profile、转换地址、存储配置、128K 字符限制。
-- `application-dev.yml`：MySQL、OpenAI 兼容模型、邮件和日志。
+- `application-dev.yml`：MySQL、OpenAI 兼容模型、邮件、日志和 chat-agent 地址。
 - 敏感配置通过环境变量读取；MinIO 凭证为空时，只有切换到 `MINIO` 才会在 Bean 创建阶段校验失败。
 
 ## 14. 当前架构边界与维护注意事项
@@ -459,6 +466,7 @@ flowchart TD
 | 上传父记录校验 | 上传服务不查询 `bid_record` 是否存在 | 可写入不存在 `bidRecordId` 的元数据和对象路径 |
 | 文件删除 | 删除端点是占位实现 | 返回成功但不删除对象和数据库行 |
 | 转换触发 | 上传请求不会自动转换；风险分析入口会按需调用无差别转换流程 | 可手动调用转换端点，也可由风险分析入口自动触发 |
+| chat-agent 接入 | Java Controller 通过启动时构造的专用 `RestClient` 同步转发 `/chat` | 当前只覆盖单轮问答，未实现历史、流式和会话管理 |
 | 风险分析前置 | 先检查批次和文件；必要时自动转换并重新查询状态 | 只有全部批次和文件最终为 `CONVERTED` 才会继续汇总和调用大模型 |
 | 转换无批次 | 返回 `ALL_CONVERTED` 成功 | “没有材料”与“全部完成”在转换接口语义上相同 |
 | 汇总覆盖 | 固定 merged object key | 重复分析不会累加文件，但会覆盖上次汇总 |

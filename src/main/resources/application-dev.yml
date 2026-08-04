@@ -17,7 +17,7 @@ credential-file:
       endpoint: ${MINIO_ENDPOINT:http://10.0.0.100:9000}
       access-key: ${MINIO_ACCESS_KEY:}
       secret-key: ${MINIO_SECRET_KEY:}
-      bucket: ${MINIO_BUCKET:credential-files}
+      bucket: ${MINIO_BUCKET:knowledge-file}
 
 risk-analysis:
   # 当前按字符数近似控制汇总 Markdown 的上下文长度，默认约 128K 字符。
@@ -55,8 +55,13 @@ spring:
             enable: true
             required: true
 
-knowledge-ingestion-agent:
-  python-base-url: ${KNOWLEDGE_INGESTION_AGENT_PYTHON_BASE_URL:http://127.0.0.1}
+chat-agent:
+  python-base-url: ${CHAT_AGENT_PYTHON_BASE_URL:http://127.0.0.1:8082}
+  datasource:
+    url: ${CHAT_AGENT_MYSQL_URL:jdbc:mysql://10.0.0.100:3306/chat_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${CHAT_AGENT_MYSQL_USERNAME:${MYSQL_USERNAME}}
+    password: ${CHAT_AGENT_MYSQL_PASSWORD:${MYSQL_PASSWORD}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
 logging:
   file:

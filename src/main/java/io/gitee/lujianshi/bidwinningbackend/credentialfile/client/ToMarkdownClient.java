@@ -1,7 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.client;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileConverterProperties;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.springframework.core.io.InputStreamResource;
@@ -10,6 +9,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -34,11 +34,8 @@ public class ToMarkdownClient {
     private final RestClient restClient;
 
     public ToMarkdownClient(
-            RestClient.Builder restClientBuilder,
-            FileConverterProperties properties) {
-        this.restClient = restClientBuilder
-                .baseUrl(properties.getBaseUrl())
-                .build();
+            @Qualifier("toMarkdownRestClient") RestClient restClient) {
+        this.restClient = restClient;
     }
 
     /**

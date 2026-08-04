@@ -12,9 +12,9 @@
 - 投标记录的多批次资信文件上传、原始文件持久化、SHA-256 校验和、Markdown 转换及汇总；
 - 基于投标记录基础信息和资信材料的同步风险分析，并保存历史分析结果；
 - 邮件测试和中标通知书发送；
-- `knowledgeingestionagent` 的 Java 到 Python 调用契约和 Controller 展位。
+- chat-agent 的 Java Controller 最小同步代理，以及 to-markdown 的 Java 编排接入。
 
-本仓库只实现 Java 服务。前端、Python 转换/知识采集服务、MySQL、MinIO 或本地文件系统、OpenAI 兼容大模型服务和 SMTP 都是外部运行依赖。
+本仓库只实现 Java 服务。前端、Python `to-markdown`/chat-agent 服务、MySQL、MinIO 或本地文件系统、OpenAI 兼容大模型服务和 SMTP 都是外部运行依赖。
 
 当前明确的边界：
 
@@ -23,7 +23,7 @@
 - 文件正文不进入 MySQL，数据库只保存元数据、状态和逻辑存储路径；
 - `bid_record.credentials` 是已转换 Markdown 路径的 JSON 投影，不是资信文件事实源；文件事实源是 `credential_file`；
 - DDL 使用 Flyway 风格 `V*.sql` 命名，但项目没有启用 Flyway，脚本需要按环境手工执行；
-- `knowledgeingestionagent` 当前只搭好 Java 客户端/DTO/Controller 框架，Python 任务服务、定时调度、政策数据库、向量库和前端页面尚未在本仓库实现。
+- chat-agent 当前只支持单轮同步问答，不保存会话历史，也不提供流式输出；前端通过 Java Controller 访问 Python 服务。
 
 ## 2. 构建、启动与配置
 
@@ -70,7 +70,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 | `credential-file.converter` | `FileConverterProperties`，绑定 Python `to-markdown` 基础地址 |
 | `credential-file.storage` | `FileStorageProperties`，选择 `LOCAL`/`MINIO` 及对应参数 |
 | `risk-analysis` | `RiskAnalysisProperties`，当前用于汇总 Markdown 字符上限，开发默认约 128K 字符 |
-| `knowledge-ingestion-agent` | `KnowledgeIngestionAgentProperties`，绑定 Python 知识采集服务地址 |
+| `chat-agent` | `ChatAgentProperties`，绑定 Python 单轮问答服务地址 |
 
 开发环境通过环境变量提供外部配置，例如 `MYSQL_URL`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`、模型 API Key、邮件密码、Python 服务地址、MinIO 地址/密钥/bucket 等。实际值不应写入仓库。
 
@@ -103,7 +103,6 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── entity/                             # 核心数据库实体
 ├── enums/                              # 招标公告状态
 ├── exception/                          # AppException、AppErrorCode
-├── knowledgeingestionagent/            # 政策/资讯采集 Python 对接展位
 ├── mapper/                             # 核心 Mapper 抽象与接口
 ├── service/                            # CRUD、邮件、风险分析、状态检查
 └── utils/                              # Prompt、模板资源、异步任务工具
@@ -322,16 +321,6 @@ RiskAnalysisController
 
 `risk-analysis.max-merged-markdown-chars` 当前按 Java 字符数限制汇总输入，开发默认约 128K；超限时不调用模型。模型输出使用 JSON Schema 约束，落库的 `raw_response` 是 Java 最终抽取到的原始 JSON 文本，而不是数据库字段重新拼装的摘要。
 
-### 6.5 知识资讯采集对接展位
-
-`knowledgeingestionagent` 是后续综合资讯获取/处理 Agent 的 Java 边界：
-
-- `KnowledgeIngestionAgentClient.startJob()` 调 Python `POST /policy-ingestion/jobs`；
-- `getJob()` 调 Python `GET /policy-ingestion/jobs/{jobId}`；
-- `KnowledgeIngestionJobRequest` 携带 jobId、时间窗口和可选 callbackUrl；
-- `KnowledgeIngestionJobResponse` 携带任务状态、阶段、发现/索引/跳过/失败计数及内嵌 `Document` 结果；
-- `KnowledgeIngestionAgentController.run()` 的 `POST /knowledge-ingestion-agent/run` 当前只返回占位成功，不会真正启动任务；
-- 当前没有定时任务、Python 实现、政策原文/Markdown 的 Java 持久化编排、向量数据库或前端页面。
 
 ## 7. Controller 与外部服务索引
 
@@ -346,7 +335,7 @@ RiskAnalysisController
 | `RiskAnalysisController` | `GET /risk-analysis`、`GET /risk-analysis/by-bid-record/{id}`、`POST /bid-record/analyze-risk/{id}` |
 | `FileUploadController` | `POST /credential-files/upload`、`DELETE /credential-files/{uploadBatchId}/files/{fileId}` |
 | `FileConvertController` | `POST /credential-files/bid-records/{bidRecordId}/convert` |
-| `KnowledgeIngestionAgentController` | `POST /knowledge-ingestion-agent/run`（占位） |
+| `ChatAgentController` | `POST /chat-agent/chat`：单轮问答代理 |
 
 完整请求字段和响应示例见 `docs/api.md`；实际 Controller 注解优先于文档中的历史端点数量。
 
@@ -357,7 +346,7 @@ RiskAnalysisController
 | `LocalFileStorage` | Java 本地文件系统 | original/converted/merged 的本地持久化 |
 | `MinioFileStorage` | MinIO | 与本地实现相同的 `store/open/delete` 抽象 |
 | `ToMarkdownClient` | Python `to-markdown` | multipart 发送单个原文件流并接收 Markdown 文件 |
-| `KnowledgeIngestionAgentClient` | Python knowledge ingestion agent | 启动/查询资讯采集任务 |
+| `ChatAgentController` | Python `chat-agent` | 转发单轮 JSON 问题并包装平台响应 |
 | `RiskAnalysisService` | OpenAI 兼容模型/LM Studio | 结构化风险分析 |
 | `MailService` | SMTP | 纯文本和 HTML 邮件 |
 
@@ -388,7 +377,7 @@ BID_HANDLER.*
 INVITATION.*
 CREDENTIAL_FILE.*
 RISK_ANALYSIS.*
-KNOWLEDGE_INGESTION_AGENT.*
+CHAT_AGENT.*
 MAIL.*
 SYSTEM.*
 ```

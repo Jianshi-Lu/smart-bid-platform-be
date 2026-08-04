@@ -124,11 +124,37 @@ public enum AppErrorCode {
     CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT(
             "CREDENTIAL_FILE.CONVERSION_DATA_INCONSISTENT", 500, "资信文件转换数据不一致", false),
 
-    // ==================== KNOWLEDGE_INGESTION_AGENT：知识采集 ====================
+    // ==================== KNOWLEDGE_FILE：知识文件 ====================
 
-    /** KNOWLEDGE_INGESTION_AGENT：知识采集服务调用失败。 */
-    KNOWLEDGE_INGESTION_AGENT_PYTHON_CALL_FAILED(
-            "KNOWLEDGE_INGESTION_AGENT.PYTHON_CALL_FAILED", 502, "知识采集服务调用失败", true),
+    /** KNOWLEDGE_FILE：多文件上传请求不合法。 */
+    KNOWLEDGE_FILE_INVALID_UPLOAD_REQUEST(
+            "KNOWLEDGE_FILE.INVALID_UPLOAD_REQUEST", 400, "知识文件上传请求不合法", false),
+
+    /** KNOWLEDGE_FILE：单个上传文件不合法。 */
+    KNOWLEDGE_FILE_INVALID_FILE(
+            "KNOWLEDGE_FILE.INVALID_FILE", 400, "知识文件不合法", false),
+
+    /** KNOWLEDGE_FILE：对象存储读写失败。 */
+    KNOWLEDGE_FILE_STORAGE_FAILED(
+            "KNOWLEDGE_FILE.STORAGE_FAILED", 503, "知识文件存储失败", true),
+
+    /** KNOWLEDGE_FILE：对象正文回读哈希不一致。 */
+    KNOWLEDGE_FILE_INTEGRITY_CHECK_FAILED(
+            "KNOWLEDGE_FILE.INTEGRITY_CHECK_FAILED", 500, "知识文件完整性校验失败", true),
+
+    /** KNOWLEDGE_FILE：original 转 Markdown 失败。 */
+    KNOWLEDGE_FILE_CONVERSION_FAILED(
+            "KNOWLEDGE_FILE.CONVERSION_FAILED", 502, "知识文件转换失败", true),
+
+    /** KNOWLEDGE_FILE：chat-agent 向量化或补偿删除失败。 */
+    KNOWLEDGE_FILE_VECTORIZATION_FAILED(
+            "KNOWLEDGE_FILE.VECTORIZATION_FAILED", 502, "知识文件向量化失败", true),
+
+    // ==================== CHAT_AGENT：知识问答 ====================
+
+    /** CHAT_AGENT：知识问答服务调用或响应校验失败。 */
+    CHAT_AGENT_PYTHON_CALL_FAILED(
+            "CHAT_AGENT.PYTHON_CALL_FAILED", 502, "知识问答服务调用失败", true),
 
     // ==================== RISK_ANALYSIS：风险分析 ====================
 
