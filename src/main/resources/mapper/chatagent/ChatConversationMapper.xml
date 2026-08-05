@@ -87,4 +87,12 @@
                  conversation_id ASC
     </select>
 
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT conversation_id, user_id, title, next_sequence_no, status,
+               last_message_at, created_at, updated_at, deleted_at
+        FROM chat_conversation
+        WHERE conversation_id = #{conversationId}
+        FOR UPDATE
+    </select>
+
 </mapper>

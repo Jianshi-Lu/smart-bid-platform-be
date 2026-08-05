@@ -156,6 +156,18 @@ public enum AppErrorCode {
     CHAT_AGENT_PYTHON_CALL_FAILED(
             "CHAT_AGENT.PYTHON_CALL_FAILED", 502, "知识问答服务调用失败", true),
 
+    /** CHAT_AGENT：会话不存在。 */
+    CHAT_AGENT_CONVERSATION_NOT_FOUND(
+            "CHAT_AGENT.CONVERSATION_NOT_FOUND", 404, "会话不存在", false),
+
+    /** CHAT_AGENT：当前用户无权访问该会话。 */
+    CHAT_AGENT_CONVERSATION_FORBIDDEN(
+            "CHAT_AGENT.CONVERSATION_FORBIDDEN", 403, "无权访问该会话", false),
+
+    /** CHAT_AGENT：同一客户端消息 ID 被用于提交不同问题。 */
+    CHAT_AGENT_IDEMPOTENCY_CONFLICT(
+            "CHAT_AGENT.IDEMPOTENCY_CONFLICT", 409, "客户端消息 ID 与已有请求内容不一致", false),
+
     // ==================== RISK_ANALYSIS：风险分析 ====================
 
     /** RISK_ANALYSIS：风险分析输入材料未准备完成。 */

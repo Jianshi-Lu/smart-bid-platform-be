@@ -100,4 +100,24 @@
         ORDER BY sequence_no ASC
     </select>
 
+    <select id="selectByConversationAndClientMessageId" resultMap="BaseResultMap">
+        SELECT message_id, conversation_id, request_id, client_message_id,
+               role, content, content_type, sequence_no, status,
+               error_code, error_message, metadata, created_at, updated_at
+        FROM chat_message
+        WHERE conversation_id = #{conversationId}
+          AND client_message_id = #{clientMessageId}
+          AND role = 'USER'
+    </select>
+
+    <select id="selectAssistantByRequestId" resultMap="BaseResultMap">
+        SELECT message_id, conversation_id, request_id, client_message_id,
+               role, content, content_type, sequence_no, status,
+               error_code, error_message, metadata, created_at, updated_at
+        FROM chat_message
+        WHERE conversation_id = #{conversationId}
+          AND request_id = #{requestId}
+          AND role = 'ASSISTANT'
+    </select>
+
 </mapper>

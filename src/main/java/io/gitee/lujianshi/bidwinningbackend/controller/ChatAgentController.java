@@ -1,72 +1,65 @@
 package io.gitee.lujianshi.bidwinningbackend.controller;
 
+import io.gitee.lujianshi.bidwinningbackend.chatagent.ChatAgentConversationService;
+import io.gitee.lujianshi.bidwinningbackend.dto.ChatMessageResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.ChatRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.ChatResponse;
+import io.gitee.lujianshi.bidwinningbackend.dto.ConversationResponse;
+import io.gitee.lujianshi.bidwinningbackend.dto.CreateConversationRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
-import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-/** Java 平台对 chat-agent Python 服务的最小同步代理入口。 */
+import java.util.List;
+
+/** Java 平台对 chat-agent 的会话、历史和问答入口。 */
 @RestController
 @RequestMapping("/chat-agent")
 public class ChatAgentController {
 
-    private final RestClient restClient;
+    private final ChatAgentConversationService conversationService;
 
-    public ChatAgentController(
-            @Qualifier("chatAgentRestClient") RestClient restClient) {
-        this.restClient = restClient;
+    public ChatAgentController(ChatAgentConversationService conversationService) {
+        this.conversationService = conversationService;
     }
 
-    /** 接收单轮问题，转发到 Python {@code POST /chat} 并包装平台统一响应。 */
+    /** 创建服务端生成 ID 的会话。 */
+    @PostMapping(value = "/conversations", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Result<ConversationResponse> createConversation(
+            @Valid @RequestBody(required = false) CreateConversationRequest request) {
+        return Result.success(
+                conversationService.createConversation(request),
+                "会话创建成功");
+    }
+
+    /** 查询当前单用户边界下的会话列表。 */
+    @GetMapping("/conversations")
+    public Result<List<ConversationResponse>> listConversations() {
+        return Result.success(
+                conversationService.listConversations(),
+                "会话查询成功");
+    }
+
+    /** 查询一个已校验归属的会话消息。 */
+    @GetMapping("/conversations/{conversationId}/messages")
+    public Result<List<ChatMessageResponse>> listMessages(
+            @PathVariable String conversationId) {
+        return Result.success(
+                conversationService.listMessages(conversationId),
+                "消息查询成功");
+    }
+
+    /** 执行一次带 conversationId/thread_id 映射和幂等保护的问答。 */
     @PostMapping(value = "/chat", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public Result<ChatResponse> chat(
-            @Valid @RequestBody ChatRequest request) {
-        try {
-            ChatResponse response = restClient.post()
-                    .uri("/chat")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(ChatResponse.class);
-
-            if (response == null
-                    || response.answer() == null
-                    || response.answer().isBlank()) {
-                throw pythonCallFailed(
-                        "VALIDATE_PYTHON_RESPONSE",
-                        "知识问答服务返回了空回答",
-                        null);
-            }
-            return Result.success(response, "知识问答完成");
-        } catch (RestClientException e) {
-            throw pythonCallFailed(
-                    "PYTHON_CALL",
-                    "知识问答服务调用失败",
-                    e);
-        }
-    }
-
-    private AppException pythonCallFailed(
-            String stage,
-            String message,
-            Throwable cause) {
-        return new AppException(
-                AppErrorCode.CHAT_AGENT_PYTHON_CALL_FAILED,
-                "chat-agent",
-                "CHAT",
-                stage,
-                message,
-                cause);
+    public Result<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
+        return Result.success(
+                conversationService.chat(request),
+                "知识问答完成");
     }
 }

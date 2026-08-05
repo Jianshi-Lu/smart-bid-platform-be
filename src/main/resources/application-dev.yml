@@ -57,6 +57,7 @@ spring:
 
 chat-agent:
   python-base-url: ${CHAT_AGENT_PYTHON_BASE_URL:http://127.0.0.1:8082}
+  user-id: ${CHAT_AGENT_USER_ID:1}
   datasource:
     url: ${CHAT_AGENT_MYSQL_URL:jdbc:mysql://10.0.0.100:3306/chat_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${CHAT_AGENT_MYSQL_USERNAME:${MYSQL_USERNAME}}

@@ -14,4 +14,7 @@ public interface ChatConversationMapper
 
     /** 按用户查询未删除会话，供后续会话列表 API 使用。 */
     List<ChatConversation> selectByUserId(@Param("userId") Long userId);
+
+    /** 锁定会话行，用于数据库层面的序号分配保护。 */
+    ChatConversation selectByIdForUpdate(@Param("conversationId") String conversationId);
 }
