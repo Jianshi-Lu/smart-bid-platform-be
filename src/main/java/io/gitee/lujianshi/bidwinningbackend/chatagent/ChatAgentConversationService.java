@@ -13,6 +13,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.ConversationResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.CreateConversationRequest;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -39,12 +41,18 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ChatAgentConversationService {
 
     private static final String ACTIVE = "ACTIVE";
+    private static final String DELETED = "DELETED";
+    private static final String AUTO = "AUTO";
+    private static final String MANUAL = "MANUAL";
     private static final String USER = "USER";
     private static final String ASSISTANT = "ASSISTANT";
     private static final String PROCESSING = "PROCESSING";
     private static final String COMPLETED = "COMPLETED";
     private static final String FAILED = "FAILED";
     private static final String TEXT = "TEXT";
+
+    private static final Logger log = LoggerFactory.getLogger(
+            ChatAgentConversationService.class);
 
     private final RestClient restClient;
     private final ChatConversationMapper conversationMapper;
@@ -85,6 +93,7 @@ public class ChatAgentConversationService {
             created.setConversationId(UUID.randomUUID().toString());
             created.setUserId(currentUserId());
             created.setTitle(title);
+            created.setTitleSource(AUTO);
             created.setNextSequenceNo(1L);
             created.setStatus(ACTIVE);
             conversationMapper.insert(created);
@@ -132,8 +141,11 @@ public class ChatAgentConversationService {
                             "知识问答服务返回了空回答",
                             null);
                 }
-                complete(prepared, pythonResponse.answer());
-                return responseOf(prepared, pythonResponse.answer());
+                String persistedTitle = complete(prepared, pythonResponse);
+                return responseOf(
+                        prepared,
+                        pythonResponse.answer(),
+                        persistedTitle);
             } catch (RestClientException e) {
                 fail(prepared, "PYTHON_CALL", "知识问答服务调用失败");
                 throw pythonCallFailed(
@@ -255,7 +267,9 @@ public class ChatAgentConversationService {
                 .body(PythonChatResponse.class);
     }
 
-    private void complete(PreparedRequest prepared, String answer) {
+    private String complete(
+            PreparedRequest prepared,
+            PythonChatResponse pythonResponse) {
         transactionTemplate.executeWithoutResult(status -> {
             ChatMessage assistant = messageMapper.selectById(
                     prepared.assistantMessage().getMessageId());
@@ -267,7 +281,7 @@ public class ChatAgentConversationService {
                         "COMPLETE_MESSAGE",
                         "助手消息不存在");
             }
-            assistant.setContent(answer);
+            assistant.setContent(pythonResponse.answer());
             assistant.setStatus(COMPLETED);
             assistant.setErrorCode(null);
             assistant.setErrorMessage(null);
@@ -279,6 +293,64 @@ public class ChatAgentConversationService {
             conversation.setLastMessageAt(LocalDateTime.now());
             conversationMapper.updateById(conversation);
         });
+
+        String pythonTitle = pythonResponse.title();
+        if (pythonTitle == null || pythonTitle.isBlank()) {
+            return null;
+        }
+
+        String normalizedTitle = pythonTitle.trim();
+        try {
+            int updated = conversationMapper.updateTitleIfAuto(
+                    prepared.conversationId(),
+                    normalizedTitle);
+            return updated > 0 ? normalizedTitle : null;
+        } catch (RuntimeException e) {
+            // 标题持久化失败不能影响已完成的问答；降级为不返回标题。
+            log.warn(
+                    "自动标题写入失败，conversationId={}",
+                    prepared.conversationId(),
+                    e);
+            return null;
+        }
+    }
+
+    /** 手动修改会话标题，并标记为 MANUAL，后续自动生成不再覆盖。 */
+    public ConversationResponse updateTitle(
+            String conversationId,
+            String title) {
+        requireOwnedConversation(conversationId);
+        String normalizedTitle = title.trim();
+        conversationMapper.updateTitleManual(conversationId, normalizedTitle);
+        ChatConversation conversation = conversationMapper.selectById(conversationId);
+        return ConversationResponse.from(required(conversation, "更新标题后读取失败"));
+    }
+
+    /** 软删除会话；已删除时幂等返回删除后的会话视图。 */
+    public ConversationResponse deleteConversation(String conversationId) {
+        ChatConversation conversation = conversationMapper.selectById(conversationId);
+        if (conversation == null) {
+            throw new AppException(
+                    AppErrorCode.CHAT_AGENT_CONVERSATION_NOT_FOUND,
+                    "chat-agent",
+                    "CONVERSATION",
+                    "DELETE_CONVERSATION",
+                    "会话不存在");
+        }
+        if (!currentUserId().equals(conversation.getUserId())) {
+            throw new AppException(
+                    AppErrorCode.CHAT_AGENT_CONVERSATION_FORBIDDEN,
+                    "chat-agent",
+                    "CONVERSATION",
+                    "DELETE_CONVERSATION",
+                    "当前用户无权删除该会话");
+        }
+
+        LocalDateTime deletedAt = LocalDateTime.now();
+        conversationMapper.softDeleteById(conversationId, deletedAt);
+        conversation.setStatus(DELETED);
+        conversation.setDeletedAt(deletedAt);
+        return ConversationResponse.from(conversation);
     }
 
     private void fail(PreparedRequest prepared, String errorCode, String message) {
@@ -341,11 +413,19 @@ public class ChatAgentConversationService {
     }
 
     private ChatResponse responseOf(PreparedRequest prepared, String answer) {
+        return responseOf(prepared, answer, null);
+    }
+
+    private ChatResponse responseOf(
+            PreparedRequest prepared,
+            String answer,
+            String title) {
         return new ChatResponse(
                 prepared.conversationId(),
                 prepared.requestId(),
                 prepared.clientMessageId(),
-                answer);
+                answer,
+                title);
     }
 
     private AppException pythonCallFailed(
@@ -380,6 +460,6 @@ public class ChatAgentConversationService {
             @JsonProperty("thread_id") String threadId) {
     }
 
-    private record PythonChatResponse(String answer) {
+    private record PythonChatResponse(String answer, String title) {
     }
 }

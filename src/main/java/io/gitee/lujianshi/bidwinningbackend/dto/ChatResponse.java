@@ -5,5 +5,6 @@ public record ChatResponse(
         String conversationId,
         String requestId,
         String clientMessageId,
-        String answer) {
+        String answer,
+        String title) {
 }

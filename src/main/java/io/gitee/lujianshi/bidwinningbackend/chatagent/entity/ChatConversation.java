@@ -23,6 +23,8 @@ public class ChatConversation {
 
     private String title;
 
+    private String titleSource;
+
     private Long nextSequenceNo;
 
     private String status;

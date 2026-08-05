@@ -8,6 +8,7 @@
         <id     column="conversation_id"  property="conversationId"/>
         <result column="user_id"           property="userId"/>
         <result column="title"             property="title"/>
+        <result column="title_source"      property="titleSource"/>
         <result column="next_sequence_no"  property="nextSequenceNo"/>
         <result column="status"            property="status"/>
         <result column="last_message_at"   property="lastMessageAt"/>
@@ -19,10 +20,10 @@
     <insert id="insert"
             parameterType="io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatConversation">
         INSERT INTO chat_conversation
-            (conversation_id, user_id, title, next_sequence_no, status,
+            (conversation_id, user_id, title, title_source, next_sequence_no, status,
              last_message_at, deleted_at)
         VALUES
-            (#{conversationId}, #{userId}, #{title}, #{nextSequenceNo}, #{status},
+            (#{conversationId}, #{userId}, #{title}, #{titleSource}, #{nextSequenceNo}, #{status},
              #{lastMessageAt}, #{deletedAt})
     </insert>
 
@@ -32,6 +33,7 @@
         <set>
             <if test="userId != null">user_id = #{userId},</if>
             <if test="title != null">title = #{title},</if>
+            <if test="titleSource != null">title_source = #{titleSource},</if>
             <if test="nextSequenceNo != null">next_sequence_no = #{nextSequenceNo},</if>
             <if test="status != null">status = #{status},</if>
             <if test="lastMessageAt != null">last_message_at = #{lastMessageAt},</if>
@@ -40,20 +42,44 @@
         WHERE conversation_id = #{conversationId}
     </update>
 
+    <update id="updateTitleIfAuto"
+            parameterType="map">
+        UPDATE chat_conversation
+        SET title = #{title}
+        WHERE conversation_id = #{conversationId}
+          AND title_source = 'AUTO'
+    </update>
+
+    <update id="updateTitleManual"
+            parameterType="map">
+        UPDATE chat_conversation
+        SET title = #{title},
+            title_source = 'MANUAL'
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+    <update id="softDeleteById" parameterType="map">
+        UPDATE chat_conversation
+        SET status = 'DELETED',
+            deleted_at = #{deletedAt}
+        WHERE conversation_id = #{conversationId}
+          AND status &lt;&gt; 'DELETED'
+    </update>
+
     <delete id="deleteById" parameterType="java.lang.String">
         DELETE FROM chat_conversation
         WHERE conversation_id = #{conversationId}
     </delete>
 
     <select id="selectById" parameterType="java.lang.String" resultMap="BaseResultMap">
-        SELECT conversation_id, user_id, title, next_sequence_no, status,
+        SELECT conversation_id, user_id, title, title_source, next_sequence_no, status,
                last_message_at, created_at, updated_at, deleted_at
         FROM chat_conversation
         WHERE conversation_id = #{conversationId}
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT conversation_id, user_id, title, next_sequence_no, status,
+        SELECT conversation_id, user_id, title, title_source, next_sequence_no, status,
                last_message_at, created_at, updated_at, deleted_at
         FROM chat_conversation
     </select>
@@ -67,7 +93,7 @@
     </delete>
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
-        SELECT conversation_id, user_id, title, next_sequence_no, status,
+        SELECT conversation_id, user_id, title, title_source, next_sequence_no, status,
                last_message_at, created_at, updated_at, deleted_at
         FROM chat_conversation
         WHERE conversation_id IN
@@ -77,7 +103,7 @@
     </select>
 
     <select id="selectByUserId" resultMap="BaseResultMap">
-        SELECT conversation_id, user_id, title, next_sequence_no, status,
+        SELECT conversation_id, user_id, title, title_source, next_sequence_no, status,
                last_message_at, created_at, updated_at, deleted_at
         FROM chat_conversation
         WHERE user_id = #{userId}
@@ -88,7 +114,7 @@
     </select>
 
     <select id="selectByIdForUpdate" resultMap="BaseResultMap">
-        SELECT conversation_id, user_id, title, next_sequence_no, status,
+        SELECT conversation_id, user_id, title, title_source, next_sequence_no, status,
                last_message_at, created_at, updated_at, deleted_at
         FROM chat_conversation
         WHERE conversation_id = #{conversationId}

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record ConversationResponse(
         String conversationId,
         String title,
+        String titleSource,
         String status,
         LocalDateTime lastMessageAt,
         LocalDateTime createdAt,
@@ -17,6 +18,7 @@ public record ConversationResponse(
         return new ConversationResponse(
                 conversation.getConversationId(),
                 conversation.getTitle(),
+                conversation.getTitleSource(),
                 conversation.getStatus(),
                 conversation.getLastMessageAt(),
                 conversation.getCreatedAt(),
