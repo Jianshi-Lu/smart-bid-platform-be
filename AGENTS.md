@@ -9,7 +9,7 @@
 这是一个采购/招投标平台的 Java 单体后端，当前已覆盖：
 
 - 招标经办人、招标公告、投标记录的关系型 CRUD；
-- 投标记录的多批次资信文件上传、原始文件持久化、SHA-256 校验和、Markdown 转换及汇总；
+- 投标方账号绑定的资信文件上传、原始文件持久化、SHA-256 校验和、Markdown 转换及汇总；
 - 基于投标记录基础信息和资信材料的同步风险分析，并保存历史分析结果；
 - 邮件测试和中标通知书发送；
 - chat-agent 的 Java Controller 最小同步代理，以及 to-markdown 的 Java 编排接入。
@@ -18,7 +18,7 @@
 
 当前明确的边界：
 
-- 没有鉴权、租户隔离和权限模型；
+- 只有演示级 HTTP Basic 鉴权（投标方/招标方账号），没有租户隔离、RBAC 和权限模型；
 - 业务表之间使用逻辑外键，数据库没有 `FOREIGN KEY`、级联删除或父记录存在性保障；
 - 文件正文不进入 MySQL，数据库只保存元数据、状态和逻辑存储路径；
 - `bid_record.credentials` 是已转换 Markdown 路径的 JSON 投影，不是资信文件事实源；文件事实源是 `credential_file`；
@@ -68,13 +68,14 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 | `application-test.yml` | 测试环境端口、数据库、邮件、日志 |
 | `application-prod.yml` | 生产端口、邮件和日志；数据库、模型、文件存储等生产配置当前未完整呈现，部署前必须确认 |
 | `credential-file.converter` | `FileConverterProperties`，绑定 Python `to-markdown` 基础地址 |
-| `credential-file.storage` | `FileStorageProperties`，选择 `LOCAL`/`MINIO` 及对应参数 |
+| `credential-file.storage` | `FileStorageProperties`，选择 `LOCAL`/`MINIO` 及对应参数；资信材料默认桶 `credential-files` |
+| `knowledge-file.storage` | `KnowledgeFileStorageProperties`，RAG 知识文件存储配置；默认桶 `knowledge-file`，与资信材料分桶 |
 | `risk-analysis` | `RiskAnalysisProperties`，当前用于汇总 Markdown 字符上限，开发默认约 128K 字符 |
 | `chat-agent` | `ChatAgentProperties`，绑定 Python 单轮问答服务地址 |
 
 开发环境通过环境变量提供外部配置，例如 `MYSQL_URL`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`、模型 API Key、邮件密码、Python 服务地址、MinIO 地址/密钥/bucket 等。实际值不应写入仓库。
 
-文件存储默认可选本地目录；切换 MinIO 时设置 `CREDENTIAL_FILE_STORAGE_TYPE=MINIO` 或在对应 profile 中配置 `credential-file.storage.type`，同时提供 MinIO endpoint、access key、secret key 和 bucket。`MinioConfiguration` 只在类型为 `MINIO` 时创建单例 `MinioClient`，不会在 Bean 创建阶段主动检查 Bucket。
+文件存储默认可选本地目录；切换 MinIO 时设置 `CREDENTIAL_FILE_STORAGE_TYPE=MINIO` 或在对应 profile 中配置 `credential-file.storage.type`，同时提供 MinIO endpoint、access key、secret key 和 bucket。知识文件存储类型未单独设置时跟随资信文件存储类型，桶由 `KNOWLEDGE_FILE_MINIO_BUCKET` 控制，默认 `knowledge-file`；资信材料桶由 `CREDENTIAL_FILE_MINIO_BUCKET` 控制，默认 `credential-files`。`MinioConfiguration` 只在任一存储类型为 `MINIO` 时创建单例 `MinioClient`，不会在 Bean 创建阶段主动检查 Bucket。
 
 ### 2.4 数据库脚本
 
@@ -85,22 +86,26 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 ```text
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java
-├── controller/                         # 通用 Controller、风险分析、全局异常出口
+├── controller/                         # 通用/全局异常；角色 Controller 按 bid_inviter/bidder 分包
+│   ├── bid_inviter/                    # 招标方管理入口：公告、经办人、投标记录、风险分析、chat-agent 问答
+│   ├── bidder/                         # 投标方入口：AuthController（注册/登录/me）、BidRecordController（我的投标）
+│   ├── bid_inviter/                    # 招标方管理入口与登录：业务 Controller + AuthController（/bid-inviter/auth）
 ├── credentialfile/                     # 资信文件垂直模块
 │   ├── checksum/                       # SHA-256 算法抽象与实现
 │   ├── client/                         # Python HTTP 客户端及协议 DTO
 │   ├── config/                         # 转换、存储、MinIO 配置
 │   ├── controller/                     # 上传、无差别转换入口
 │   ├── dto/                            # 上传/转换响应与请求
-│   ├── entity/                         # credential_file/batch 实体
+│   ├── entity/                         # credential_file 实体
 │   ├── enums/                          # ConvertStatus、存储类型、汇总状态
-│   ├── intake/                         # multipart 到内部 UploadBatch/UploadItem
-│   ├── mapper/                         # 文件和批次 Mapper
+│   ├── intake/                         # multipart 到内部 UploadItem
+│   ├── mapper/                         # 文件 Mapper
 │   ├── processor/                      # 单文件存储与完整性验证编排
 │   ├── service/                        # 上传、转换、Markdown 汇总
 │   └── storage/                        # FileStorage、Local、MinIO 适配器
 ├── dto/                                # 通用业务请求/响应 DTO
-├── entity/                             # 核心数据库实体
+├── config/                             # 双数据源、MyBatis 与招标方鉴权拦截器（BidInviterAuthInterceptor）
+├── entity/                             # 核心数据库实体（含 BidInviterAccount）
 ├── enums/                              # 招标公告状态
 ├── exception/                          # AppException、AppErrorCode
 ├── mapper/                             # 核心 Mapper 抽象与接口
@@ -137,8 +142,8 @@ HTTP/Controller → DTO → Service → Entity/业务模型
 | `invitation_for_bid` | `InvitationForBid` | 招标公告/Invitation for Bids |
 | `invitation_for_bid_status_history` | `InvitationForBidStatusHistory` | 公告状态变更历史 |
 | `bid_record` | `BidRecord` | 某公告下某投标人的一次投标记录 |
-| `credential_file_batch` | `CredentialFileBatch` | 一个投标记录的一套资信材料上传批次 |
-| `credential_file` | `CredentialFile` | 一个批次中的一个原始文件及转换元数据 |
+| `bid_inviter_account` | `BidInviterAccount` | 招标方（管理员）登录账号（V31） |
+| `credential_file` | `CredentialFile` | 一个文件单元（账号+file_uuid 目录）中的原始文件及转换元数据 |
 | `risk_analysis` | `RiskAnalysis` | 一次风险分析历史结果 |
 
 逻辑关系：
@@ -146,11 +151,14 @@ HTTP/Controller → DTO → Service → Entity/业务模型
 ```text
 bid_handler_info 1 ── * invitation_for_bid
 invitation_for_bid 1 ── * bid_record
-bid_record 1 ── * credential_file_batch 1 ── * credential_file
+bid_record 1 ── * credential_file
 bid_record 1 ── * risk_analysis
 ```
 
-`credential_file_batch.bid_record_id`、`credential_file.bid_record_id`、`credential_file.upload_batch_id` 都是应用层关系。`credential_file` 冗余保存 `bid_record_id`，方便按投标记录查询，但数据库不会自动保证它与所属批次一致。
+`credential_file.bid_record_id`、`bid_record.bidder_account_id` 都是应用层关系。
+`credential_file.file_uuid` 是文件单元唯一标识，同时作为对象存储目录
+`{bidderAccountId}/files/{file_uuid}/...` 的一部分；溯源链路为
+`bidder_account → bid_record → credential_file`。
 
 ### 4.2 `bid_record` 的特殊字段
 
@@ -161,9 +169,19 @@ bid_record 1 ── * risk_analysis
 
 ### 4.3 资信文件字段约束
 
-`credential_file` 保存原始文件名、顺序、MIME 类型、大小、SHA-256、存储类型、`original_file_path`、`markdown_file_path`、状态和时间戳。`credential_file_batch.file_count` 是上传时声明的文件数，`converted_file_count` 是批次已完成转换数。
+`credential_file` 保存原始文件名、顺序、MIME 类型、大小、SHA-256、存储类型、
+`file_uuid`、`original_file_path`、`markdown_file_path`、状态和时间戳。
 
 ## 5. 状态和不可破坏的约束
+
+### 5.0 登录鉴权（最小实现，与投标方对称）
+
+- 投标方：`bidder_account` + `/bidder/auth/*`，受保护接口在 Controller 内做账号归属校验；
+- 招标方：`bid_inviter_account` + `/bid-inviter/auth/*`，初始管理员账号 `admin/admin`（演示环境明文密码）；
+- 招标方管理接口（公告/经办人/投标记录/风险分析/问答/知识文件/资信转换）由
+  `BidInviterAuthInterceptor` 统一校验 HTTP Basic 凭据，未登录返回
+  `BID_INVITER_ACCOUNT.UNAUTHORIZED`；
+- 最小鉴权不签发令牌，每次请求携带用户名+密码；禁止用于生产。
 
 ### 5.1 招标公告
 
@@ -176,23 +194,22 @@ DRAFT → PUBLISHED → CLOSED → AWARDED
 
 不能自转、`CANCELLED` 是终态。状态更新使用 `UPDATE ... WHERE status = oldStatus`，影响行数不是 1 时返回并发冲突；成功后在同一事务写状态历史。
 
-### 5.2 资信批次和文件
+### 5.2 资信文件状态
 
-批次、文件共用 `ConvertStatus`：
+`credential_file` 使用 `ConvertStatus`：
 
 ```text
 UPLOADING → UPLOADED → CONVERTING → CONVERTED
                               └──────→ FAILED
 ```
 
-- 上传时批次先为 `UPLOADING`，所有文件完成存储、回读校验和元数据插入后才封口为 `UPLOADED`；
-- 转换接口是无差别重处理入口，不以 `UPLOADED` 作为唯一筛选条件；`UPLOADED`、`FAILED`、`CONVERTED` 可以重新抢占，`CONVERTING` 不会被第二个请求再次抢占；
-- 文件和批次的状态抢占通过 Mapper 的条件更新完成，返回行数是是否拿到处理权的依据；
+- 上传时文件记录为 `UPLOADED`；转换接口是无差别重处理入口，`UPLOADED`、`FAILED`、`CONVERTED` 可以重新抢占，`CONVERTING` 不会被第二个请求再次抢占；
+- 文件状态抢占通过 Mapper 的条件更新完成，返回行数是是否拿到处理权的依据；
 - Python 只负责文件流到 Markdown 的内容转换；Java 负责 original/converted 存取、
-  完整性校验、批次/文件循环、数据库状态和批次最终收敛；
+  完整性校验、文件循环和数据库状态收敛；
 - 转换成功后保存 `markdown_file_path`，失败信息进入 `error_message`；单文件失败通常被转换服务收敛到失败状态和汇总响应，不一定抛到全局异常处理器；
 - `BidRecordCredentialConversionStatus` 是投标记录级汇总状态：`ALL_CONVERTED / PROCESSING / PARTIAL_FAILED`；
-- 汇总和风险分析不能依赖批次响应快照，必须重新查询数据库确认所有批次、所有文件为 `CONVERTED` 且 Markdown 路径非空。
+- 汇总和风险分析不能依赖转换响应快照，必须重新查询数据库确认该投标记录下所有文件为 `CONVERTED` 且 Markdown 路径非空。
 
 ### 5.3 风险分析
 
@@ -214,35 +231,40 @@ Controller → DTO 校验 → Service → Mapper 接口 → Mapper XML → MySQL
 
 ### 6.2 原始资信文件上传
 
-入口：`POST /credential-files/upload`，`multipart/form-data`，字段为 `bidRecordId` 和重复的 `files`。
+入口：`POST /bidder/bid-records/{id}/credential-files`（投标方登录鉴权 + 账号归属校验），
+`multipart/form-data`，字段为重复的 `files`；`bidRecordId` 来自路径。每次上传的每个文件
+独立生成文件单元 UUID，不再有批次概念。
 
 ```text
 MultipartFile
-  ↓ FileUploadController.toUploadItems()
-UploadItem → UploadBatch
+  ↓ BidderBidRecordController.toUploadItems()
+UploadItem
   ↓ FileUploadService
-创建 credential_file_batch(UPLOADING)
-  ↓ 每个 UploadItem
+每个 UploadItem：
 计算请求流 SHA-256
+  → 生成文件单元 UUID（file_uuid）
   → StoragePath 生成 original 逻辑路径
   → FileStorage.store()
   → 从存储重新 open()，再次计算 SHA-256 并比对
-  → 插入 credential_file(UPLOADED)
-  ↓ 全部成功
-批次 UPLOADING → UPLOADED
-  ↓
-返回 uploadBatchId 和文件元数据
+  → 插入 credential_file(file_uuid, UPLOADED)
+  → 返回 fileId 和文件元数据
 ```
 
 路径由 `StoragePath` 统一生成，当前形态为：
 
 ```text
-bid-records/{bidRecordId}/batches/{uploadBatchId}/original/{randomUUID}_{safeFilename}
+{bidderAccountId}/files/{fileUuid}/original/{fileUuid}_{safeFilename}
+{bidderAccountId}/files/{fileUuid}/converted/content.md
+{bidderAccountId}/merged/{bidRecordId}/credentials.md
 ```
 
-`LocalFileStorage` 将它解释为存储根目录下的相对路径；`MinioFileStorage` 将它解释为 object key。路径会拒绝绝对路径、`.`、`..` 和空片段，原始文件名会去除客户端路径片段和控制字符。原始文件名使用 UUID 前缀，避免同名文件覆盖。
+`LocalFileStorage` 将它解释为存储根目录下的相对路径；`MinioFileStorage` 将它解释为
+object key。路径会拒绝绝对路径、`.`、`..` 和空片段，原始文件名会去除客户端路径片段和
+控制字符。文件单元 UUID 保证目录唯一，converted 固定为 `content.md`，重复转换覆盖同一对象。
 
-上传 Service 会在事务失败时尽力删除本次已写入的对象；对象存储与数据库不是同一事务，删除失败只作为 suppressed exception 保留。当前上传入口只校验 `bidRecordId` 格式，不主动查询投标记录是否存在；由于没有硬外键，错误 ID 可能形成孤儿批次/文件，属于已知限制。
+上传 Service 会在事务失败时尽力删除本次已写入的对象；对象存储与数据库不是同一事务，
+删除失败只作为 suppressed exception 保留。上传接口强制要求投标记录已绑定
+`bidder_account_id`（Controller 校验归属 + Service 防御校验），不存在“无账号上传”。
 
 ### 6.3 原始文件转 Markdown
 
@@ -250,23 +272,20 @@ bid-records/{bidRecordId}/batches/{uploadBatchId}/original/{randomUUID}_{safeFil
 
 ```text
 FileConvertController
-  → FileConvertService.convertAllBatches(bidRecordId)
-  → 查询该投标记录全部批次（batch_no ASC）
-  → Java 条件抢占批次 CONVERTING
-  → 查询批次文件（file_order ASC, file_id ASC）
+  → FileConvertService.convertAll(bidRecordId)
+  → 查询该投标记录全部文件（created_at/file_order/file_id ASC）
   → Java 条件抢占单文件 CONVERTING
   → FileStorage.open(original_file_path)
   → 读取过程中重新计算并校验 original SHA-256
   → ToMarkdownClient multipart POST Python /convert
        file=<original 文件流>
   → 校验 Python 返回非空 text/markdown 文件
-  → Java 生成同批次 converted Markdown 路径
+  → Java 生成同文件单元 converted Markdown 路径（converted/content.md）
   → FileStorage.store() 上传 Markdown 并校验属性/metadata
   → 重新 open converted，校验 Markdown SHA-256
   → 文件标记 CONVERTED 并保存 markdown_file_path
   → 重新聚合已完成路径，回写 bid_record.credentials JSON
-  → 根据最新文件状态收敛批次
-  → 重新查询所有批次，生成总体转换响应
+  → 重新查询所有文件，生成文件级总体转换响应
 ```
 
 Java 接收 Python 返回的 Markdown 正文，并独立负责 original/converted 的全部存储
@@ -274,7 +293,7 @@ Java 接收 Python 返回的 Markdown 正文，并独立负责 original/converte
 object key。converted 路径由 Java 根据 original 路径稳定生成，重复转换覆盖同一
 派生对象。
 
-转换成功后 `credentials` 回写通过 `BidRecordMapper.selectByIdForUpdate` 锁定投标记录，再查询所有 `credential_file` 中状态为 `CONVERTED` 且路径非空的记录，去重后整体覆盖 JSON。风险分析仍然按数据库批次/文件重新排序并读取，不把 `credentials` 当唯一事实源。
+转换成功后 `credentials` 回写通过 `BidRecordMapper.selectByIdForUpdate` 锁定投标记录，再查询所有 `credential_file` 中状态为 `CONVERTED` 且路径非空的记录，去重后整体覆盖 JSON。风险分析仍然按数据库文件重新排序并读取，不把 `credentials` 当唯一事实源。
 
 ### 6.4 汇总 Markdown 与风险分析
 
@@ -284,13 +303,13 @@ object key。converted 路径由 Java 根据 original 路径稳定生成，重�
 RiskAnalysisController
   → RiskAnalysisService.analyzeRisk()
   → 查询 bid_record 并抢占 ANALYZING
-  → 检查批次/文件是否全部 CONVERTED
+  → 检查文件是否全部 CONVERTED
        未完成：调用 FileConvertService 无差别转换，重新查询
   → CredentialMarkdownAggregationService.aggregate()
-       按 batch_no、file_order、file_id 排序
+       按 created_at、file_order、file_id 排序
        读取每个 converted Markdown
        编排标题和分隔线，写临时汇总文件
-       覆盖 bid-records/{id}/merged/credentials.md
+       覆盖 {bidderAccountId}/merged/{bidRecordId}/credentials.md
   → 重新读取 merged Markdown
   → BidRecordLoader 加载投标记录基础信息
   → PromptFiller 加载 system/user Prompt 并填充变量
@@ -307,8 +326,6 @@ RiskAnalysisController
 # 投标记录资信材料汇总
 
 投标记录 ID：{bidRecordId}
-
-## 批次 {batchNo}
 
 ### 文件：{originalFilename}
 
@@ -333,7 +350,7 @@ RiskAnalysisController
 | `InvitationForBidController` | `/invitation-for-bid/*`：CRUD、批量新增、状态变更 |
 | `BidRecordController` | `/bid-record/*`：CRUD、分页、批量删除、按公告查询 |
 | `RiskAnalysisController` | `GET /risk-analysis`、`GET /risk-analysis/by-bid-record/{id}`、`POST /bid-record/analyze-risk/{id}` |
-| `FileUploadController` | `POST /credential-files/upload`、`DELETE /credential-files/{uploadBatchId}/files/{fileId}` |
+| `BidderBidRecordController` | `/bidder/bid-records/*`：我的投标 CRUD、`POST /{id}/credential-files` 上传、`DELETE /{id}/credential-files/{fileId}` 删除 |
 | `FileConvertController` | `POST /credential-files/bid-records/{bidRecordId}/convert` |
 | `ChatAgentController` | `POST /chat-agent/chat`：单轮问答代理 |
 
@@ -470,11 +487,11 @@ tests/postman/credential-file-flow.postman_collection.json
 
 ### 未完成或已知限制
 
-- `DELETE /credential-files/{uploadBatchId}/files/{fileId}` 仍是占位实现，不会真实校验归属、删除对象或更新数据库；
+- 资信文件删除已实现真实删除（对象 + DB + `bid_record.credentials` 投影同步），但删除不级联投标记录；
 - 上传不会自动把原始文件转换为 Markdown；风险分析入口会在需要时自动调用转换；
 - 风险分析 `ANALYZING` 没有超时恢复；
 - 手动转换与风险分析没有投标记录级互斥；
-- 无鉴权、租户隔离、数据库硬外键、级联删除和孤儿数据清理；
+- 租户隔离、数据库硬外键、级联删除和孤儿数据清理仍缺失；演示鉴权为 HTTP Basic 明文密码；
 - 资讯采集的 Python 服务、定时任务、LangChain 编排、原文/Markdown 持久化、去重、向量化、向量数据库和前端 UI 尚未实现；
 - 生产 profile 的数据库、模型和文件存储配置完整性待部署前确认；
 - Python 的标题/OCR 格式化细节不属于本仓库；converted 覆盖、MinIO 权限和存储

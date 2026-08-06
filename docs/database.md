@@ -6,15 +6,17 @@
 
 ## 1. 结论与约束
 
-当前最终结构包含 7 张业务表：
+当前最终结构包含 6 张业务表：
 
 1. `bid_handler_info`
 2. `invitation_for_bid`
 3. `invitation_for_bid_status_history`
 4. `bid_record`
-5. `credential_file_batch`
-6. `credential_file`
-7. `risk_analysis`
+5. `credential_file`
+6. `risk_analysis`
+
+> 说明：`credential_file_batch`（上传批次）已随批次概念移除而废弃并删除；
+> 文件单元唯一标识由 `credential_file.file_uuid` 承担。
 
 数据库设计有三个必须先明确的事实：
 
@@ -29,9 +31,8 @@ erDiagram
     BID_HANDLER_INFO ||--o{ INVITATION_FOR_BID : "bid_handler_id（逻辑）"
     INVITATION_FOR_BID ||--o{ INVITATION_STATUS_HISTORY : "invitation_id（逻辑）"
     INVITATION_FOR_BID ||--o{ BID_RECORD : "invitation_id（逻辑）"
-    BID_RECORD ||--o{ CREDENTIAL_FILE_BATCH : "bid_record_id（逻辑）"
-    CREDENTIAL_FILE_BATCH ||--o{ CREDENTIAL_FILE : "upload_batch_id（逻辑）"
-    BID_RECORD ||--o{ CREDENTIAL_FILE : "bid_record_id（冗余逻辑关联）"
+    BIDDER_ACCOUNT ||--o{ BID_RECORD : "bidder_account_id（逻辑）"
+    BID_RECORD ||--o{ CREDENTIAL_FILE : "bid_record_id（逻辑）"
     BID_RECORD ||--o{ RISK_ANALYSIS : "bid_record_id（逻辑）"
 
     BID_HANDLER_INFO {
@@ -89,24 +90,9 @@ erDiagram
         VARCHAR risk_analysis_error
     }
 
-    CREDENTIAL_FILE_BATCH {
-        CHAR upload_batch_id PK
-        INT bid_record_id FK
-        INT batch_no
-        VARCHAR status
-        INT file_count
-        INT converted_file_count
-        VARCHAR error_message
-        DATETIME created_at
-        DATETIME uploaded_at
-        DATETIME converting_at
-        DATETIME converted_at
-        DATETIME updated_at
-    }
-
     CREDENTIAL_FILE {
         BIGINT file_id PK
-        CHAR upload_batch_id FK
+        CHAR file_uuid
         INT bid_record_id FK
         INT file_order
         VARCHAR original_filename
@@ -147,9 +133,7 @@ bid_handler_info
 └── invitation_for_bid
     ├── invitation_for_bid_status_history
     └── bid_record
-        ├── credential_file_batch
-        │   └── credential_file
-        ├── credential_file（冗余保存 bid_record_id，便于直接查询）
+        ├── credential_file（通过 bid_record_id 归属）
         └── risk_analysis
 ```
 
@@ -204,9 +188,8 @@ flowchart LR
 | `invitation_for_bid.bid_handler_id` | `bid_handler_info.bid_handler_id` | 多对一 | 否 | 否 | 公告归属经办人 |
 | `invitation_for_bid_status_history.invitation_id` | `invitation_for_bid.invitation_id` | 多对一 | 否 | 否 | 公告状态审计 |
 | `bid_record.invitation_id` | `invitation_for_bid.invitation_id` | 多对一 | 否 | 否 | 公告下的投标记录 |
-| `credential_file_batch.bid_record_id` | `bid_record.bid_record_id` | 多对一 | 否 | 否 | 投标记录的上传批次 |
-| `credential_file.upload_batch_id` | `credential_file_batch.upload_batch_id` | 多对一 | 否 | 否 | 批次内文件 |
-| `credential_file.bid_record_id` | `bid_record.bid_record_id` | 多对一 | 是 | 否 | 绕过批次直接查全部文件 |
+| `bid_record.bidder_account_id` | `bidder_account.bidder_account_id` | 多对一 | 是 | 否 | 投标方账号归属 |
+| `credential_file.bid_record_id` | `bid_record.bid_record_id` | 多对一 | 是 | 否 | 直接查询投标记录下全部文件 |
 | `risk_analysis.bid_record_id` | `bid_record.bid_record_id` | 多对一 | 否 | 否 | 历史风险分析 |
 
 删除父记录时数据库不会自动：
@@ -332,8 +315,8 @@ flowchart LR
 - 它是转换后路径的冗余投影，不是原始文件，也不是 Markdown 正文。
 - Java 通过 `Fastjson2TypeHandler` 在 `List<String>` 与 MySQL JSON 之间转换。
 - 每个文件转换成功后，Service 会重新查询所有已完成文件并整体覆盖该 JSON。
-- 当前 `selectByBidRecordId` 的排序是 `upload_batch_id ASC, file_order ASC, file_id ASC`，不等同于业务 `batch_no` 顺序。
-- 风险分析不依赖 `credentials`，而是按 `batch_no` 和 `file_order` 从批次/文件表重新组织，避免 JSON 投影过期或排序偏差。
+- 当前 `selectByBidRecordId` 的排序是 `created_at ASC, file_order ASC, file_id ASC`。
+- 风险分析不依赖 `credentials`，而是按文件顺序从 `credential_file` 重新组织，避免 JSON 投影过期或排序偏差。
 
 ### 8.2 风险分析状态
 
@@ -346,48 +329,14 @@ COMPLETED ┘
 
 数据库条件更新负责抢占，但没有超时字段索引或自动恢复任务。
 
-## 9. `credential_file_batch`
-
-用途：一次 multipart 上传形成一个不可追加的业务批次。
-
-| 字段 | 类型 | NULL | 默认/生成 | 键/关系 | 说明 |
-|---|---|---:|---|---|---|
-| `upload_batch_id` | `CHAR(36)` | 否 | Java UUID | PK | 上传批次 ID |
-| `bid_record_id` | `INT` | 否 | — | 逻辑 FK → `bid_record` | 所属投标记录 |
-| `batch_no` | `INT` | 否 | — | 参与唯一键 | 投标记录内从 1 递增 |
-| `status` | `VARCHAR(20)` | 否 | `UPLOADING` | 状态字段 | 上传/转换状态 |
-| `file_count` | `INT` | 否 | `0` | — | 声明的文件总数 |
-| `converted_file_count` | `INT` | 否 | `0` | — | 已完成文件数 |
-| `error_message` | `VARCHAR(1000)` | 是 | `NULL` | — | 批次失败摘要 |
-| `created_at` | `DATETIME` | 否 | `CURRENT_TIMESTAMP` | — | 批次创建 |
-| `uploaded_at` | `DATETIME` | 是 | `NULL` | — | original 全部完成 |
-| `converting_at` | `DATETIME` | 是 | `NULL` | — | 最近开始转换 |
-| `converted_at` | `DATETIME` | 是 | `NULL` | — | 全部转换完成 |
-| `updated_at` | `DATETIME` | 否 | 自动更新 | — | 最后更新时间 |
-
-索引与约束：
-
-- PK：`upload_batch_id`
-- 唯一键：`uk_bid_record_batch_no(bid_record_id, batch_no)`
-- 普通索引：`idx_bid_record_id(bid_record_id)`
-- 普通索引：`idx_status(status)`
-
-状态：
-
-```text
-UPLOADING → UPLOADED → CONVERTING → CONVERTED
-                              └──→ FAILED → CONVERTING
-CONVERTED 也允许再次进入 CONVERTING
-```
-
-## 10. `credential_file`
+## 9. `credential_file`
 
 用途：每个原始上传文件一行，追踪原始对象、转换对象、校验和和状态。
 
 | 字段 | 类型 | NULL | 默认/生成 | 键/关系 | 说明 |
 |---|---|---:|---|---|---|
 | `file_id` | `BIGINT` | 否 | `AUTO_INCREMENT` | PK | 文件 ID |
-| `upload_batch_id` | `CHAR(36)` | 否 | — | 逻辑 FK → `credential_file_batch` | 所属批次 |
+| `file_uuid` | `CHAR(36)` | 否 | Java UUID | 文件单元标识 | 对象目录 `{accountId}/files/{file_uuid}/` 的一部分 |
 | `bid_record_id` | `INT` | 是 | `NULL` | 逻辑 FK → `bid_record` | 直接归属字段 |
 | `file_order` | `INT` | 否 | `0` | 排序字段 | 请求内从 0 开始 |
 | `original_filename` | `VARCHAR(255)` | 否 | — | — | 清理后的原始文件名 |
@@ -406,15 +355,15 @@ CONVERTED 也允许再次进入 CONVERTING
 索引：
 
 - PK：`file_id`
-- `idx_upload_batch_id(upload_batch_id)`
+- `idx_file_uuid(file_uuid)`
 - `idx_bid_record_id(bid_record_id)`
 - `idx_status(status)`
 
 当前应用在上传时已经知道 `bidRecordId`，因此会立即填写 `bid_record_id` 和 `bound_at`。DDL 中“后续回填”的注释属于更早的设计，和当前上传实现不完全一致。
 
-当前没有唯一约束 `(upload_batch_id, file_order)`，因此顺序唯一性由 Java 上传循环维护。
+当前没有唯一约束 `(file_uuid, file_order)`，因此顺序唯一性由 Java 上传循环维护。
 
-## 11. `risk_analysis`
+## 10. `risk_analysis`
 
 用途：保存每次成功风险分析的历史快照。
 
@@ -456,23 +405,23 @@ flowchart LR
 
 `raw_response` 是 JSON 列，因此数据库会拒绝非法 JSON。HTTP 响应序列化时它作为 Java `String` 再被 JSON 转义，视觉上会出现引号前的反斜杠；数据库中保存的 JSON 本身不是在每个中文字符前增加反斜杠。
 
-## 12. 文件对象与数据库字段的关系
+## 11. 文件对象与数据库字段的关系
 
 ```text
-bid-records/{bidRecordId}/
-├── batches/{uploadBatchId}/
-│   ├── original/{uuid}_{filename}
+{bidderAccountId}/
+├── files/{fileUuid}/
+│   ├── original/{fileUuid}_{filename}
 │   │   └── credential_file.original_file_path
-│   └── converted/{name}.md
+│   └── converted/content.md
 │       └── credential_file.markdown_file_path
-└── merged/credentials.md
+└── merged/{bidRecordId}/credentials.md
     └── 不对应数据库文件行，每次风险分析时覆盖
 ```
 
 | 对象信息 | 数据库来源 |
 |---|---|
-| `{bidRecordId}` | `bid_record.bid_record_id` |
-| `{uploadBatchId}` | `credential_file_batch.upload_batch_id` |
+| `{bidderAccountId}` | `bid_record.bidder_account_id` |
+| `{fileUuid}` | `credential_file.file_uuid` |
 | original object key | `credential_file.original_file_path` |
 | converted object key | `credential_file.markdown_file_path` |
 | converted key 列表投影 | `bid_record.credentials` |
@@ -498,7 +447,6 @@ bid-records/{bidRecordId}/
 
 - 所有主键唯一。
 - `(invitation_id, bidder_name, bid_no)` 唯一。
-- `(bid_record_id, batch_no)` 唯一。
 - 非空列约束。
 - `JSON` 列必须是合法 JSON。
 - 字段长度和数值类型。
