@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidInviterAccountMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidInviterAccount">
+        <id     column="bid_inviter_account_id" property="bidInviterAccountId"/>
+        <result column="username"             property="username"/>
+        <result column="password"             property="password"/>
+        <result column="phone"                property="phone"/>
+        <result column="display_name"         property="displayName"/>
+        <result column="created_at"           property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidInviterAccount"
+            useGeneratedKeys="true"
+            keyProperty="bidInviterAccountId">
+        INSERT INTO bid_inviter_account
+            (username, password, phone, display_name, created_at)
+        VALUES
+            (#{username}, #{password}, #{phone}, #{displayName}, #{createdAt})
+    </insert>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT bid_inviter_account_id, username, password, phone, display_name,
+               created_at
+        FROM bid_inviter_account
+        WHERE bid_inviter_account_id = #{bidInviterAccountId}
+    </select>
+
+    <select id="selectByUsername" resultMap="BaseResultMap">
+        SELECT bid_inviter_account_id, username, password, phone, display_name,
+               created_at
+        FROM bid_inviter_account
+        WHERE username = #{username}
+    </select>
+
+</mapper>

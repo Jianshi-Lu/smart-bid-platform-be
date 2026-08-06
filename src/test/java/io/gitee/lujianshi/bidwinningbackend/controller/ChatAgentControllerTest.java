@@ -6,6 +6,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.ChatResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.ConversationResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.UpdateConversationTitleRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
+import io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter.ChatAgentController;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

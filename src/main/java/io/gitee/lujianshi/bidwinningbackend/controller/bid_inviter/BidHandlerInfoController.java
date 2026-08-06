@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.controller;
+package io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;

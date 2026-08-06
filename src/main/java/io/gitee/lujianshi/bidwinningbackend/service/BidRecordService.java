@@ -96,4 +96,14 @@ public class BidRecordService extends BaseService<BidRecord> {
     public List<BidRecord> listByInvitationId(Integer invitationId) {
         return mapper.selectByInvitationId(invitationId);
     }
+
+    /**
+     * 按投标方账号查询其全部投标记录（"我的投标"），按 bidAt 倒序。
+     *
+     * @param bidderAccountId 投标方账号 ID
+     * @return 该账号的投标记录；无记录时返回空列表
+     */
+    public List<BidRecord> listByBidderAccountId(Long bidderAccountId) {
+        return mapper.selectByBidderAccountId(bidderAccountId);
+    }
 }

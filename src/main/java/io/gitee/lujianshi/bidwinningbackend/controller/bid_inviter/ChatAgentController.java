@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.controller;
+package io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter;
 
 import io.gitee.lujianshi.bidwinningbackend.chatagent.ChatAgentConversationService;
 import io.gitee.lujianshi.bidwinningbackend.dto.ChatMessageResponse;
