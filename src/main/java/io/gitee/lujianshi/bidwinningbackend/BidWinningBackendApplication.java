@@ -16,10 +16,12 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @ConfigurationPropertiesScan
 @EnableAsync
 @EnableAspectJAutoProxy
-@MapperScan({
-        "io.gitee.lujianshi.bidwinningbackend.mapper",
-        "io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper"
-})
+@MapperScan(
+        basePackages = {
+                "io.gitee.lujianshi.bidwinningbackend.mapper",
+                "io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper"
+        },
+        sqlSessionFactoryRef = "mainSqlSessionFactory")
 public class BidWinningBackendApplication {
 
     public static void main(String[] args) {

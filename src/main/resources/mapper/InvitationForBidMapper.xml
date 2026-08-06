@@ -74,9 +74,9 @@
 
     <update id="updateStatusIfCurrent">
         UPDATE invitation_for_bid
-        SET status = #{toStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
+        SET status = #{toStatus}
         WHERE invitation_id = #{invitationId}
-          AND status = #{fromStatus, typeHandler=org.apache.ibatis.type.EnumTypeHandler}
+          AND status = #{fromStatus}
     </update>
 
     <delete id="deleteById" parameterType="java.lang.Integer">
