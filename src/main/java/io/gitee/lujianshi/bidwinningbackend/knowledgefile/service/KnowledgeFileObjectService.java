@@ -24,7 +24,7 @@ public class KnowledgeFileObjectService {
     private final FileChecksumCalculator checksumCalculator;
 
     public KnowledgeFileObjectService(
-            FileStorage fileStorage,
+            @Qualifier("knowledgeFileStorage") FileStorage fileStorage,
             @Qualifier("sha256FileChecksumCalculator")
             FileChecksumCalculator checksumCalculator) {
         this.fileStorage = fileStorage;

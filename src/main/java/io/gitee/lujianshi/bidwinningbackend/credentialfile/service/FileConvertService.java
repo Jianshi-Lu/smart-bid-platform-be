@@ -4,13 +4,11 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksum
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.ToMarkdownClient;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.BatchConvertResponse;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
@@ -32,25 +30,21 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 
-/** 按 bid_record 编排资信文件批次转换。 */
+/** 按 bid_record 编排资信文件转换，以文件为最小状态单元。 */
 @Service
 public class FileConvertService {
 
     private static final String MARKDOWN_CONTENT_TYPE =
             "text/markdown; charset=utf-8";
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
-    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String FILE_UUID_METADATA = "file-uuid";
     private static final String SOURCE_FILE_ID_METADATA = "source-file-id";
     private static final String SOURCE_SHA256_METADATA = "source-sha256";
     private static final String MARKDOWN_SHA256_METADATA = "markdown-sha256";
-
-    @Resource
-    private CredentialFileBatchMapper batchMapper;
 
     @Resource
     private CredentialFileMapper fileMapper;
@@ -79,20 +73,20 @@ public class FileConvertService {
     private FileConvertService self;
 
     /**
-     * 无差别重新处理指定投标记录下的全部批次，并返回批次级汇总状态。
+     * 无差别重新处理指定投标记录下的全部资信文件，并返回文件级汇总状态。
      *
      * <p>Java 读取 original 文件、校验其 SHA-256、multipart 调用 Python、保存并回读
      * converted Markdown。重复转换使用同一个 converted 路径并覆盖旧派生对象。</p>
      */
-    public FileConvertResponse convertAllBatches(Integer bidRecordId) {
+    public FileConvertResponse convertAll(Integer bidRecordId) {
         validateBidRecord(bidRecordId);
 
-        List<CredentialFileBatch> batches = batchMapper.selectByBidRecordId(bidRecordId);
-        if (batches == null || batches.isEmpty()) {
+        List<CredentialFile> files = fileMapper.selectByBidRecordId(bidRecordId);
+        if (files == null || files.isEmpty()) {
             return new FileConvertResponse(
                     bidRecordId,
                     BidRecordCredentialConversionStatus.ALL_CONVERTED,
-                    "该投标记录暂无资信材料批次",
+                    "该投标记录暂无资信文件",
                     0,
                     0,
                     0,
@@ -100,114 +94,78 @@ public class FileConvertService {
                     List.of());
         }
 
-        for (CredentialFileBatch batch : batches) {
-            convertBatch(batch);
+        for (CredentialFile file : files) {
+            convertFile(file);
         }
 
-        List<CredentialFileBatch> latestBatches =
-                batchMapper.selectByBidRecordId(bidRecordId);
-        if (latestBatches == null) {
-            latestBatches = List.of();
+        List<CredentialFile> latestFiles =
+                fileMapper.selectByBidRecordId(bidRecordId);
+        if (latestFiles == null) {
+            latestFiles = List.of();
         }
 
-        int convertedCount = countByStatus(latestBatches, ConvertStatus.CONVERTED);
-        int failedCount = countByStatus(latestBatches, ConvertStatus.FAILED);
-        int processingCount = latestBatches.size() - convertedCount - failedCount;
+        int convertedCount = countByStatus(latestFiles, ConvertStatus.CONVERTED);
+        int failedCount = countByStatus(latestFiles, ConvertStatus.FAILED);
+        int processingCount = latestFiles.size() - convertedCount - failedCount;
 
         BidRecordCredentialConversionStatus overallStatus;
         String message;
         if (failedCount > 0) {
             overallStatus = BidRecordCredentialConversionStatus.PARTIAL_FAILED;
-            message = "部分资信材料批次转换失败";
-        } else if (convertedCount == latestBatches.size()) {
+            message = "部分资信文件转换失败";
+        } else if (convertedCount == latestFiles.size()) {
             overallStatus = BidRecordCredentialConversionStatus.ALL_CONVERTED;
-            message = "该投标记录的所有资信材料批次已经完成转换";
+            message = "该投标记录的所有资信文件已经完成转换";
         } else {
             overallStatus = BidRecordCredentialConversionStatus.PROCESSING;
-            message = "部分资信材料批次仍在处理中";
+            message = "部分资信文件仍在处理中";
         }
 
         return new FileConvertResponse(
                 bidRecordId,
                 overallStatus,
                 message,
-                latestBatches.size(),
+                latestFiles.size(),
                 convertedCount,
                 processingCount,
                 failedCount,
-                toBatchResponses(latestBatches));
+                toFileItems(latestFiles));
     }
 
-    /** 抢占一个批次，并由 Java 逐文件编排转换和状态更新。 */
-    private void convertBatch(CredentialFileBatch batch) {
-        LocalDateTime now = LocalDateTime.now();
-        int claimed = batchMapper.claimConverting(batch.getUploadBatchId(), now);
+    /** 抢占单个文件，并由 Java 完成该文件的转换与状态更新。 */
+    private void convertFile(CredentialFile file) {
+        int claimed = fileMapper.markConverting(file.getFileId());
         if (claimed != 1) {
+            // 没有获得文件处理权不代表转换失败，由后续状态聚合决定整体结果。
             return;
         }
 
-        int convertedFileCount = 0;
         try {
-            List<CredentialFile> files = fileMapper.selectByUploadBatchId(
-                    batch.getUploadBatchId());
-            if (files == null || files.size() != batch.getFileCount()) {
-                throw conversionDataInconsistent("资信文件批次明细数量不一致");
+            String markdownPath = convertAndStore(file);
+            int rows = fileMapper.markConverted(
+                    file.getFileId(),
+                    markdownPath,
+                    LocalDateTime.now());
+            if (rows != 1) {
+                throw persistenceFailure(
+                        "MARK_FILE_CONVERTED",
+                        "资信文件完成状态更新失败: " + file.getFileId(),
+                        null);
             }
-
-            List<String> failures = new ArrayList<>();
-            for (CredentialFile file : files) {
-                int fileClaimed = fileMapper.markConverting(file.getFileId());
-                if (fileClaimed != 1) {
-                    // 没有获得文件处理权不代表转换失败，不能触发批次级失败处理。
-                    // 循环结束后通过最新数据库状态决定批次是否仍在处理中。
-                    continue;
-                }
-
-                String markdownPath;
-                try {
-                    markdownPath = convertAndStore(file);
-                } catch (RuntimeException failure) {
-                    String message = toErrorMessage(failure);
-                    int rows = fileMapper.markFailed(file.getFileId(), message);
-                    if (rows != 1) {
-                        throw persistenceFailure(
-                                "MARK_FILE_FAILED",
-                                "资信文件失败状态更新失败: " + file.getFileId(),
-                                failure);
-                    }
-                    failures.add(file.getOriginalFilename() + ": " + message);
-                    // 重试已转换文件失败时，立即从 bid_record.credentials 投影中移除
-                    // 失效路径；对象和文件状态仍以 credential_file 为事实源。
-                    self.syncBidRecordCredentials(batch.getBidRecordId());
-                    continue;
-                }
-
-                int rows = fileMapper.markConverted(
-                        file.getFileId(),
-                        markdownPath,
-                        LocalDateTime.now());
-                if (rows != 1) {
-                    throw persistenceFailure(
-                            "MARK_FILE_CONVERTED",
-                            "资信文件完成状态更新失败: " + file.getFileId(),
-                            null);
-                }
-                convertedFileCount++;
-
-                // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
-                // 回写失败属于批次编排失败，不再把已经转换成功的文件改记为 FAILED。
-                self.syncBidRecordCredentials(batch.getBidRecordId());
-            }
-
-            finalizeBatch(batch, failures);
+            // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
+            self.syncBidRecordCredentials(file.getBidRecordId());
         } catch (RuntimeException failure) {
-            fileMapper.markFailedByUploadBatchId(
-                    batch.getUploadBatchId(),
-                    toErrorMessage(failure));
-            markBatchFailed(
-                    batch.getUploadBatchId(),
-                    convertedFileCount,
-                    failure.getMessage());
+            String message = toErrorMessage(failure);
+            int rows = fileMapper.markFailed(file.getFileId(), message);
+            if (rows != 1) {
+                throw persistenceFailure(
+                        "MARK_FILE_FAILED",
+                        "资信文件失败状态更新失败: " + file.getFileId(),
+                        failure);
+            }
+            // 重试已转换文件失败时，立即从 bid_record.credentials 投影中移除
+            // 失效路径；对象和文件状态仍以 credential_file 为事实源。
+            self.syncBidRecordCredentials(file.getBidRecordId());
         }
     }
 
@@ -266,7 +224,7 @@ public class FileConvertService {
         String markdownSha256 = calculateSha256(markdown);
         Map<String, String> metadata = Map.of(
                 BID_RECORD_ID_METADATA, file.getBidRecordId().toString(),
-                UPLOAD_BATCH_ID_METADATA, file.getUploadBatchId(),
+                FILE_UUID_METADATA, file.getFileUuid(),
                 SOURCE_FILE_ID_METADATA, file.getFileId().toString(),
                 SOURCE_SHA256_METADATA, file.getSha256(),
                 MARKDOWN_SHA256_METADATA, markdownSha256);
@@ -343,8 +301,8 @@ public class FileConvertService {
         if (file == null
                 || file.getFileId() == null
                 || file.getBidRecordId() == null
-                || file.getUploadBatchId() == null
-                || file.getUploadBatchId().isBlank()
+                || file.getFileUuid() == null
+                || file.getFileUuid().isBlank()
                 || file.getOriginalFilename() == null
                 || file.getOriginalFilename().isBlank()
                 || file.getOriginalFilePath() == null
@@ -363,7 +321,7 @@ public class FileConvertService {
         }
     }
 
-    /** 将 original 路径映射为 converted Markdown 路径并统一转换异常语义。 */
+    /** 将 original 路径映射为文件单元内固定的 converted Markdown 路径。 */
     private String createMarkdownPath(String originalFilePath) {
         try {
             return StoragePath.createConvertedMarkdownPath(originalFilePath);
@@ -409,72 +367,6 @@ public class FileConvertService {
         }
     }
 
-    /** 根据文件的最新状态收敛批次状态，避免使用本次请求的局部计数作判断。 */
-    private void finalizeBatch(
-            CredentialFileBatch batch,
-            List<String> failures) {
-        List<CredentialFile> latestFiles = fileMapper.selectByUploadBatchId(
-                batch.getUploadBatchId());
-        if (latestFiles == null || latestFiles.size() != batch.getFileCount()) {
-            throw conversionDataInconsistent("资信文件批次明细数量不一致");
-        }
-
-        int convertedFileCount = (int) latestFiles.stream()
-                .filter(file -> file.getStatus() == ConvertStatus.CONVERTED)
-                .count();
-        boolean hasFailed = latestFiles.stream()
-                .anyMatch(file -> file.getStatus() == ConvertStatus.FAILED);
-        boolean hasProcessing = latestFiles.stream()
-                .anyMatch(file -> file.getStatus() == ConvertStatus.UPLOADING
-                        || file.getStatus() == ConvertStatus.UPLOADED
-                        || file.getStatus() == ConvertStatus.CONVERTING);
-
-        if (hasFailed) {
-            String message = failures.isEmpty()
-                    ? latestFiles.stream()
-                    .filter(file -> file.getStatus() == ConvertStatus.FAILED)
-                    .map(file -> file.getOriginalFilename() + ": "
-                            + toErrorMessage(file.getErrorMessage()))
-                    .reduce((left, right) -> left + "; " + right)
-                    .orElse("资信文件转换失败")
-                    : String.join("; ", failures);
-            markBatchFailed(
-                    batch.getUploadBatchId(),
-                    convertedFileCount,
-                    message);
-            return;
-        }
-
-        if (hasProcessing) {
-            // 仍有文件由其他任务处理，保留批次 CONVERTING 状态。
-            return;
-        }
-
-        if (convertedFileCount != batch.getFileCount()) {
-            throw conversionDataInconsistent("资信文件批次状态不一致");
-        }
-
-        int rows = batchMapper.markConverted(
-                batch.getUploadBatchId(),
-                convertedFileCount,
-                LocalDateTime.now());
-        if (rows != 1) {
-            throw persistenceFailure(
-                    "MARK_BATCH_CONVERTED",
-                    "资信文件批次完成状态更新失败",
-                    null);
-        }
-    }
-
-    /** 将批次失败原因截断到数据库字段长度以内。 */
-    private void markBatchFailed(
-            String uploadBatchId,
-            int convertedFileCount,
-            String errorMessage) {
-        String message = toErrorMessage(errorMessage);
-        batchMapper.markFailed(uploadBatchId, convertedFileCount, message);
-    }
-
     private String toErrorMessage(Throwable failure) {
         return toErrorMessage(failure == null ? null : failure.getMessage());
     }
@@ -492,7 +384,7 @@ public class FileConvertService {
     /**
      * 将当前投标记录下已完成文件的 Markdown object key 列表写回 bid_record。
      *
-     * <p>先锁定 bid_record 行，再查询文件路径并整体更新 JSON，避免两个批次并发转换时发生
+     * <p>先锁定 bid_record 行，再查询文件路径并整体更新 JSON，避免多个文件并发转换时发生
      * 读改写覆盖。事务只包含数据库查询和更新，不包含 Python 调用。</p>
      */
     @Transactional(rollbackFor = Exception.class)
@@ -601,34 +493,31 @@ public class FileConvertService {
     }
 
     private int countByStatus(
-            List<CredentialFileBatch> batches,
+            List<CredentialFile> files,
             ConvertStatus status) {
-        return (int) batches.stream()
-                .filter(batch -> batch.getStatus() == status)
+        return (int) files.stream()
+                .filter(file -> file.getStatus() == status)
                 .count();
     }
 
-    private List<BatchConvertResponse> toBatchResponses(
-            List<CredentialFileBatch> batches) {
-        List<BatchConvertResponse> responses = new ArrayList<>();
-        for (CredentialFileBatch batch : batches) {
-            String message = switch (batch.getStatus()) {
+    private List<FileConvertItem> toFileItems(List<CredentialFile> files) {
+        List<FileConvertItem> items = new ArrayList<>();
+        for (CredentialFile file : files) {
+            String message = switch (file.getStatus()) {
                 case UPLOADING -> "文件仍在上传中";
                 case UPLOADED -> "等待转换";
                 case CONVERTING -> "正在转换";
                 case CONVERTED -> "转换完成";
-                case FAILED -> batch.getErrorMessage() == null
+                case FAILED -> file.getErrorMessage() == null
                         ? "转换失败"
-                        : batch.getErrorMessage();
+                        : file.getErrorMessage();
             };
-            responses.add(new BatchConvertResponse(
-                    batch.getUploadBatchId(),
-                    batch.getBatchNo(),
-                    batch.getStatus(),
-                    batch.getFileCount(),
-                    batch.getConvertedFileCount(),
+            items.add(new FileConvertItem(
+                    file.getFileId(),
+                    file.getOriginalFilename(),
+                    file.getStatus(),
                     message));
         }
-        return Collections.unmodifiableList(responses);
+        return items;
     }
 }

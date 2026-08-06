@@ -21,7 +21,8 @@ class KnowledgeObjectKeyGeneratorTest {
 
         assertEquals("采购规则.txt", original.safeOriginalFilename());
         assertEquals(
-                documentUuid + "/original/采购规则.txt",
+                documentUuid + "/original/"
+                        + documentUuid + "_采购规则.txt",
                 original.objectKey());
         assertEquals(
                 documentUuid + "/converted/content.md",

@@ -1,6 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.ObjectWriteResponse;
@@ -9,9 +8,6 @@ import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.MinioException;
-import jakarta.annotation.Resource;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,24 +15,36 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 基于 MinIO 的资信文件存储实现。
+ * 基于 MinIO 的文件存储实现。
  *
- * <p>对象 Key 与本地存储逻辑路径保持一致，上层处理流程无需感知具体存储介质。</p>
+ * <p>对象 Key 与本地存储逻辑路径保持一致，上层处理流程无需感知具体存储介质；
+ * 使用的 Bucket 在构造时由调用方指定，资信材料与知识文件因此可以分开落桶。</p>
  *
  * @since 1.0
  */
-@Service
-@ConditionalOnProperty(
-        prefix = "credential-file.storage",
-        name = "type",
-        havingValue = "MINIO")
 public class MinioFileStorage implements FileStorage {
 
-    @Resource
-    private MinioClient minioClient;
+    private final MinioClient minioClient;
 
-    @Resource
-    private FileStorageProperties properties;
+    private final String bucket;
+
+    /**
+     * 创建 MinIO 存储实现。
+     *
+     * @param minioClient 共享的 MinIO 客户端
+     * @param bucket 本存储实例写入的 Bucket
+     * @throws IllegalArgumentException 客户端或 Bucket 为空时抛出
+     */
+    public MinioFileStorage(MinioClient minioClient, String bucket) {
+        if (minioClient == null) {
+            throw new IllegalArgumentException("MinIO 客户端不能为空");
+        }
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalArgumentException("MinIO bucket 不能为空");
+        }
+        this.minioClient = minioClient;
+        this.bucket = bucket;
+    }
 
     /**
      * 将文件上传至调用方指定的 MinIO object key 并回读对象属性。
@@ -228,8 +236,8 @@ public class MinioFileStorage implements FileStorage {
         }
     }
 
-    /** 返回配置中的资信文件 Bucket。 */
+    /** 返回本存储实例绑定的 Bucket。 */
     private String bucket() {
-        return properties.getMinio().getBucket();
+        return bucket;
     }
 }

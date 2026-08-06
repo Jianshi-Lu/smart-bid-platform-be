@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 资信文件批次上传响应。
+ * 资信文件上传响应。
  *
  * @since 1.0
  */
@@ -16,8 +16,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UploadResponse {
-
-    private String uploadBatchId;
 
     private List<UploadedFile> files;
 
@@ -32,6 +30,8 @@ public class UploadResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class UploadedFile {
+
+        private Long fileId;
 
         private Integer fileOrder;
 

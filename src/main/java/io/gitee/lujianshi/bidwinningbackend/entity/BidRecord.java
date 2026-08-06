@@ -46,6 +46,9 @@ public class BidRecord {
 
     private String bidderName;
 
+    /** 投标方账号 ID（V28 新增，逻辑外键 → bidder_account；招标方代录或存量数据为 NULL）。 */
+    private Long bidderAccountId;
+
     private BigDecimal quotePrice;
 
     private String bidderContact;

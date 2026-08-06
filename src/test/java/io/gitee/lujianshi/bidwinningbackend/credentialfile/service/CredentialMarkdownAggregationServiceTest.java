@@ -2,14 +2,15 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.service;
 
 import io.gitee.lujianshi.bidwinningbackend.config.RiskAnalysisProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
+import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -29,60 +30,61 @@ import static org.mockito.Mockito.when;
 class CredentialMarkdownAggregationServiceTest {
 
     private static final int BID_RECORD_ID = 8;
+    private static final Long BIDDER_ACCOUNT_ID = 55L;
 
     @TempDir
     Path tempDir;
 
     @Test
-    void shouldMergeConvertedFilesInBatchAndFileOrder() throws Exception {
-        String firstBatchId = UUID.randomUUID().toString();
-        String secondBatchId = UUID.randomUUID().toString();
+    void shouldMergeConvertedFilesInFileOrder() throws Exception {
         FileStorage storage = createStorage();
 
-        String firstPath = storeMarkdown(storage, firstBatchId, "first.md", "第一份材料");
-        String secondPath = storeMarkdown(storage, firstBatchId, "second.md", "第二份材料");
-        String thirdPath = storeMarkdown(storage, secondBatchId, "third.md", "第三份材料");
+        String firstPath = storeMarkdown(storage, "first", "第一份材料");
+        String secondPath = storeMarkdown(storage, "second", "第二份材料");
+        String thirdPath = storeMarkdown(storage, "third", "第三份材料");
 
-        CredentialFile first = file(firstBatchId, 0, "first.pdf", firstPath);
-        CredentialFile second = file(firstBatchId, 1, "second.pdf", secondPath);
-        CredentialFile third = file(secondBatchId, 0, "third.pdf", thirdPath);
+        CredentialFile first = file("first", 0, "first.pdf", firstPath);
+        CredentialFile second = file("second", 1, "second.pdf", secondPath);
+        CredentialFile third = file("third", 2, "third.pdf", thirdPath);
 
-        CredentialFileBatchMapper batchMapper = mock(CredentialFileBatchMapper.class);
-        when(batchMapper.selectByBidRecordId(BID_RECORD_ID)).thenReturn(List.of(
-                batch(firstBatchId, 1, 2),
-                batch(secondBatchId, 2, 1)));
         CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
-        when(fileMapper.selectByUploadBatchId(firstBatchId))
-                .thenReturn(List.of(first, second));
-        when(fileMapper.selectByUploadBatchId(secondBatchId))
-                .thenReturn(List.of(third));
+        when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
+                .thenReturn(List.of(first, second, third));
+        BidRecordMapper bidRecordMapper = mock(BidRecordMapper.class);
+        when(bidRecordMapper.selectById(BID_RECORD_ID))
+                .thenReturn(accountBidRecord());
 
         CredentialMarkdownAggregationService service = createService(
-                storage, batchMapper, fileMapper, 131_072);
+                storage, fileMapper, bidRecordMapper, 131_072);
 
         String mergedPath = service.aggregate(BID_RECORD_ID);
 
+        assertEquals(
+                BIDDER_ACCOUNT_ID + "/merged/" + BID_RECORD_ID
+                        + "/credentials.md",
+                mergedPath);
         String merged = new String(
                 storage.open(mergedPath).readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(
                 "# 投标记录资信材料汇总\n\n"
                         + "投标记录 ID：8\n\n"
-                        + "## 批次 1\n\n"
                         + "### 文件：first.pdf\n\n---\n\n第一份材料\n\n---\n\n"
                         + "### 文件：second.pdf\n\n---\n\n第二份材料\n\n---\n\n"
-                        + "## 批次 2\n\n"
                         + "### 文件：third.pdf\n\n---\n\n第三份材料\n\n---\n\n",
                 merged);
     }
 
     @Test
-    void shouldRejectAnyBatchThatIsNotConverted() {
-        CredentialFileBatchMapper batchMapper = mock(CredentialFileBatchMapper.class);
-        when(batchMapper.selectByBidRecordId(BID_RECORD_ID)).thenReturn(List.of(
-                batch(UUID.randomUUID().toString(), 1, 1, ConvertStatus.FAILED)));
+    void shouldRejectAnyFileThatIsNotConverted() {
+        CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
+        when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
+                .thenReturn(List.of(failedFile()));
+        BidRecordMapper bidRecordMapper = mock(BidRecordMapper.class);
+        when(bidRecordMapper.selectById(BID_RECORD_ID))
+                .thenReturn(accountBidRecord());
 
         CredentialMarkdownAggregationService service = createService(
-                createStorage(), batchMapper, mock(CredentialFileMapper.class), 131_072);
+                createStorage(), fileMapper, bidRecordMapper, 131_072);
 
         AppException exception = assertThrows(AppException.class,
                 () -> service.aggregate(BID_RECORD_ID));
@@ -93,18 +95,17 @@ class CredentialMarkdownAggregationServiceTest {
 
     @Test
     void shouldRejectMergedMarkdownOverConfiguredLimit() throws Exception {
-        String batchId = UUID.randomUUID().toString();
         FileStorage storage = createStorage();
-        String markdownPath = storeMarkdown(storage, batchId, "large.md", "超过限制");
+        String markdownPath = storeMarkdown(storage, "large", "超过限制");
         CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
-        when(fileMapper.selectByUploadBatchId(batchId)).thenReturn(List.of(
-                file(batchId, 0, "large.pdf", markdownPath)));
-        CredentialFileBatchMapper batchMapper = mock(CredentialFileBatchMapper.class);
-        when(batchMapper.selectByBidRecordId(BID_RECORD_ID)).thenReturn(List.of(
-                batch(batchId, 1, 1)));
+        when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
+                .thenReturn(List.of(file("large", 0, "large.pdf", markdownPath)));
+        BidRecordMapper bidRecordMapper = mock(BidRecordMapper.class);
+        when(bidRecordMapper.selectById(BID_RECORD_ID))
+                .thenReturn(accountBidRecord());
 
         CredentialMarkdownAggregationService service = createService(
-                storage, batchMapper, fileMapper, 1);
+                storage, fileMapper, bidRecordMapper, 1);
 
         AppException exception = assertThrows(AppException.class,
                 () -> service.aggregate(BID_RECORD_ID));
@@ -115,33 +116,33 @@ class CredentialMarkdownAggregationServiceTest {
 
     private CredentialMarkdownAggregationService createService(
             FileStorage storage,
-            CredentialFileBatchMapper batchMapper,
             CredentialFileMapper fileMapper,
+            BidRecordMapper bidRecordMapper,
             int maxCharacters) {
         RiskAnalysisProperties properties = new RiskAnalysisProperties();
         properties.setMaxMergedMarkdownChars(maxCharacters);
         CredentialMarkdownAggregationService service =
                 new CredentialMarkdownAggregationService();
-        ReflectionTestUtils.setField(service, "batchMapper", batchMapper);
         ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
         ReflectionTestUtils.setField(service, "fileStorage", storage);
         ReflectionTestUtils.setField(service, "riskAnalysisProperties", properties);
+        ReflectionTestUtils.setField(service, "bidRecordMapper", bidRecordMapper);
         return service;
     }
 
     private FileStorage createStorage() {
         var properties = new io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        return new LocalFileStorage(properties);
+        return new LocalFileStorage(properties.getLocal().getRoot());
     }
 
     private String storeMarkdown(
             FileStorage storage,
-            String batchId,
-            String filename,
+            String fileUuid,
             String content) throws Exception {
-        String path = "bid-records/" + BID_RECORD_ID + "/batches/"
-                + batchId + "/converted/" + filename;
+        String path = StoragePath.createConvertedMarkdownPath(
+                BIDDER_ACCOUNT_ID + "/files/" + fileUuid
+                        + "/original/" + fileUuid + "_source.pdf");
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         storage.store(new FileStorage.StoreRequest(
                 path,
@@ -152,41 +153,36 @@ class CredentialMarkdownAggregationServiceTest {
         return path;
     }
 
-    private CredentialFileBatch batch(
-            String batchId,
-            int batchNo,
-            int fileCount) {
-        return batch(batchId, batchNo, fileCount, ConvertStatus.CONVERTED);
-    }
-
-    private CredentialFileBatch batch(
-            String batchId,
-            int batchNo,
-            int fileCount,
-            ConvertStatus status) {
-        CredentialFileBatch batch = new CredentialFileBatch();
-        batch.setUploadBatchId(batchId);
-        batch.setBidRecordId(BID_RECORD_ID);
-        batch.setBatchNo(batchNo);
-        batch.setStatus(status);
-        batch.setFileCount(fileCount);
-        batch.setConvertedFileCount(fileCount);
-        return batch;
+    private BidRecord accountBidRecord() {
+        BidRecord record = new BidRecord();
+        record.setBidRecordId(BID_RECORD_ID);
+        record.setBidderAccountId(BIDDER_ACCOUNT_ID);
+        return record;
     }
 
     private CredentialFile file(
-            String batchId,
+            String fileUuid,
             int fileOrder,
             String filename,
             String markdownPath) {
         CredentialFile file = new CredentialFile();
-        file.setFileId((long) fileOrder + 1);
-        file.setUploadBatchId(batchId);
+        file.setFileId((long) (fileOrder + 1));
+        file.setFileUuid(UUID.nameUUIDFromBytes(
+                fileUuid.getBytes(StandardCharsets.UTF_8)).toString());
         file.setBidRecordId(BID_RECORD_ID);
         file.setFileOrder(fileOrder);
         file.setOriginalFilename(filename);
         file.setStatus(ConvertStatus.CONVERTED);
         file.setMarkdownFilePath(markdownPath);
+        return file;
+    }
+
+    private CredentialFile failedFile() {
+        CredentialFile file = new CredentialFile();
+        file.setFileId(99L);
+        file.setBidRecordId(BID_RECORD_ID);
+        file.setOriginalFilename("failed.pdf");
+        file.setStatus(ConvertStatus.FAILED);
         return file;
     }
 }

@@ -9,6 +9,7 @@
         <result column="bid_no"          property="bidNo"/>
         <result column="bid_at"          property="bidAt"/>
         <result column="bidder_name"     property="bidderName"/>
+        <result column="bidder_account_id" property="bidderAccountId"/>
         <result column="quote_price"     property="quotePrice"/>
         <result column="bidder_contact"  property="bidderContact"/>
         <result column="credentials"     property="credentials"
@@ -23,9 +24,11 @@
             useGeneratedKeys="true"
             keyProperty="bidRecordId">
         INSERT INTO bid_record
-            (invitation_id, bid_no, bid_at, bidder_name, quote_price, bidder_contact, credentials)
+            (invitation_id, bid_no, bid_at, bidder_name, bidder_account_id,
+             quote_price, bidder_contact, credentials)
         VALUES
-            (#{invitationId}, #{bidNo}, #{bidAt}, #{bidderName}, #{quotePrice}, #{bidderContact},
+            (#{invitationId}, #{bidNo}, #{bidAt}, #{bidderName}, #{bidderAccountId},
+             #{quotePrice}, #{bidderContact},
              #{credentials, jdbcType=VARCHAR, typeHandler=com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler})
     </insert>
 
@@ -53,7 +56,7 @@
 
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id = #{bidRecordId}
@@ -61,7 +64,7 @@
 
     <select id="selectByIdForUpdate" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id = #{bidRecordId}
@@ -70,7 +73,7 @@
 
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
     </select>
@@ -85,7 +88,7 @@
 
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id IN
@@ -113,11 +116,20 @@
     -->
     <select id="selectByInvitationId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
-               bidder_name, quote_price, bidder_contact, credentials,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE invitation_id = #{invitationId}
         ORDER BY bid_at ASC
+    </select>
+
+    <select id="selectByBidderAccountId" resultMap="BaseResultMap">
+        SELECT bid_record_id, invitation_id, bid_no, bid_at,
+               bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               risk_analysis_status, risk_analysis_started_at, risk_analysis_error
+        FROM bid_record
+        WHERE bidder_account_id = #{bidderAccountId}
+        ORDER BY bid_at DESC
     </select>
 
     <update id="claimRiskAnalysis">

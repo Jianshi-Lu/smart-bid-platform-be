@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,34 +27,24 @@ class UploadIntakeModelTest {
     }
 
     @Test
-    void shouldCreateImmutableUploadBatchSnapshot() {
-        List<UploadItem> source = new ArrayList<>();
-        source.add(item("license.pdf", "content"));
-
-        UploadBatch batch = new UploadBatch(1001, source);
-        source.add(item("other.pdf", "other"));
-
-        assertEquals(1, batch.items().size());
-        assertThrows(
-                UnsupportedOperationException.class,
-                () -> batch.items().add(item("third.pdf", "third")));
-    }
-
-    @Test
     void shouldValidatePendingItemAndResolvedContextBoundaries() {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> item("empty.pdf", ""));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new UploadBatch(0, List.of(item("file.pdf", "content"))));
+                () -> new UploadFileContext(0, 55L, UUID.randomUUID().toString()));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new UploadBatchContext(1001, "../invalid"));
+                () -> new UploadFileContext(1001, null, UUID.randomUUID().toString()));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new UploadFileContext(1001, 55L, "../invalid"));
 
-        String batchId = UUID.randomUUID().toString();
-        UploadBatchContext context = new UploadBatchContext(1001, batchId);
-        assertEquals(batchId, context.uploadBatchId());
+        String fileUuid = UUID.randomUUID().toString();
+        UploadFileContext context = new UploadFileContext(1001, 55L, fileUuid);
+        assertEquals(fileUuid, context.fileUuid());
+        assertEquals(55L, context.bidderAccountId());
     }
 
     private UploadItem item(String filename, String content) {

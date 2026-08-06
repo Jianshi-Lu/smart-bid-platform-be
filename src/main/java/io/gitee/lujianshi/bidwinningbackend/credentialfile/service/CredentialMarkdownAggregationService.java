@@ -2,14 +2,14 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.service;
 
 import io.gitee.lujianshi.bidwinningbackend.config.RiskAnalysisProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
+import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +24,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * 投标记录级资信 Markdown 汇总服务。
@@ -38,9 +37,6 @@ public class CredentialMarkdownAggregationService {
     private static final String MARKDOWN_CONTENT_TYPE = "text/markdown; charset=UTF-8";
 
     @Resource
-    private CredentialFileBatchMapper batchMapper;
-
-    @Resource
     private CredentialFileMapper fileMapper;
 
     @Resource
@@ -48,6 +44,9 @@ public class CredentialMarkdownAggregationService {
 
     @Resource
     private RiskAnalysisProperties riskAnalysisProperties;
+
+    @Resource
+    private BidRecordMapper bidRecordMapper;
 
     /**
      * 汇总指定投标记录下的全部已转换 Markdown，并写入投标记录级路径。
@@ -58,18 +57,18 @@ public class CredentialMarkdownAggregationService {
     public String aggregate(Integer bidRecordId) {
         validateBidRecordId(bidRecordId);
 
-        List<CredentialFileBatch> batches = batchMapper.selectByBidRecordId(bidRecordId);
-        if (batches == null || batches.isEmpty()) {
-            throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
+        BidRecord record = bidRecordMapper.selectById(bidRecordId);
+        if (record == null || record.getBidderAccountId() == null) {
+            throw inputNotReady("投标记录不存在或未绑定投标方账号，不能进行风险分析");
         }
-
-        List<OrderedCredentialFile> orderedFiles = loadReadyFiles(bidRecordId, batches);
+        List<CredentialFile> orderedFiles = loadReadyFiles(bidRecordId);
         Path temporaryPath = null;
         try {
             temporaryPath = Files.createTempFile("bid-record-" + bidRecordId + "-", ".md");
             long characterCount = writeMergedMarkdown(temporaryPath, bidRecordId, orderedFiles);
             long contentLength = Files.size(temporaryPath);
-            String mergedPath = StoragePath.createMergedMarkdownPath(bidRecordId);
+            String mergedPath = StoragePath.createMergedMarkdownPath(
+                    bidRecordId, record.getBidderAccountId());
 
             try (InputStream input = Files.newInputStream(temporaryPath)) {
                 fileStorage.store(new FileStorage.StoreRequest(
@@ -78,6 +77,7 @@ public class CredentialMarkdownAggregationService {
                         contentLength,
                         Map.of(
                                 "bid-record-id", bidRecordId.toString(),
+                                "bidder-account-id", record.getBidderAccountId().toString(),
                                 "source-file-count", Integer.toString(orderedFiles.size()),
                                 "character-count", Long.toString(characterCount)),
                         input));
@@ -100,40 +100,24 @@ public class CredentialMarkdownAggregationService {
         }
     }
 
-    /** 校验批次和文件状态，并按批次号、文件顺序组织文件。 */
-    private List<OrderedCredentialFile> loadReadyFiles(
-            Integer bidRecordId,
-            List<CredentialFileBatch> batches) {
-        List<OrderedCredentialFile> orderedFiles = new ArrayList<>();
-        for (CredentialFileBatch batch : batches) {
-            if (batch == null || batch.getStatus() != ConvertStatus.CONVERTED) {
-                String batchId = batch == null ? "未知" : batch.getUploadBatchId();
-                throw inputNotReady(
-                        "资信材料尚未全部转换完成，批次状态不满足要求: " + batchId);
-            }
+    /** 校验文件状态，并按数据库文件顺序组织可汇总文件。 */
+    private List<CredentialFile> loadReadyFiles(Integer bidRecordId) {
+        List<CredentialFile> files = fileMapper.selectByBidRecordId(bidRecordId);
+        if (files == null || files.isEmpty()) {
+            throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
+        }
 
-            List<CredentialFile> files = fileMapper.selectByUploadBatchId(
-                    batch.getUploadBatchId());
-            int expectedCount = batch.getFileCount() == null ? 0 : batch.getFileCount();
-            if (files == null || files.size() != expectedCount) {
+        List<CredentialFile> orderedFiles = new ArrayList<>();
+        for (CredentialFile file : files) {
+            if (file == null
+                    || file.getStatus() != ConvertStatus.CONVERTED
+                    || file.getMarkdownFilePath() == null
+                    || file.getMarkdownFilePath().isBlank()) {
+                String filename = file == null ? "未知" : file.getOriginalFilename();
                 throw inputNotReady(
-                        "资信材料批次文件数量不一致: " + batch.getUploadBatchId());
+                        "资信材料尚未全部转换完成，文件状态不满足要求: " + filename);
             }
-
-            for (CredentialFile file : files) {
-                if (file == null
-                        || file.getStatus() != ConvertStatus.CONVERTED
-                        || file.getMarkdownFilePath() == null
-                        || file.getMarkdownFilePath().isBlank()) {
-                    String filename = file == null ? "未知" : file.getOriginalFilename();
-                    throw inputNotReady(
-                            "资信材料尚未全部转换完成，文件状态不满足要求: " + filename);
-                }
-                if (!Objects.equals(file.getBidRecordId(), bidRecordId)) {
-                    throw inputNotReady("资信文件与投标记录归属不一致");
-                }
-                orderedFiles.add(new OrderedCredentialFile(file, batch.getBatchNo()));
-            }
+            orderedFiles.add(file);
         }
 
         if (orderedFiles.isEmpty()) {
@@ -146,9 +130,8 @@ public class CredentialMarkdownAggregationService {
     private long writeMergedMarkdown(
             Path temporaryPath,
             Integer bidRecordId,
-            List<OrderedCredentialFile> files) throws IOException {
+            List<CredentialFile> files) throws IOException {
         long characterCount = 0;
-        int currentBatchNo = -1;
 
         try (BufferedWriter writer = Files.newBufferedWriter(
                 temporaryPath, StandardCharsets.UTF_8)) {
@@ -156,15 +139,7 @@ public class CredentialMarkdownAggregationService {
                     "# 投标记录资信材料汇总\n\n投标记录 ID："
                             + bidRecordId + "\n\n", characterCount);
 
-            for (OrderedCredentialFile orderedFile : files) {
-                CredentialFile file = orderedFile.file();
-                int batchNo = orderedFile.batchNo();
-                if (batchNo != currentBatchNo) {
-                    currentBatchNo = batchNo;
-                    characterCount = appendText(writer,
-                            "## 批次 " + batchNo + "\n\n", characterCount);
-                }
-
+            for (CredentialFile file : files) {
                 characterCount = appendText(writer,
                         "### 文件：" + file.getOriginalFilename() + "\n\n---\n\n",
                         characterCount);
@@ -249,7 +224,4 @@ public class CredentialMarkdownAggregationService {
                 cause);
     }
 
-    /** 保留数据库排序得到的文件及其业务批次号，避免从 object key 反推批次。 */
-    private record OrderedCredentialFile(CredentialFile file, Integer batchNo) {
-    }
 }

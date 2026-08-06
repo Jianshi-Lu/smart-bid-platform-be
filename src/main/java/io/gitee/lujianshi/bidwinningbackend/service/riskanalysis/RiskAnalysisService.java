@@ -8,10 +8,8 @@ import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.CredentialMarkdownAggregationService;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.FileConvertService;
@@ -107,9 +105,6 @@ public class RiskAnalysisService {
 
     @Resource
     private FileConvertService fileConvertService;
-
-    @Resource
-    private CredentialFileBatchMapper credentialFileBatchMapper;
 
     @Resource
     private CredentialFileMapper credentialFileMapper;
@@ -242,46 +237,38 @@ public class RiskAnalysisService {
      * 转换后才允许继续汇总和调用大模型。</p>
      */
     private void ensureCredentialFilesConverted(Integer bidRecordId) {
-        List<CredentialFileBatch> batches =
-                credentialFileBatchMapper.selectByBidRecordId(bidRecordId);
-        if (batches == null || batches.isEmpty()) {
+        List<CredentialFile> files =
+                credentialFileMapper.selectByBidRecordId(bidRecordId);
+        if (files == null || files.isEmpty()) {
             throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
         }
 
-        if (areCredentialFilesConverted(bidRecordId, batches)) {
+        if (areCredentialFilesConverted(files)) {
             return;
         }
 
         log.info("[风险分析] 资信材料未全部转换，自动发起转换 bidRecordId={}",
                 bidRecordId);
         FileConvertResponse response =
-                fileConvertService.convertAllBatches(bidRecordId);
+                fileConvertService.convertAll(bidRecordId);
 
-        // 转换服务返回的是批次汇总结果，仍需重新查询文件状态，避免只依据响应快照继续分析。
-        List<CredentialFileBatch> latestBatches =
-                credentialFileBatchMapper.selectByBidRecordId(bidRecordId);
+        // 转换服务返回的是文件汇总结果，仍需重新查询文件状态，避免只依据响应快照继续分析。
+        List<CredentialFile> latestFiles =
+                credentialFileMapper.selectByBidRecordId(bidRecordId);
         if (response == null
                 || response.status() != BidRecordCredentialConversionStatus.ALL_CONVERTED
-                || !areCredentialFilesConverted(bidRecordId, latestBatches)) {
+                || !areCredentialFilesConverted(latestFiles)) {
             throw inputNotReady("资信材料尚未全部转换完成，暂不能进行风险分析");
         }
     }
 
-    /** 判断指定投标记录下的批次和文件是否都已经具备可分析的 Markdown。 */
+    /** 判断指定投标记录下的文件是否都已经具备可分析的 Markdown。 */
     private boolean areCredentialFilesConverted(
-            Integer bidRecordId,
-            List<CredentialFileBatch> batches) {
-        if (batches == null || batches.isEmpty()
-                || batches.stream().anyMatch(batch -> batch == null
-                || batch.getStatus() != ConvertStatus.CONVERTED)) {
+            List<CredentialFile> files) {
+        if (files == null || files.isEmpty()) {
             return false;
         }
-
-        List<CredentialFile> files =
-                credentialFileMapper.selectByBidRecordId(bidRecordId);
-        return files != null
-                && !files.isEmpty()
-                && files.stream().allMatch(file -> file != null
+        return files.stream().allMatch(file -> file != null
                 && file.getStatus() == ConvertStatus.CONVERTED
                 && file.getMarkdownFilePath() != null
                 && !file.getMarkdownFilePath().isBlank());

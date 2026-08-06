@@ -4,7 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStoragePro
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadFileContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
@@ -48,7 +48,7 @@ class UploadItemProcessorTest {
         };
 
         VerifiedStoredFileMetadata verifiedMetadata = processor.process(
-                new UploadBatchContext(1001, UUID.randomUUID().toString()),
+                new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
                 new UploadItem(
                         "license.pdf",
                         "application/pdf",
@@ -86,7 +86,7 @@ class UploadItemProcessorTest {
         assertThrows(
                 IOException.class,
                 () -> processor.process(
-                        new UploadBatchContext(1001, UUID.randomUUID().toString()),
+                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
                         item("license.pdf", "content")));
 
         assertNull(storage.storeRequest);
@@ -103,7 +103,7 @@ class UploadItemProcessorTest {
         assertThrows(
                 AppException.class,
                 () -> processor.process(
-                        new UploadBatchContext(1001, UUID.randomUUID().toString()),
+                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
                         item("license.pdf", "original-content")));
 
         try (var paths = Files.walk(tempDir)) {
@@ -135,7 +135,7 @@ class UploadItemProcessorTest {
         assertThrows(
                 IOException.class,
                 () -> processor.process(
-                        new UploadBatchContext(1001, UUID.randomUUID().toString()),
+                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
                         new UploadItem(
                                 "license.pdf",
                                 "application/pdf",
@@ -178,7 +178,7 @@ class UploadItemProcessorTest {
 
         private RecordingLocalFileStorage(
             FileStorageProperties properties) {
-            super(properties);
+            super(properties.getLocal().getRoot());
         }
 
         @Override
@@ -198,7 +198,7 @@ class UploadItemProcessorTest {
 
         private TamperingLocalFileStorage(
             FileStorageProperties properties) {
-            super(properties);
+            super(properties.getLocal().getRoot());
         }
 
         @Override

@@ -62,6 +62,38 @@ public enum AppErrorCode {
     BID_RECORD_BID_NO_CONFLICT(
             "BID_RECORD.BID_NO_CONFLICT", 409, "投标序号生成发生冲突", true),
 
+    /** BID_RECORD：当前账号无权操作该投标记录。 */
+    BID_RECORD_FORBIDDEN(
+            "BID_RECORD.FORBIDDEN", 403, "无权操作该投标记录", false),
+
+    // ==================== BIDDER_ACCOUNT：投标方账号 ====================
+
+    /** BIDDER_ACCOUNT：登录账号名已被占用。 */
+    BIDDER_ACCOUNT_USERNAME_TAKEN(
+            "BIDDER_ACCOUNT.USERNAME_TAKEN", 409, "账号名已存在", false),
+
+    /** BIDDER_ACCOUNT：账号或密码错误。 */
+    BIDDER_ACCOUNT_INVALID_CREDENTIALS(
+            "BIDDER_ACCOUNT.INVALID_CREDENTIALS", 401, "账号或密码错误", false),
+
+    /** BIDDER_ACCOUNT：未登录或登录已失效。 */
+    BIDDER_ACCOUNT_UNAUTHORIZED(
+            "BIDDER_ACCOUNT.UNAUTHORIZED", 401, "请先登录", false),
+
+    // ==================== BID_INVITER_ACCOUNT：招标方账号 ====================
+
+    /** BID_INVITER_ACCOUNT：登录账号名已被占用。 */
+    BID_INVITER_ACCOUNT_USERNAME_TAKEN(
+            "BID_INVITER_ACCOUNT.USERNAME_TAKEN", 409, "账号名已存在", false),
+
+    /** BID_INVITER_ACCOUNT：账号或密码错误。 */
+    BID_INVITER_ACCOUNT_INVALID_CREDENTIALS(
+            "BID_INVITER_ACCOUNT.INVALID_CREDENTIALS", 401, "账号或密码错误", false),
+
+    /** BID_INVITER_ACCOUNT：未登录或登录已失效。 */
+    BID_INVITER_ACCOUNT_UNAUTHORIZED(
+            "BID_INVITER_ACCOUNT.UNAUTHORIZED", 401, "请先登录", false),
+
     // ==================== BID_HANDLER：招标经办人 ====================
 
     /** BID_HANDLER：招标经办人不存在。 */
@@ -123,6 +155,10 @@ public enum AppErrorCode {
     /** CREDENTIAL_FILE：转换批次与文件数据不一致。 */
     CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT(
             "CREDENTIAL_FILE.CONVERSION_DATA_INCONSISTENT", 500, "资信文件转换数据不一致", false),
+
+    /** CREDENTIAL_FILE：文件或归属记录不存在。 */
+    CREDENTIAL_FILE_NOT_FOUND(
+            "CREDENTIAL_FILE.NOT_FOUND", 404, "资信文件不存在", false),
 
     // ==================== KNOWLEDGE_FILE：知识文件 ====================
 

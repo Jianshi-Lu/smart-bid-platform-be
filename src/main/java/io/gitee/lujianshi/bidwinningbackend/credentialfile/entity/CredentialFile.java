@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 /**
  * 资信文件实体。对应表 {@code credential_file}（V21/V23）。
  *
- * <p>每个原始文件对应一条记录；同一次上传的文件通过 {@code uploadBatchId} 聚合。
+ * <p>每个原始文件对应一条记录；同一次上传的文件通过 {@code fileUuid} 聚合。
  * {@code bidRecordId} 在创建投标记录后回填，转换前为 {@code null} 的 Markdown 路径也保持为 {@code null}。</p>
  */
 @Data
@@ -25,7 +25,7 @@ public class CredentialFile {
     @TableId(type = IdType.AUTO)
     private Long fileId;
 
-    private String uploadBatchId;
+    private String fileUuid;
 
     private Integer bidRecordId;
 

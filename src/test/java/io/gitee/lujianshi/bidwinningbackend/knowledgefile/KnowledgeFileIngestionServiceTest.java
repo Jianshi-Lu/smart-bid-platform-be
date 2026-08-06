@@ -66,7 +66,8 @@ class KnowledgeFileIngestionServiceTest {
         assertEquals(1, response.documents().size());
         assertEquals(documentUuid.toString(), response.documents().getFirst().documentUuid());
         assertEquals(
-                documentUuid + "/original/knowledge.txt",
+                documentUuid + "/original/"
+                        + documentUuid + "_knowledge.txt",
                 response.documents().getFirst().originalObjectKey());
         assertEquals(
                 documentUuid + "/converted/content.md",
@@ -117,7 +118,7 @@ class KnowledgeFileIngestionServiceTest {
     private TestFixture fixture(UUID... uuids) {
         FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(storageRoot.toString());
-        LocalFileStorage storage = new LocalFileStorage(properties);
+        LocalFileStorage storage = new LocalFileStorage(storageRoot.toString());
         KnowledgeFileObjectService objectService = new KnowledgeFileObjectService(
                 storage, new Sha256FileChecksumCalculator());
         ToMarkdownClient toMarkdownClient = mock(ToMarkdownClient.class);

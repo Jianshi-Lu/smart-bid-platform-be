@@ -37,6 +37,15 @@ public interface BidRecordMapper extends BaseMapper<BidRecord, Integer> {
      */
     List<BidRecord> selectByInvitationId(@Param("invitationId") Integer invitationId);
 
+    /**
+     * 按投标方账号 ID 查询其全部投标记录（"我的投标"），按 bidAt 倒序。
+     *
+     * @param bidderAccountId 投标方账号 ID
+     * @return 该账号的投标记录；无记录时返回空列表
+     */
+    List<BidRecord> selectByBidderAccountId(
+            @Param("bidderAccountId") Long bidderAccountId);
+
     /** 在事务中锁定指定投标记录，供资信路径汇总的读改写操作使用。 */
     BidRecord selectByIdForUpdate(@Param("bidRecordId") Integer bidRecordId);
 

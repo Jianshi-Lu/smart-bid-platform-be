@@ -7,10 +7,8 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMark
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFileBatch;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileBatchMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
@@ -43,13 +41,14 @@ import static org.mockito.Mockito.when;
 class FileConvertServiceTest {
 
     private static final int BID_RECORD_ID = 1001;
+    private static final Long BIDDER_ACCOUNT_ID = 55L;
 
     @TempDir
     Path tempDir;
 
     @Test
     void shouldReadOriginalCallPythonStoreAndVerifyMarkdown() throws Exception {
-        String batchId = UUID.randomUUID().toString();
+        String fileUuid = UUID.randomUUID().toString();
         byte[] original = "original-pdf-content"
                 .getBytes(StandardCharsets.UTF_8);
         byte[] markdown = "# converted"
@@ -57,8 +56,8 @@ class FileConvertServiceTest {
         FileChecksumCalculator checksumCalculator =
                 new Sha256FileChecksumCalculator();
         FileStorage storage = createStorage();
-        String originalPath = "bid-records/" + BID_RECORD_ID
-                + "/batches/" + batchId + "/original/source.pdf";
+        String originalPath = BIDDER_ACCOUNT_ID + "/files/" + fileUuid
+                + "/original/" + fileUuid + "_source.pdf";
         String originalSha256 = checksumCalculator.calculate(
                 new ByteArrayInputStream(original));
         storage.store(new FileStorage.StoreRequest(
@@ -69,34 +68,21 @@ class FileConvertServiceTest {
                 new ByteArrayInputStream(original)));
 
         CredentialFile sourceFile = file(
-                batchId,
+                fileUuid,
                 originalPath,
                 original.length,
                 originalSha256,
                 ConvertStatus.UPLOADED);
         CredentialFile convertedFile = file(
-                batchId,
+                fileUuid,
                 originalPath,
                 original.length,
                 originalSha256,
                 ConvertStatus.CONVERTED);
-        CredentialFileBatch uploadedBatch =
-                batch(batchId, ConvertStatus.UPLOADED, 0);
-        CredentialFileBatch convertedBatch =
-                batch(batchId, ConvertStatus.CONVERTED, 1);
-
-        CredentialFileBatchMapper batchMapper =
-                mock(CredentialFileBatchMapper.class);
-        when(batchMapper.selectByBidRecordId(BID_RECORD_ID))
-                .thenReturn(List.of(uploadedBatch), List.of(convertedBatch));
-        when(batchMapper.claimConverting(eq(batchId), any()))
-                .thenReturn(1);
-        when(batchMapper.markConverted(eq(batchId), eq(1), any()))
-                .thenReturn(1);
 
         CredentialFileMapper fileMapper =
                 mock(CredentialFileMapper.class);
-        when(fileMapper.selectByUploadBatchId(batchId))
+        when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
                 .thenReturn(List.of(sourceFile), List.of(convertedFile));
         when(fileMapper.markConverting(1L)).thenReturn(1);
         when(fileMapper.markConverted(eq(1L), any(), any()))
@@ -124,7 +110,6 @@ class FileConvertServiceTest {
                 .thenReturn(new BidRecord());
         FileConvertService self = mock(FileConvertService.class);
         FileConvertService service = createService(
-                batchMapper,
                 fileMapper,
                 toMarkdownClient,
                 storage,
@@ -133,13 +118,14 @@ class FileConvertServiceTest {
                 self);
 
         FileConvertResponse response =
-                service.convertAllBatches(BID_RECORD_ID);
+                service.convertAll(BID_RECORD_ID);
 
         String markdownPath =
                 StoragePath.createConvertedMarkdownPath(originalPath);
         assertEquals(
                 BidRecordCredentialConversionStatus.ALL_CONVERTED,
                 response.status());
+        assertEquals(1, response.totalFileCount());
         assertArrayEquals(
                 markdown,
                 storage.open(markdownPath).readAllBytes());
@@ -177,7 +163,6 @@ class FileConvertServiceTest {
     }
 
     private FileConvertService createService(
-            CredentialFileBatchMapper batchMapper,
             CredentialFileMapper fileMapper,
             ToMarkdownClient toMarkdownClient,
             FileStorage storage,
@@ -185,7 +170,6 @@ class FileConvertServiceTest {
             BidRecordService bidRecordService,
             FileConvertService self) {
         FileConvertService service = new FileConvertService();
-        ReflectionTestUtils.setField(service, "batchMapper", batchMapper);
         ReflectionTestUtils.setField(service, "fileMapper", fileMapper);
         ReflectionTestUtils.setField(
                 service, "toMarkdownClient", toMarkdownClient);
@@ -205,7 +189,7 @@ class FileConvertServiceTest {
     private FileStorage createStorage() {
         FileStorageProperties properties = localStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        return new LocalFileStorage(properties);
+        return new LocalFileStorage(properties.getLocal().getRoot());
     }
 
     private FileStorageProperties localStorageProperties() {
@@ -213,14 +197,14 @@ class FileConvertServiceTest {
     }
 
     private CredentialFile file(
-            String batchId,
+            String fileUuid,
             String originalPath,
             long fileSize,
             String sha256,
             ConvertStatus status) {
         CredentialFile file = new CredentialFile();
         file.setFileId(1L);
-        file.setUploadBatchId(batchId);
+        file.setFileUuid(fileUuid);
         file.setBidRecordId(BID_RECORD_ID);
         file.setFileOrder(0);
         file.setOriginalFilename("source.pdf");
@@ -235,19 +219,5 @@ class FileConvertServiceTest {
                     StoragePath.createConvertedMarkdownPath(originalPath));
         }
         return file;
-    }
-
-    private CredentialFileBatch batch(
-            String batchId,
-            ConvertStatus status,
-            int convertedFileCount) {
-        CredentialFileBatch batch = new CredentialFileBatch();
-        batch.setUploadBatchId(batchId);
-        batch.setBidRecordId(BID_RECORD_ID);
-        batch.setBatchNo(1);
-        batch.setStatus(status);
-        batch.setFileCount(1);
-        batch.setConvertedFileCount(convertedFileCount);
-        return batch;
     }
 }

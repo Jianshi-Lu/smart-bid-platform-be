@@ -15,12 +15,12 @@ public class FileConvertController {
     @Resource
     private FileConvertService conversionService;
 
-    /** 转换指定投标记录下的全部资信文件批次。 */
+    /** 转换指定投标记录下的全部资信文件。 */
     @PostMapping("/credential-files/bid-records/{bidRecordId}/convert")
     public Result<FileConvertResponse> convert(
             @PathVariable Integer bidRecordId) {
         FileConvertResponse response =
-                conversionService.convertAllBatches(bidRecordId);
+                conversionService.convertAll(bidRecordId);
         return Result.success(response, response.message());
     }
 }

@@ -1,9 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,18 +9,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 
 /**
- * 基于本地文件系统的资信文件存储实现。
+ * 基于本地文件系统的文件存储实现。
  *
  * <p>调用方负责提供逻辑相对路径，本实现只负责安全解析、目录创建、写入、替换和大小确认。</p>
  *
  * @since 1.0
  */
-@Service
-@ConditionalOnProperty(
-        prefix = "credential-file.storage",
-        name = "type",
-        havingValue = "LOCAL",
-        matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
 
     private final Path storageRoot;
@@ -32,13 +22,12 @@ public class LocalFileStorage implements FileStorage {
     /**
      * 创建本地存储实现。
      *
-     * @param properties 资信文件存储配置，必须包含本地存储根目录
+     * @param localRoot 本地存储根目录
      * @throws IllegalArgumentException 根目录为空时抛出
      */
-    public LocalFileStorage(FileStorageProperties properties) {
-        String localRoot = properties.getLocal().getRoot();
+    public LocalFileStorage(String localRoot) {
         if (localRoot == null || localRoot.isBlank()) {
-            throw new IllegalArgumentException("资信文件存储根目录不能为空");
+            throw new IllegalArgumentException("文件存储根目录不能为空");
         }
         this.storageRoot = Path.of(localRoot).toAbsolutePath().normalize();
     }

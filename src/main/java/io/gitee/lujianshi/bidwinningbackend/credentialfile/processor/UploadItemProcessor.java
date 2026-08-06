@@ -1,8 +1,8 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.processor;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadFileContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadBatchContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
@@ -27,7 +27,8 @@ import java.util.Map;
 public class UploadItemProcessor {
 
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
-    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String BIDDER_ACCOUNT_ID_METADATA = "bidder-account-id";
+    private static final String FILE_UUID_METADATA = "file-uuid";
     private static final String SHA256_METADATA = "sha256";
 
     @Resource
@@ -39,17 +40,17 @@ public class UploadItemProcessor {
     /**
      * 完成单个上传文件从请求内容到已验证存储结果的状态转换。
      *
-     * @param context 已解析的上传批次上下文
+     * @param context 已解析的文件单元上传上下文
      * @param item 尚未持久化的上传文件
      * @return 已保存并通过正文回读校验的文件元数据
      * @throws IOException 文件内容读取、存储或回读失败
      * @throws RuntimeException 请求边界或文件完整性校验失败
      */
     public VerifiedStoredFileMetadata process(
-            UploadBatchContext context,
+            UploadFileContext context,
             UploadItem item) throws IOException {
         if (context == null) {
-            throw new IllegalArgumentException("上传批次上下文不能为空");
+            throw new IllegalArgumentException("上传文件上下文不能为空");
         }
         if (item == null) {
             throw new IllegalArgumentException("待上传文件不能为空");
@@ -63,8 +64,9 @@ public class UploadItemProcessor {
         StoragePath.OriginalFilePath storagePath;
         try {
             storagePath = StoragePath.createOriginalFilePath(
-                    context.bidRecordId(),
-                    context.uploadBatchId(), item.originalFilename());
+                    context.bidderAccountId(),
+                    context.fileUuid(),
+                    item.originalFilename());
         } catch (IllegalArgumentException failure) {
             throw new AppException(
                     AppErrorCode.CREDENTIAL_FILE_INVALID_PATH,
@@ -120,11 +122,12 @@ public class UploadItemProcessor {
 
     /** 构造由上传流程定义、存储端仅负责透传的对象 metadata。 */
     private Map<String, String> createMetadata(
-            UploadBatchContext context,
+            UploadFileContext context,
             String sha256) {
         return Map.of(
                 BID_RECORD_ID_METADATA, context.bidRecordId().toString(),
-                UPLOAD_BATCH_ID_METADATA, context.uploadBatchId(),
+                BIDDER_ACCOUNT_ID_METADATA, context.bidderAccountId().toString(),
+                FILE_UUID_METADATA, context.fileUuid(),
                 SHA256_METADATA, sha256);
     }
 

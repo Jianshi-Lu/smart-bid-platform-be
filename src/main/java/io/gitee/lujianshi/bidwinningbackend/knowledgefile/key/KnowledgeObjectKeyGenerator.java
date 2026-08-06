@@ -8,15 +8,16 @@ import java.util.UUID;
 @Component
 public class KnowledgeObjectKeyGenerator {
 
-    /** 生成 {@code {uuid}/original/{safeFilename}}。 */
+    /** 生成 {@code {uuid}/original/{uuid}_{safeFilename}}。 */
     public OriginalObjectKey original(
             UUID documentUuid,
             String originalFilename) {
         requireUuid(documentUuid);
         String safeFilename = normalizeFilename(originalFilename);
+        String storedFilename = documentUuid + "_" + safeFilename;
         return new OriginalObjectKey(
                 safeFilename,
-                documentUuid + "/original/" + safeFilename);
+                documentUuid + "/original/" + storedFilename);
     }
 
     /** 生成 {@code {uuid}/converted/content.md}。 */

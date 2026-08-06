@@ -1,6 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.HeadObjectResponse;
@@ -13,7 +12,6 @@ import io.minio.StatObjectResponse;
 import io.minio.errors.MinioException;
 import okhttp3.Headers;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -33,7 +31,7 @@ class MinioFileStorageTest {
 
     private static final int BID_RECORD_ID = 1001;
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
-    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String FILE_UUID_METADATA = "file-uuid";
     private static final String SHA256_METADATA = "sha256";
     private static final String SHA256 =
             "9cd4aefcb376e737ae07795b61419408249765494085c144e2d83561de56d145";
@@ -48,7 +46,7 @@ class MinioFileStorageTest {
         minioClient.prepareStoredObject(batchId, content.length, "application/pdf");
 
         StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, "../营业执照.pdf");
+                StoragePath.createOriginalFilePath(55L, batchId, "../营业执照.pdf");
         FileStorage.StoredFile storedFile = storage.store(new FileStorage.StoreRequest(
                 storagePath.relativePath(),
                 "application/pdf",
@@ -62,7 +60,7 @@ class MinioFileStorageTest {
         assertEquals(content.length, args.objectSize());
         assertEquals("application/pdf", args.contentType().toString());
         assertEquals("1001", args.userMetadata().getFirst("x-amz-meta-bid-record-id"));
-        assertEquals(batchId, args.userMetadata().getFirst("x-amz-meta-upload-batch-id"));
+        assertEquals(batchId, args.userMetadata().getFirst("x-amz-meta-file-uuid"));
         assertEquals(SHA256, args.userMetadata().getFirst("x-amz-meta-sha256"));
         assertSame(input, args.stream());
         assertEquals("credential-files", minioClient.statObjectArgs.bucket());
@@ -72,7 +70,7 @@ class MinioFileStorageTest {
         assertEquals(metadata(batchId), storedFile.metadata());
         assertEquals("etag-1", storedFile.etag());
         assertTrue(storedFile.relativePath().startsWith(
-                "bid-records/" + BID_RECORD_ID + "/batches/" + batchId + "/original/"));
+                "55/files/" + batchId + "/original/"));
     }
 
     @Test
@@ -218,12 +216,7 @@ class MinioFileStorageTest {
     }
 
     private MinioFileStorage createStorage(MinioClient minioClient) {
-        FileStorageProperties properties = new FileStorageProperties();
-        properties.getMinio().setBucket("credential-files");
-        MinioFileStorage storage = new MinioFileStorage();
-        ReflectionTestUtils.setField(storage, "minioClient", minioClient);
-        ReflectionTestUtils.setField(storage, "properties", properties);
-        return storage;
+        return new MinioFileStorage(minioClient, "credential-files");
     }
 
     private FileStorage.StoreRequest request(
@@ -232,7 +225,7 @@ class MinioFileStorageTest {
             String contentType,
             byte[] content) {
         return new FileStorage.StoreRequest(
-                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, filename).relativePath(),
+                StoragePath.createOriginalFilePath(55L, batchId, filename).relativePath(),
                 contentType,
                 content.length,
                 metadata(batchId),
@@ -242,7 +235,7 @@ class MinioFileStorageTest {
     private Map<String, String> metadata(String batchId) {
         return Map.of(
                 BID_RECORD_ID_METADATA, "1001",
-                UPLOAD_BATCH_ID_METADATA, batchId,
+                FILE_UUID_METADATA, batchId,
                 SHA256_METADATA, SHA256);
     }
 
@@ -256,7 +249,7 @@ class MinioFileStorageTest {
         private MinioException statFailure;
         private MinioException removeFailure;
         private String statBidRecordId;
-        private String statUploadBatchId;
+        private String statFileUuid;
         private String statSha256;
         private long statFileSize;
         private String statContentType;
@@ -278,11 +271,11 @@ class MinioFileStorageTest {
         }
 
         private void prepareStoredObject(
-                String uploadBatchId,
+                String fileUuid,
                 long fileSize,
                 String contentType) {
             this.statBidRecordId = "1001";
-            this.statUploadBatchId = uploadBatchId;
+            this.statFileUuid = fileUuid;
             this.statSha256 = SHA256;
             this.statFileSize = fileSize;
             this.statContentType = contentType;
@@ -317,8 +310,8 @@ class MinioFileStorageTest {
             if (statBidRecordId != null) {
                 headers.add("x-amz-meta-bid-record-id", statBidRecordId);
             }
-            if (statUploadBatchId != null) {
-                headers.add("x-amz-meta-upload-batch-id", statUploadBatchId);
+            if (statFileUuid != null) {
+                headers.add("x-amz-meta-file-uuid", statFileUuid);
             }
             if (statSha256 != null) {
                 headers.add("x-amz-meta-sha256", statSha256);

@@ -12,19 +12,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MinioConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(MinioTestConfiguration.class);
+            .withUserConfiguration(MinioTestConfiguration.class)
+            .withPropertyValues(
+                    "knowledge-file.storage.minio.endpoint=http://10.0.0.100:9000",
+                    "knowledge-file.storage.minio.access-key=test-access-key",
+                    "knowledge-file.storage.minio.secret-key=test-secret-key",
+                    "knowledge-file.storage.minio.bucket=knowledge-file");
 
     @Test
-    void shouldCreateMinioClientWhenStorageTypeIsMinio() {
-        minioContextRunner().run(context -> assertThat(context)
+    void shouldCreateMinioClientWhenCredentialStorageIsMinio() {
+        credentialMinioRunner().run(context -> assertThat(context)
                 .hasNotFailed()
                 .hasSingleBean(MinioClient.class));
     }
 
     @Test
-    void shouldNotCreateMinioClientWhenStorageTypeIsLocal() {
+    void shouldCreateMinioClientWhenOnlyKnowledgeStorageIsMinio() {
         contextRunner
-                .withPropertyValues("credential-file.storage.type=LOCAL")
+                .withPropertyValues(
+                        "credential-file.storage.type=LOCAL",
+                        "knowledge-file.storage.type=MINIO")
+                .run(context -> assertThat(context)
+                        .hasNotFailed()
+                        .hasSingleBean(MinioClient.class));
+    }
+
+    @Test
+    void shouldNotCreateMinioClientWhenBothStoragesAreLocal() {
+        contextRunner
+                .withPropertyValues(
+                        "credential-file.storage.type=LOCAL",
+                        "knowledge-file.storage.type=LOCAL")
                 .run(context -> assertThat(context)
                         .hasNotFailed()
                         .doesNotHaveBean(MinioClient.class));
@@ -32,7 +50,7 @@ class MinioConfigurationTest {
 
     @Test
     void shouldReuseSameMinioClientBean() {
-        minioContextRunner().run(context -> {
+        credentialMinioRunner().run(context -> {
             MinioClient first = context.getBean(MinioClient.class);
             MinioClient second = context.getBean(MinioClient.class);
 
@@ -45,6 +63,7 @@ class MinioConfigurationTest {
         contextRunner
                 .withPropertyValues(
                         "credential-file.storage.type=MINIO",
+                        "knowledge-file.storage.type=LOCAL",
                         "credential-file.storage.minio.access-key=test-access-key",
                         "credential-file.storage.minio.secret-key=test-secret-key",
                         "credential-file.storage.minio.bucket=credential-files")
@@ -55,7 +74,7 @@ class MinioConfigurationTest {
                 });
     }
 
-    private ApplicationContextRunner minioContextRunner() {
+    private ApplicationContextRunner credentialMinioRunner() {
         return contextRunner.withPropertyValues(
                 "credential-file.storage.type=MINIO",
                 "credential-file.storage.minio.endpoint=http://10.0.0.100:9000",
@@ -65,7 +84,10 @@ class MinioConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(FileStorageProperties.class)
+    @EnableConfigurationProperties({
+            FileStorageProperties.class,
+            KnowledgeFileStorageProperties.class
+    })
     @Import(MinioConfiguration.class)
     static class MinioTestConfiguration {
     }

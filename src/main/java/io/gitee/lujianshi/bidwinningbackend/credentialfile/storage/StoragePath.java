@@ -14,45 +14,45 @@ public final class StoragePath {
     }
 
     /**
-     * 为原始文件生成以投标记录为顶层归属、以批次为第二层归属的存储路径。
+     * 为原始文件生成以投标方账号为顶层归属、以文件单元 UUID 为目录的存储路径。
      *
      * <p>MinIO 中的目录是 object key 前缀，本地文件系统则会将同一个逻辑路径解释为
      * 存储根目录下的相对路径。</p>
      *
-     * @param bidRecordId 投标记录 ID
-     * @param uploadBatchId 上传批次 UUID
+     * @param bidderAccountId 投标方账号 ID（资信文件归属与溯源根）
+     * @param fileUuid 文件单元 UUID
      * @param originalFilename 客户端提供的原始文件名
      * @return 安全原始文件名及逻辑存储路径
      */
     public static OriginalFilePath createOriginalFilePath(
-            Integer bidRecordId,
-            String uploadBatchId,
+            Long bidderAccountId,
+            String fileUuid,
             String originalFilename) {
-        validateBidRecordId(bidRecordId);
-        String normalizedBatchId;
+        validateBidderAccountId(bidderAccountId);
+        String normalizedFileUuid;
         try {
-            normalizedBatchId = UUID.fromString(uploadBatchId).toString();
+            normalizedFileUuid = UUID.fromString(fileUuid).toString();
         } catch (NullPointerException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("上传批次号格式不正确", e);
+            throw new IllegalArgumentException("文件单元 UUID 格式不正确", e);
         }
 
         String safeOriginalFilename = normalizeFilename(originalFilename);
-        String storedFilename = UUID.randomUUID() + "_" + safeOriginalFilename;
+        String storedFilename = normalizedFileUuid + "_" + safeOriginalFilename;
         return new OriginalFilePath(
                 safeOriginalFilename,
-                "bid-records/" + bidRecordId
-                        + "/batches/" + normalizedBatchId
+                bidderAccountId
+                        + "/files/" + normalizedFileUuid
                         + "/original/" + storedFilename);
     }
 
     /**
-     * 根据 original 逻辑路径生成同一批次下稳定的 converted Markdown 路径。
+     * 根据 original 逻辑路径生成同一文件单元下固定的 converted Markdown 路径。
      *
      * <p>路径只做确定性映射，不访问存储。重复转换同一个原文件会得到同一个目标路径，
      * 因而由存储实现覆盖旧的派生 Markdown。</p>
      *
      * @param originalFilePath 已落库的 original 相对路径或 MinIO object key
-     * @return 同批次 converted 目录下、后缀为 {@code .md} 的逻辑路径
+     * @return 同文件单元 converted 目录下的固定 {@code content.md} 逻辑路径
      * @throws IllegalArgumentException 路径不合法或不位于 original 目录
      */
     public static String createConvertedMarkdownPath(String originalFilePath) {
@@ -65,13 +65,11 @@ public final class StoragePath {
 
         String relativeFilename = normalizedPath.substring(
                 markerIndex + marker.length());
-        int lastSlash = relativeFilename.lastIndexOf('/');
-        int lastDot = relativeFilename.lastIndexOf('.');
-        String markdownFilename = lastDot > lastSlash + 1
-                ? relativeFilename.substring(0, lastDot) + ".md"
-                : relativeFilename + ".md";
+        if (relativeFilename.isBlank()) {
+            throw new IllegalArgumentException("原始文件路径必须位于 original 目录");
+        }
         return normalizedPath.substring(0, markerIndex)
-                + "/converted/" + markdownFilename;
+                + "/converted/content.md";
     }
 
     /**
@@ -81,11 +79,16 @@ public final class StoragePath {
      * 前重新生成并覆盖同一个对象。</p>
      *
      * @param bidRecordId 投标记录 ID
+     * @param bidderAccountId 投标方账号 ID
      * @return 汇总 Markdown 的逻辑存储路径
      */
-    public static String createMergedMarkdownPath(Integer bidRecordId) {
+    public static String createMergedMarkdownPath(
+            Integer bidRecordId,
+            Long bidderAccountId) {
         validateBidRecordId(bidRecordId);
-        return "bid-records/" + bidRecordId + "/merged/credentials.md";
+        validateBidderAccountId(bidderAccountId);
+        return bidderAccountId
+                + "/merged/" + bidRecordId + "/credentials.md";
     }
 
     /**
@@ -130,6 +133,13 @@ public final class StoragePath {
     private static void validateBidRecordId(Integer bidRecordId) {
         if (bidRecordId == null || bidRecordId <= 0) {
             throw new IllegalArgumentException("投标记录 ID 不正确");
+        }
+    }
+
+    /** 校验投标方账号 ID，资信文件路径必须以账号为顶层归属。 */
+    private static void validateBidderAccountId(Long bidderAccountId) {
+        if (bidderAccountId == null || bidderAccountId <= 0) {
+            throw new IllegalArgumentException("投标方账号 ID 不正确");
         }
     }
 

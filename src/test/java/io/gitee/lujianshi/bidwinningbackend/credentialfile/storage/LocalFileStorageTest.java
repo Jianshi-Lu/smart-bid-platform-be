@@ -24,7 +24,7 @@ class LocalFileStorageTest {
 
     private static final int BID_RECORD_ID = 1001;
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
-    private static final String UPLOAD_BATCH_ID_METADATA = "upload-batch-id";
+    private static final String FILE_UUID_METADATA = "file-uuid";
     private static final String SHA256_METADATA = "sha256";
     private static final String VALID_SHA256 = "0".repeat(64);
 
@@ -43,7 +43,7 @@ class LocalFileStorageTest {
         assertEquals(content.length, storedFile.fileSize());
         assertEquals(metadata(batchId), storedFile.metadata());
         assertTrue(storedFile.relativePath().startsWith(
-                "bid-records/" + BID_RECORD_ID + "/batches/" + batchId + "/original/"));
+                "55/files/" + batchId + "/original/"));
         assertFalse(storedFile.relativePath().startsWith(tempDir.toString()));
         assertTrue(Files.isRegularFile(tempDir.resolve(storedFile.relativePath())));
         try (InputStream input = storage.open(storedFile.relativePath())) {
@@ -55,24 +55,26 @@ class LocalFileStorageTest {
     }
 
     @Test
-    void shouldGenerateDifferentStoredPathsForSameOriginalFilename() throws Exception {
+    void shouldOverwriteOriginalPathForSameFileUuid() throws Exception {
         LocalFileStorage storage = createStorage();
-        String batchId = UUID.randomUUID().toString();
+        String fileUuid = UUID.randomUUID().toString();
 
         FileStorage.StoredFile first = storage.store(
-                request(batchId, "license.pdf", "application/pdf", new byte[]{1}));
+                request(fileUuid, "license.pdf", "application/pdf", new byte[]{1}));
         FileStorage.StoredFile second = storage.store(
-                request(batchId, "license.pdf", "application/pdf", new byte[]{2}));
+                request(fileUuid, "license.pdf", "application/pdf", new byte[]{2}));
 
-        assertNotEquals(first.relativePath(), second.relativePath());
+        assertEquals(first.relativePath(), second.relativePath());
         assertTrue(Files.exists(tempDir.resolve(first.relativePath())));
-        assertTrue(Files.exists(tempDir.resolve(second.relativePath())));
+        try (InputStream input = storage.open(first.relativePath())) {
+            assertEquals(2, input.readAllBytes()[0]);
+        }
     }
 
     @Test
     void shouldReplaceExistingDerivedFileAtSamePath() throws Exception {
         LocalFileStorage storage = createStorage();
-        String path = StoragePath.createMergedMarkdownPath(BID_RECORD_ID);
+        String path = StoragePath.createMergedMarkdownPath(BID_RECORD_ID, 55L);
 
         storage.store(new FileStorage.StoreRequest(
                 path, "text/markdown", 3, Map.of(),
@@ -99,7 +101,7 @@ class LocalFileStorageTest {
         byte[] content = "content".getBytes(StandardCharsets.UTF_8);
         String batchId = UUID.randomUUID().toString();
         StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, "license.pdf");
+                StoragePath.createOriginalFilePath(55L, batchId, "license.pdf");
         FileStorage.StoreRequest request =
                 new FileStorage.StoreRequest(
                         storagePath.relativePath(),
@@ -131,7 +133,7 @@ class LocalFileStorageTest {
     private LocalFileStorage createStorage() {
         FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        return new LocalFileStorage(properties);
+        return new LocalFileStorage(properties.getLocal().getRoot());
     }
 
     private FileStorage.StoreRequest request(
@@ -140,7 +142,7 @@ class LocalFileStorageTest {
             String contentType,
             byte[] content) {
         return new FileStorage.StoreRequest(
-                StoragePath.createOriginalFilePath(BID_RECORD_ID, batchId, filename).relativePath(),
+                StoragePath.createOriginalFilePath(55L, batchId, filename).relativePath(),
                 contentType,
                 content.length,
                 metadata(batchId),
@@ -150,7 +152,7 @@ class LocalFileStorageTest {
     private Map<String, String> metadata(String batchId) {
         return Map.of(
                 BID_RECORD_ID_METADATA, "1001",
-                UPLOAD_BATCH_ID_METADATA, batchId,
+                FILE_UUID_METADATA, batchId,
                 SHA256_METADATA, VALID_SHA256);
     }
 }

@@ -16,15 +16,7 @@ import java.util.List;
 @Mapper
 public interface CredentialFileMapper extends BaseMapper<CredentialFile, Long> {
 
-    /**
-     * 查询指定上传批次下的全部文件。
-     *
-     * @param uploadBatchId 上传批次 UUID
-     * @return 文件列表，按 file_order、file_id 升序
-     */
-    List<CredentialFile> selectByUploadBatchId(@Param("uploadBatchId") String uploadBatchId);
-
-    /** 查询指定投标记录下的全部资信文件，按批次和文件顺序返回。 */
+    /** 查询指定投标记录下的全部资信文件，按文件顺序返回。 */
     List<CredentialFile> selectByBidRecordId(@Param("bidRecordId") Integer bidRecordId);
 
     /**
@@ -47,8 +39,4 @@ public interface CredentialFileMapper extends BaseMapper<CredentialFile, Long> {
             @Param("fileId") Long fileId,
             @Param("errorMessage") String errorMessage);
 
-    /** 将批次中尚未完成的文件统一标记为失败。 */
-    int markFailedByUploadBatchId(
-            @Param("uploadBatchId") String uploadBatchId,
-            @Param("errorMessage") String errorMessage);
 }
