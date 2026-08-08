@@ -2,15 +2,16 @@ package io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.BatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecordOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -18,9 +19,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 投标记录 Controller。7 端点（6 标准 CRUD + 1 按公告过滤）。
+ * 投标记录 Controller。7 端点（查询/更新/删除/分页/批量删除/按公告过滤/历史）。
  *
- * <p>风险分析查询和触发入口已拆分到 {@link RiskAnalysisController}。</p>
+ * <p>投标记录由投标人创建（/bidder/bid-records），招标方只做管理，不再提供创建端点。
+ * 风险分析查询和触发入口已拆分到 {@link RiskAnalysisController}。</p>
  *
  * @since V18
  */
@@ -30,23 +32,8 @@ public class BidRecordController {
     @Resource
     private BidRecordService service;
 
-    /**
-     * 创建投标记录。Service 自动计算 {@code bidNo}（同公告+同投标人下递增）和 {@code bidAt}（当前时间）。
-     *
-     * @param request 创建请求（invitationId / bidderName / quotePrice / bidderContact 必填，credentials 路径列表可选）
-     * @return 创建的实体（含自增 bidRecordId）
-     */
-    @PostMapping("/bid-record/add")
-    public Result<BidRecord> addBidRecord(@Valid @RequestBody AddRequest request) {
-        BidRecord entity = new BidRecord();
-        entity.setInvitationId(request.getInvitationId());
-        entity.setBidderName(request.getBidderName());
-        entity.setQuotePrice(request.getQuotePrice());
-        entity.setBidderContact(request.getBidderContact());
-        entity.setCredentials(request.getCredentials());
-        service.add(entity);
-        return Result.success(entity, "创建成功");
-    }
+    @Resource
+    private OperationHistoryService operationHistoryService;
 
     /**
      * 按 ID 查询投标记录。
@@ -152,6 +139,14 @@ public class BidRecordController {
     @GetMapping("/bid-record/by-invitation/{invitationId}")
     public Result<List<BidRecord>> listByInvitation(@PathVariable Integer invitationId) {
         return Result.success(service.listByInvitationId(invitationId), "查询成功");
+    }
+
+    /** 查询投标记录的操作历史（创建/修改/删除，时间倒序）。 */
+    @GetMapping("/bid-record/{id}/history")
+    public Result<List<BidRecordOperationHistory>> listOperationHistory(
+            @PathVariable Integer id) {
+        return Result.success(
+                operationHistoryService.listBidRecordHistory(id), "查询成功");
     }
 
     /** 构造投标记录不存在异常，统一交给全局异常处理器返回。 */

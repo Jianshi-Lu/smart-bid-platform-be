@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper">
 
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord">
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord">
         <id     column="bid_record_id"   property="bidRecordId"/>
         <result column="invitation_id"   property="invitationId"/>
         <result column="bid_no"          property="bidNo"/>
@@ -20,7 +20,7 @@
     </resultMap>
 
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord"
             useGeneratedKeys="true"
             keyProperty="bidRecordId">
         INSERT INTO bid_record
@@ -33,7 +33,7 @@
     </insert>
 
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidRecord">
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord">
         UPDATE bid_record
         <set>
             <if test="invitationId != null">invitation_id = #{invitationId},</if>

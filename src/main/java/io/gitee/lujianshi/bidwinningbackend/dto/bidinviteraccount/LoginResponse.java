@@ -6,7 +6,7 @@ package io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount;
  * <p>与投标方对称：不签发令牌，客户端后续请求携带 HTTP Basic，
  * 后端每次实时校验。{@code /bid-inviter/auth/me} 返回同一结构。</p>
  *
- * @since V31
+ * @since V39
  */
 public record LoginResponse(
         Long bidInviterAccountId,

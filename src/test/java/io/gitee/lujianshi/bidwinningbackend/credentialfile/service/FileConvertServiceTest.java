@@ -13,9 +13,10 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.when;
 class FileConvertServiceTest {
 
     private static final int BID_RECORD_ID = 1001;
-    private static final Long BIDDER_ACCOUNT_ID = 55L;
+    private static final String USERNAME = "bidder01";
 
     @TempDir
     Path tempDir;
@@ -56,8 +57,8 @@ class FileConvertServiceTest {
         FileChecksumCalculator checksumCalculator =
                 new Sha256FileChecksumCalculator();
         FileStorage storage = createStorage();
-        String originalPath = BIDDER_ACCOUNT_ID + "/files/" + fileUuid
-                + "/original/" + fileUuid + "_source.pdf";
+        String originalPath = USERNAME + "/source.pdf/original/"
+                + fileUuid + "_source.pdf";
         String originalSha256 = checksumCalculator.calculate(
                 new ByteArrayInputStream(original));
         storage.store(new FileStorage.StoreRequest(
@@ -85,7 +86,7 @@ class FileConvertServiceTest {
         when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
                 .thenReturn(List.of(sourceFile), List.of(convertedFile));
         when(fileMapper.markConverting(1L)).thenReturn(1);
-        when(fileMapper.markConverted(eq(1L), any(), any()))
+        when(fileMapper.markConverted(eq(1L), any(), any(), any()))
                 .thenReturn(1);
 
         ToMarkdownClient toMarkdownClient =
@@ -121,7 +122,7 @@ class FileConvertServiceTest {
                 service.convertAll(BID_RECORD_ID);
 
         String markdownPath =
-                StoragePath.createConvertedMarkdownPath(originalPath);
+                USERNAME + "/source.pdf/converted/source.md";
         assertEquals(
                 BidRecordCredentialConversionStatus.ALL_CONVERTED,
                 response.status());
@@ -130,15 +131,15 @@ class FileConvertServiceTest {
                 markdown,
                 storage.open(markdownPath).readAllBytes());
         verify(fileMapper).markConverted(
-                eq(1L), eq(markdownPath), any());
-        verify(fileMapper, never()).markFailed(eq(1L), any());
+                eq(1L), eq(markdownPath), any(), any());
+        verify(fileMapper, never()).markFailed(eq(1L), any(), any());
         verify(self).syncBidRecordCredentials(BID_RECORD_ID);
     }
 
     @Test
     void shouldClearCredentialProjectionWhenNoConvertedFileRemains() {
         CredentialFile failedFile = new CredentialFile();
-        failedFile.setStatus(ConvertStatus.FAILED);
+        failedFile.setConvertStatus(ConvertStatus.FAILED);
         CredentialFileMapper fileMapper =
                 mock(CredentialFileMapper.class);
         when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
@@ -183,6 +184,9 @@ class FileConvertServiceTest {
         ReflectionTestUtils.setField(
                 service, "bidRecordMapper", mock(BidRecordMapper.class));
         ReflectionTestUtils.setField(service, "self", self);
+        ReflectionTestUtils.setField(
+                service, "operationHistoryService",
+                mock(OperationHistoryService.class));
         return service;
     }
 
@@ -210,10 +214,10 @@ class FileConvertServiceTest {
         file.setOriginalFilename("source.pdf");
         file.setContentType("application/pdf");
         file.setFileSize(fileSize);
-        file.setSha256(sha256);
+        file.setOriginalSha256(sha256);
         file.setStorageType("LOCAL");
         file.setOriginalFilePath(originalPath);
-        file.setStatus(status);
+        file.setConvertStatus(status);
         if (status == ConvertStatus.CONVERTED) {
             file.setMarkdownFilePath(
                     StoragePath.createConvertedMarkdownPath(originalPath));

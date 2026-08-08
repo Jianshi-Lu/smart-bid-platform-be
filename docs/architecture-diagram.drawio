@@ -173,7 +173,7 @@
         <mxCell id="svc_risk" value="&lt;b&gt;RiskAnalysisService&lt;/b&gt;&lt;br&gt;AI 调用 + extractRawContent + persist&#xa;Structured Output + reasoning fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
           <mxGeometry x="980" y="40" width="260" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="svc_loader" value="&lt;b&gt;BidRecordLoader&lt;/b&gt;&lt;br&gt;loadDetail() 返回 Markdown 字符串&#xa;供 prompt 模板 {{detail}} 注入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
+        <mxCell id="svc_loader" value="&lt;b&gt;BidRecordLoader&lt;/b&gt;&lt;br&gt;loadDetail() 返回 Markdown 字符串&#xa;供 USER_PROMPT_TEMPLATE %s 注入" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
           <mxGeometry x="1260" y="40" width="220" height="70" as="geometry" />
         </mxCell>
         <mxCell id="svc_mail" value="&lt;b&gt;MailService&lt;/b&gt;&lt;br&gt;JavaMailSender&#xa;Thymeleaf 模板渲染" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=11;" parent="lane_app" vertex="1">
@@ -248,7 +248,7 @@
         <mxCell id="lane_cross" value="横切关注点 (Cross-Cutting) — Util / Mail / AOP / Async / Actuator / DevTools" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;html=1;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
           <mxGeometry x="60" y="1040" width="2280" height="180" as="geometry" />
         </mxCell>
-        <mxCell id="util_pf" value="&lt;b&gt;PromptFiller&lt;/b&gt;&lt;br&gt;classpath:prompts/*.txt 加载&#xa;{{var}} 替换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
+        <mxCell id="util_pf" value="&lt;b&gt;RiskAnalysis Prompt&lt;/b&gt;&lt;br&gt;Service 内固定 system/user prompt&#xa;String.formatted 注入业务字段" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
           <mxGeometry x="20" y="40" width="220" height="70" as="geometry" />
         </mxCell>
         <mxCell id="util_rs" value="&lt;b&gt;ResourceSearcher&lt;/b&gt;&lt;br&gt;模板文件存在性校验&#xa;classpath:/templates/*.html&#xa;&lt;font color=&quot;#b85450&quot;&gt;⚠ copy_down 1.1 死依赖 (Java 零引用)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontSize=11;" parent="lane_cross" vertex="1">
@@ -362,7 +362,7 @@
         <mxCell id="edg22" value="SMTP" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=11;fontStyle=1;" parent="1" source="cross_mail" target="ext_smtp" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="edg23" value="加载 prompts/*" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="util_pf" target="svc_risk" edge="1">
+        <mxCell id="edg23" value="固定 Prompt 配置" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="util_pf" target="svc_risk" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="edg24" value="注入 ChatClient" style="endArrow=open;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;fontSize=9;dashed=1;" parent="1" source="cross_ai" target="svc_risk" edge="1">
@@ -412,7 +412,7 @@
         <mxCell id="c2" value="&lt;b&gt;邮件集成层&lt;/b&gt;&lt;br&gt;JavaMailSender + Thymeleaf&#xa;templates/*.html&#xa;→ QQ SMTP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
           <mxGeometry x="360" y="640" width="240" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="c3" value="&lt;b&gt;工具层 (Util)&lt;/b&gt;&lt;br&gt;PromptFiller: 加载 prompts/*&#xa;ResourceSearcher: 路径解析&#xa;AsyncTaskManager: 异步延迟" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+        <mxCell id="c3" value="&lt;b&gt;工具层 (Util)&lt;/b&gt;&lt;br&gt;ResourceSearcher: 路径解析&#xa;AsyncTaskManager: 异步延迟" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
           <mxGeometry x="620" y="640" width="240" height="100" as="geometry" />
         </mxCell>
         <mxCell id="c4" value="&lt;b&gt;异常处理&lt;/b&gt;&lt;br&gt;GlobalExceptionHandler&#xa;统一捕获 → Result 包装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
@@ -500,7 +500,7 @@
         <mxCell id="m6_s" edge="1" parent="1" source="c4" style="endArrow=classic;html=1;rounded=1;edgeStyle=none;exitX=1;exitY=0.2031;exitDx=0;exitDy=0;entryX=1;entryY=0.2386;entryDx=0;entryDy=0;fontSize=10;fontColor=#333;labelBackgroundColor=#f5f5f5;strokeColor=#888;dashed=1;" target="c4" value="6. BidRecordLoader.loadDetail() → Markdown 字符串">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="m7_s" edge="1" parent="1" source="c4" style="endArrow=classic;html=1;rounded=1;edgeStyle=none;exitX=1;exitY=0.2406;exitDx=0;exitDy=0;entryX=1;entryY=0.2761;entryDx=0;entryDy=0;fontSize=10;fontColor=#333;labelBackgroundColor=#f5f5f5;strokeColor=#888;dashed=1;" target="c4" value="7. promptFiller.loadFromResource()">
+        <mxCell id="m7_s" edge="1" parent="1" source="c4" style="endArrow=classic;html=1;rounded=1;edgeStyle=none;exitX=1;exitY=0.2406;exitDx=0;exitDy=0;entryX=1;entryY=0.2761;entryDx=0;entryDy=0;fontSize=10;fontColor=#333;labelBackgroundColor=#f5f5f5;strokeColor=#888;dashed=1;" target="c4" value="7. 固定 Prompt + String.formatted()">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="m8" edge="1" parent="1" source="c4" style="endArrow=classic;html=1;rounded=1;edgeStyle=none;exitX=1;exitY=0.2781;exitDx=0;exitDy=0;entryX=0;entryY=0.2781;entryDx=0;entryDy=0;fontSize=10;fontColor=#333;labelBackgroundColor=#f5f5f5;strokeColor=#1a73e8;" target="c5" value="8. chatClient.prompt().system().user().call().content()">

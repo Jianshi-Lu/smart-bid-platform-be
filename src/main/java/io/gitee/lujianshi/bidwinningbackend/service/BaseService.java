@@ -176,7 +176,11 @@ public abstract class BaseService<T> {
      */
     @Transactional(rollbackFor = Exception.class)
     public int add(T entity) {
-        return getMapper().insert(entity);
+        int rows = getMapper().insert(entity);
+        if (rows == 1) {
+            afterAdd(entity);
+        }
+        return rows;
     }
 
     /**
@@ -187,7 +191,13 @@ public abstract class BaseService<T> {
      */
     @Transactional(rollbackFor = Exception.class)
     public int update(T entity) {
-        return getMapper().updateById(entity);
+        Integer id = getIdExtractor().apply(entity);
+        T before = id == null ? null : getMapper().selectById(id);
+        int rows = getMapper().updateById(entity);
+        if (rows == 1) {
+            afterUpdate(before, getMapper().selectById(id));
+        }
+        return rows;
     }
 
     /**
@@ -198,7 +208,12 @@ public abstract class BaseService<T> {
      */
     @Transactional(rollbackFor = Exception.class)
     public int delete(Integer id) {
-        return getMapper().deleteById(id);
+        T before = getMapper().selectById(id);
+        int rows = getMapper().deleteById(id);
+        if (rows == 1) {
+            afterDelete(before);
+        }
+        return rows;
     }
 
     /**
@@ -237,7 +252,33 @@ public abstract class BaseService<T> {
                     .map(getIdExtractor())
                     .toList();
             getMapper().deleteByIds(existingIds);
+            existing.forEach(this::afterDelete);
         }
         return existing;
+    }
+
+    /**
+     * 新增成功后的子类钩子（默认空实现），用于写操作历史等审计逻辑。
+     *
+     * @param entity 已落库（含自增主键）的实体
+     */
+    protected void afterAdd(T entity) {
+    }
+
+    /**
+     * 更新成功后的子类钩子（默认空实现），用于写操作历史等审计逻辑。
+     *
+     * @param before 更新前实体（不存在时为 null）
+     * @param after  更新后重新查询的实体（不存在时为 null）
+     */
+    protected void afterUpdate(T before, T after) {
+    }
+
+    /**
+     * 删除成功后的子类钩子（默认空实现），用于写操作历史等审计逻辑。
+     *
+     * @param deleted 删除前实体（不存在时为 null）
+     */
+    protected void afterDelete(T deleted) {
     }
 }

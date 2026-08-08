@@ -33,18 +33,27 @@ class UploadIntakeModelTest {
                 () -> item("empty.pdf", ""));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new UploadFileContext(0, 55L, UUID.randomUUID().toString()));
+                () -> new UploadFileContext(
+                        0, 55L, "bidder01", UUID.randomUUID().toString()));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new UploadFileContext(1001, null, UUID.randomUUID().toString()));
+                () -> new UploadFileContext(
+                        1001, null, "bidder01", UUID.randomUUID().toString()));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new UploadFileContext(1001, 55L, "../invalid"));
+                () -> new UploadFileContext(
+                        1001, 55L, "bidder01", "../invalid"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new UploadFileContext(
+                        1001, 55L, " ", UUID.randomUUID().toString()));
 
         String fileUuid = UUID.randomUUID().toString();
-        UploadFileContext context = new UploadFileContext(1001, 55L, fileUuid);
+        UploadFileContext context = new UploadFileContext(
+                1001, 55L, "bidder01", fileUuid);
         assertEquals(fileUuid, context.fileUuid());
         assertEquals(55L, context.bidderAccountId());
+        assertEquals("bidder01", context.username());
     }
 
     private UploadItem item(String filename, String content) {

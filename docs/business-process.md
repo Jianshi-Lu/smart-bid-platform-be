@@ -1,6 +1,6 @@
 # smart-bid-platform-be 业务流程文档
 
-> 本文档以 2026-07-30 当前工作区源码为准，覆盖 31 个显式 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点。
+> 本文档以当前工作区源码为准，按业务流程说明主要 Controller 端点。Spring Actuator 自动生成的管理端点不计入业务端点；资信文件接口按投标方和招标方角色拆分。
 >
 > 系统分层见 [architecture.md](architecture.md)，表关系见 [database.md](database.md)。
 
@@ -12,7 +12,7 @@
 | 招标经办人 | 7 | `BidHandlerInfoController` |
 | 招标公告 | 8 | `InvitationForBidController` |
 | 投标记录 | 7 | `BidRecordController` |
-| 资信文件 | 3 | `FileUploadController`、`FileConvertController` |
+| 资信文件 | 10 | `BidRecordController`、`BidderFileDownloadController`、`BidInviterFileDownloadController`、`FileConvertController`、`CredentialFileOperationHistoryController` |
 | 风险分析 | 3 | `RiskAnalysisController` |
 | 合计 | 31 | 7 个 Controller |
 
@@ -318,42 +318,34 @@ flowchart TD
 
 ## 8. 资信文件上传
 
-### 8.1 `POST /credential-files/upload`
+### 8.1 `POST /bidder/bid-records/{bidRecordId}/credential-files`
 
-请求为 `multipart/form-data`：
-
-- `bidRecordId`：正整数。
-- `files`：重复字段，一次请求提交一个批次的全部文件。
-- 后端生成 `uploadBatchId`，前端不传批次号。
+请求为 `multipart/form-data`，使用重复的 `files` 字段提交多个文件；请求还携带
+`username`，必须与当前 Basic 登录账号一致。批次号由后端生成，前端不传批次号。
 
 具体步骤：
 
-1. Spring 把 multipart 分片包装为 `MultipartFile`。
-2. Controller 将每个 `MultipartFile` 适配为 `UploadItem`；`file::getInputStream` 允许按需重新打开流。
-3. Controller 创建不可变 `UploadBatch`，交给上传 Service。
-4. Service 查询当前 `bidRecordId` 的最大批次号，生成 `batchNo+1` 和 UUID，插入 `credential_file_batch(UPLOADING)`；唯一键冲突最多重试 3 次。
-5. 对每个文件按请求顺序处理：
-   1. 从请求流计算第一次 SHA-256。
-   2. 生成安全 original 路径。
-   3. 通过 `FileStorage.store` 写 Local 或 MinIO。
-   4. 从存储空间重新读取同一文件；MinIO 场景附带 ETag 条件。
-   5. 计算第二次 SHA-256 并比对。
-   6. 校验通过后插入 `credential_file(UPLOADED)`。
-6. 全部文件成功后，把批次由 `UPLOADING` 条件更新为 `UPLOADED`。
-7. 事务提交，返回批次 UUID 与各文件路径、大小和校验和。
+1. `BidRecordController` 从 Basic 凭据解析当前 `bidderAccountId`。
+2. `requireOwned` 查询 `bid_record`，要求目标记录存在且
+   `bid_record.bidder_account_id == 当前 bidderAccountId`；不满足时分别返回 404 或 403。
+3. Controller 将 `MultipartFile` 适配为 `UploadItem`，交给 `FileUploadService`；Service
+   为本次请求生成批次，并按文件顺序保存 original、校验完整性和写入 `credential_file`。
+4. 全部文件成功后返回上传结果；转换由后续转换流程异步推进，文件状态通过列表查询或
+   SSE 事件接口获取。
 
 ```mermaid
 sequenceDiagram
     participant FE as 前端
-    participant C as FileUploadController
+    participant C as BidRecordController
     participant S as FileUploadService
     participant P as UploadItemProcessor
     participant FS as FileStorage
     participant DB as MySQL
 
-    FE->>C: multipart bidRecordId + files[]
-    C->>C: MultipartFile → UploadItem → UploadBatch
-    C->>S: upload(batch)
+    FE->>C: Basic + multipart files[] + username
+    C->>C: authenticateBasic + requireOwned
+    C->>C: MultipartFile → UploadItem
+    C->>S: upload(bidRecordId, bidderAccountId, username, items)
     S->>DB: INSERT batch(UPLOADING)
     loop 每个文件
         S->>P: process(context, item)
@@ -366,7 +358,7 @@ sequenceDiagram
         S->>DB: INSERT credential_file(UPLOADED)
     end
     S->>DB: batch UPLOADING → UPLOADED
-    S-->>FE: uploadBatchId + files
+    S-->>FE: UploadResponse + file states
 ```
 
 ### 8.2 上传异常与补偿
@@ -383,29 +375,27 @@ sequenceDiagram
 
 对象删除是尽力补偿；删除失败会挂在原异常的 suppressed exceptions 中，但不会替换原始错误。
 
-当前上传流程没有校验 `bid_record` 是否真实存在。由于 `bid_record_id` 是逻辑外键，错误 ID 仍可能生成批次行、文件行和对象路径。
+上传入口在进入 Service 前已经校验 `bid_record` 存在且属于当前投标方账号；因此通过正常接口
+不会为其他投标人的记录创建文件。
 
-### 8.3 `DELETE /credential-files/{uploadBatchId}/files/{fileId}`
+### 8.3 `DELETE /bidder/bid-records/{bidRecordId}/credential-files/{fileId}`
 
-当前实现是占位端点：
+该接口只允许当前投标方删除自己投标记录下的文件：
 
-1. 解析路径参数。
-2. 在标准输出打印批次号和文件 ID。
-3. 直接返回 `SUCCESS`。
+1. 通过 Basic 凭据解析当前 `bidderAccountId`。
+2. `requireOwned` 校验投标记录归属。
+3. `FileUploadService` 校验文件属于该投标记录，并删除或标记删除 original、converted
+   Markdown 及对应元数据。
 
-它目前不会：
+招标方侧没有同等的删除入口；招标方使用独立的下载、转换和操作历史接口。
 
-- 查询文件归属；
-- 删除 original；
-- 删除 converted Markdown；
-- 删除或标记 `credential_file`；
-- 更新批次计数或状态。
-
-路径参数类型错误会得到 `COMMON.INVALID_ARGUMENT`；除此之外，即使文件不存在也返回成功。
 
 ## 9. 资信文件转换
 
 ### 9.1 `POST /credential-files/bid-records/{bidRecordId}/convert`
+
+该接口受招标方 Basic 鉴权保护。它按投标记录执行转换，但不要求当前招标方账号与投标记录
+建立归属关系；任意已认证招标方都可以对指定投标记录触发转换。
 
 该接口是“无差别重新转换”入口：
 
@@ -600,7 +590,7 @@ bid-records/{bidRecordId}/merged/credentials.md
 ### 10.4 大模型调用与落库
 
 1. `BidRecordLoader` 把投标人名称、报价、联系方式和投标次序转为 Markdown。
-2. `PromptFiller` 加载 system/user Prompt 并替换变量。
+2. `RiskAnalysisService` 直接使用固定 system/user Prompt，动态业务字段通过 `String.formatted` 注入。
 3. Spring AI 使用 JSON Schema 约束：
    - `riskLevel`：`LOW/MEDIUM/HIGH/CRITICAL`
    - `summary`
@@ -674,6 +664,6 @@ bid-records/{bidRecordId}/merged/credentials.md
 - 风险分析在自动转换并重新查询后，只接受全部批次和文件均为 `CONVERTED` 的投标记录。
 - 文件删除端点尚未实现真实删除。
 - 所有业务关联是逻辑外键；父记录存在性、级联删除和孤儿清理需由应用层保障，但当前部分入口尚未实现。
-- 没有鉴权与租户隔离。
+- 只有演示级 HTTP Basic 鉴权，没有 RBAC 和租户隔离：投标方资信接口限制为本人投标记录；招标方下载接口可访问所有未删除且已准备完成的投标资信文件。当前招标方前端尚未接入资信文件下载 UI。
 - 风险分析和手动重新转换没有互斥；同一投标记录应避免并行执行二者。
-- `PromptFiller` 读取 Prompt 失败时返回空字符串，不会抛结构化异常。
+- 风险分析 Prompt 固化在 `RiskAnalysisService`，不再存在 classpath 模板缺失后静默返回空字符串的问题。

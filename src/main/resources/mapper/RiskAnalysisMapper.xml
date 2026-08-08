@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper">
 
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis">
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis">
         <id     column="analysis_id"     property="analysisId"/>
         <result column="bid_record_id"   property="bidRecordId"/>
         <result column="bidder_name"     property="bidderName"/>
@@ -16,7 +16,7 @@
     </resultMap>
 
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis"
             useGeneratedKeys="true"
             keyProperty="analysisId">
         INSERT INTO risk_analysis
@@ -43,6 +43,22 @@
         WHERE bid_record_id = #{bidRecordId}
         ORDER BY analyzed_at DESC
     </select>
+
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis">
+        UPDATE risk_analysis
+        <set>
+            <if test="bidRecordId != null">bid_record_id = #{bidRecordId},</if>
+            <if test="bidderName != null">bidder_name = #{bidderName},</if>
+            <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="summary != null">summary = #{summary},</if>
+            <if test="suggestions != null">suggestions = #{suggestions},</if>
+            <if test="rawResponse != null">raw_response = #{rawResponse},</if>
+            <if test="promptVersion != null">prompt_version = #{promptVersion},</if>
+            <if test="analyzedAt != null">analyzed_at = #{analyzedAt},</if>
+        </set>
+        WHERE analysis_id = #{analysisId}
+    </update>
 
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT

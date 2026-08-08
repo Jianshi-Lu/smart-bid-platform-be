@@ -1,12 +1,12 @@
 package io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter;
 
 import io.gitee.lujianshi.bidwinningbackend.chatagent.ChatAgentConversationService;
-import io.gitee.lujianshi.bidwinningbackend.dto.ChatMessageResponse;
-import io.gitee.lujianshi.bidwinningbackend.dto.ChatRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.ChatResponse;
-import io.gitee.lujianshi.bidwinningbackend.dto.ConversationResponse;
-import io.gitee.lujianshi.bidwinningbackend.dto.CreateConversationRequest;
-import io.gitee.lujianshi.bidwinningbackend.dto.UpdateConversationTitleRequest;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatMessageResponse;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatRequest;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatResponse;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ConversationResponse;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.CreateConversationRequest;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.UpdateConversationTitleRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;

@@ -3,7 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+import io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis;
 import io.gitee.lujianshi.bidwinningbackend.service.riskanalysis.RiskAnalysisService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;

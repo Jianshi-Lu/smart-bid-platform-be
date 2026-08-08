@@ -110,12 +110,11 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── exception/                          # AppException、AppErrorCode
 ├── mapper/                             # 核心 Mapper 抽象与接口
 ├── service/                            # CRUD、邮件、风险分析、状态检查
-└── utils/                              # Prompt、模板资源、异步任务工具
+└── utils/                              # 路径解析与异步任务工具
 
 src/main/resources/
 ├── application*.yml                    # 环境配置
 ├── mapper/*.xml                        # MyBatis SQL 与 resultMap
-├── prompts/*.txt                       # 风险分析 Prompt
 ├── sql/ddl/*.sql                       # 手工数据库脚本
 └── templates/*.html                    # Thymeleaf 邮件模板
 ```
@@ -141,9 +140,15 @@ HTTP/Controller → DTO → Service → Entity/业务模型
 | `bid_handler_info` | `BidHandlerInfo` | 招标方经办人 |
 | `invitation_for_bid` | `InvitationForBid` | 招标公告/Invitation for Bids |
 | `invitation_for_bid_status_history` | `InvitationForBidStatusHistory` | 公告状态变更历史 |
+| `invitation_for_bid_operation_history` | `InvitationForBidOperationHistory` | 公告操作历史快照（V33） |
+| `bid_handler_info_operation_history` | `BidHandlerInfoOperationHistory` | 经办人操作历史快照（V34） |
+| `bid_record_operation_history` | `BidRecordOperationHistory` | 投标记录操作历史快照（V35） |
 | `bid_record` | `BidRecord` | 某公告下某投标人的一次投标记录 |
-| `bid_inviter_account` | `BidInviterAccount` | 招标方（管理员）登录账号（V31） |
-| `credential_file` | `CredentialFile` | 一个文件单元（账号+file_uuid 目录）中的原始文件及转换元数据 |
+| `bid_inviter_account` | `BidInviterAccount` | 招标方（管理员）登录账号（V39） |
+| `credential_file` | `CredentialFile` | 一个文件单元（账号+file_uuid 目录）中的原始文件及转换元数据；V45 软删+删除状态机，V46 字段命名/失败留痕对齐 knowledge_file |
+| `credential_file_operation_history` | `CredentialFileOperationHistory` | 资信文件生命周期历史（V40） |
+| `knowledge_file` | `KnowledgeFileRecord` | 知识文件生命周期追溯（V32）：document_uuid 串联对象/转换/向量化状态；V44 起删除状态机 |
+| `knowledge_file_operation_history` | `KnowledgeFileOperationHistory` | 知识文件生命周期历史（V41） |
 | `risk_analysis` | `RiskAnalysis` | 一次风险分析历史结果 |
 
 逻辑关系：
@@ -159,6 +164,11 @@ bid_record 1 ── * risk_analysis
 `credential_file.file_uuid` 是文件单元唯一标识，同时作为对象存储目录
 `{bidderAccountId}/files/{file_uuid}/...` 的一部分；溯源链路为
 `bidder_account → bid_record → credential_file`。
+
+`knowledge_file` 独立于资信文件，是知识入库链路的唯一事实源：
+`document_uuid` 同时是对象存储目录根（`{documentUuid}/original|converted`）
+与 chat-agent Chroma chunk 的稳定身份；转换与向量化分两个状态列推进，
+失败保留对象与错误信息，可按失败点重试，删除走软删除保留追溯。
 
 ### 4.2 `bid_record` 的特殊字段
 
@@ -183,6 +193,23 @@ bid_record 1 ── * risk_analysis
   `BID_INVITER_ACCOUNT.UNAUTHORIZED`；
 - 最小鉴权不签发令牌，每次请求携带用户名+密码；禁止用于生产。
 
+### 5.0.1 资信文件访问边界
+
+- 投标方接口（`/bidder/bid-records/{bidRecordId}/credential-files/**`）先通过
+  `BidderAccountService.authenticateBasic` 得到当前 `bidderAccountId`，再要求
+  `bid_record.bidder_account_id` 与当前账号一致；文件下载 Service 继续校验
+  `credential_file.file_id` 属于目标 `bidRecordId`。
+- 招标方下载接口（`/credential-files/{fileId}/download/original`、
+  `/credential-files/{fileId}/download/markdown`）只经过
+  `BidInviterAuthInterceptor` 的招标方 Basic 鉴权，不执行投标方账号归属校验。
+  因此任意已认证的招标方账号都可以访问所有未删除且已准备完成的投标资信文件。
+- 招标方下载接口向 `FileDownloadService` 传入 `bidRecordId=null`，表示跳过投标方
+  记录归属检查；Service 仍检查文件存在、删除状态、原文件/Markdown 是否已准备完成。
+- `credential_file` 通过 `bid_record_id` 间接关联投标方账号，当前不直接保存
+  `bidder_account_id`；上述两种访问范围是角色接口边界的设计结果。
+- 当前前端招标方投标记录页只展示 `bid_record.credentials` 投影，尚未接入招标方
+  资信文件列表和下载接口；这是页面能力未接入，不改变后端权限边界。
+
 ### 5.1 招标公告
 
 `BidNoticeStatus` 状态机：
@@ -204,10 +231,14 @@ UPLOADING → UPLOADED → CONVERTING → CONVERTED
 ```
 
 - 上传时文件记录为 `UPLOADED`；转换接口是无差别重处理入口，`UPLOADED`、`FAILED`、`CONVERTED` 可以重新抢占，`CONVERTING` 不会被第二个请求再次抢占；
+- V46 起上传链路对齐知识文件（向量化除外）：先落库再存储，单文件失败只留痕
+  （`convert_status=FAILED` + `error_stage` + `error_message`），不整体回滚、不删对象、不连坐同批其他文件；
+- 上传成功即同步转换，状态直接推进到 `CONVERTED/FAILED`；转换失败保留 original 供重试；
 - 文件状态抢占通过 Mapper 的条件更新完成，返回行数是是否拿到处理权的依据；
 - Python 只负责文件流到 Markdown 的内容转换；Java 负责 original/converted 存取、
   完整性校验、文件循环和数据库状态收敛；
-- 转换成功后保存 `markdown_file_path`，失败信息进入 `error_message`；单文件失败通常被转换服务收敛到失败状态和汇总响应，不一定抛到全局异常处理器；
+- 转换成功后保存 `markdown_file_path` 与 `converted_sha256`，失败信息进入
+  `error_message`/`error_stage`；单文件失败被收敛到该文件状态和汇总响应，不抛到全局异常处理器；
 - `BidRecordCredentialConversionStatus` 是投标记录级汇总状态：`ALL_CONVERTED / PROCESSING / PARTIAL_FAILED`；
 - 汇总和风险分析不能依赖转换响应快照，必须重新查询数据库确认该投标记录下所有文件为 `CONVERTED` 且 Markdown 路径非空。
 
@@ -216,6 +247,28 @@ UPLOADING → UPLOADED → CONVERTING → CONVERTED
 风险分析通过 `claimRiskAnalysis` 条件更新抢占同一投标记录的分析权：只有 `IDLE`、`COMPLETED`、`FAILED` 可以进入 `ANALYZING`。成功落库后进入 `COMPLETED`；运行时失败会尽力写回 `FAILED`，允许后续重试。
 
 当前已知限制：Java 进程若在写入 `ANALYZING` 后直接宕机，当前没有超时恢复机制，记录可能长期停留在 `ANALYZING`；风险分析和手动转换也没有形成投标记录级互斥锁，后续修改必须注意二者并发读取/覆盖文件的问题。
+
+### 5.4 知识文件状态
+
+`knowledge_file` 使用两级状态：
+
+```text
+转换：UPLOADED → CONVERTING → CONVERTED
+                            └──────→ FAILED（保留 original，可重试）
+向量化：PENDING → VECTORIZING → VECTORIZED
+                          └──────→ FAILED（保留 converted，可重试）
+```
+
+- 上传即建记录，状态由 Java 逐阶段条件更新推进，不整体回滚；
+- 失败只写状态与错误（error_stage=CONVERT/VECTORIZE），对象保留供重试；
+- 重试前先查询 chat-agent 向量状态：已存在则直接置 VECTORIZED，否则按替换语义重写；
+- 删除是可追溯、可幂等续删的状态机（V44）：CAS 抢占 `DELETING` → Chroma 向量 →
+  original/converted 对象 → `deleted_at` 软删除 → 删除历史 → `DELETED` 终态；
+  任一步失败把失败点写入 `deletion_failed_stage/deletion_error_message` 后抛错，
+  记录保持 active，重试删除从头幂等重放；已软删但历史未写完时重试走补记历史分支。
+- 每次状态变化（增 CREATE / 改 UPDATE / 删 DELETE）同步写入对应文件历史表；
+  具体阶段（转换/向量化/重试）通过 before/after 快照差异推导（V42 起 operation
+  收敛为 CREATE/UPDATE/DELETE 枚举），历史查询见 `GET /{文件}/history`。
 
 ## 6. 关键业务流程
 
@@ -241,29 +294,27 @@ MultipartFile
 UploadItem
   ↓ FileUploadService
 每个 UploadItem：
-计算请求流 SHA-256
-  → 生成文件单元 UUID（file_uuid）
-  → StoragePath 生成 original 逻辑路径
-  → FileStorage.store()
+生成文件单元 UUID（file_uuid）→ 插入 credential_file(UPLOADED)
+  → 计算请求流 SHA-256 → StoragePath 生成 original 逻辑路径 → FileStorage.store()
   → 从存储重新 open()，再次计算 SHA-256 并比对
-  → 插入 credential_file(file_uuid, UPLOADED)
-  → 返回 fileId 和文件元数据
+  → 回填 original_sha256/original_file_path/storage_type → 写 CREATE 历史
+  → 同步转换（CONVERTING → CONVERTED/FAILED + converted_sha256）
+  → 返回该文件最新状态（成功或 FAILED + error_stage/error_message）
 ```
 
 路径由 `StoragePath` 统一生成，当前形态为：
 
 ```text
-{bidderAccountId}/files/{fileUuid}/original/{fileUuid}_{safeFilename}
-{bidderAccountId}/files/{fileUuid}/converted/content.md
-{bidderAccountId}/merged/{bidRecordId}/credentials.md
+{username}/{safeFilename}/original/{fileUuid}_{safeFilename}
+{username}/{safeFilename}/converted/{markdownFilename}
+{username}/merged/{bidRecordId}/credentials.md
 ```
 
 `LocalFileStorage` 将它解释为存储根目录下的相对路径；`MinioFileStorage` 将它解释为
 object key。路径会拒绝绝对路径、`.`、`..` 和空片段，原始文件名会去除客户端路径片段和
-控制字符。文件单元 UUID 保证目录唯一，converted 固定为 `content.md`，重复转换覆盖同一对象。
-
-上传 Service 会在事务失败时尽力删除本次已写入的对象；对象存储与数据库不是同一事务，
-删除失败只作为 suppressed exception 保留。上传接口强制要求投标记录已绑定
+控制字符。文件单元 UUID 保证 original 目录唯一，converted 由转换服务命名（固定 `.md`），
+重复转换覆盖同一对象。单文件失败不触发整批清理，失败状态与原因留存在该行上；
+显式删除接口（V45 删除状态机）才清理对象与软删记录。上传接口强制要求投标记录已绑定
 `bidder_account_id`（Controller 校验归属 + Service 防御校验），不存在“无账号上传”。
 
 ### 6.3 原始文件转 Markdown
@@ -312,7 +363,7 @@ RiskAnalysisController
        覆盖 {bidderAccountId}/merged/{bidRecordId}/credentials.md
   → 重新读取 merged Markdown
   → BidRecordLoader 加载投标记录基础信息
-  → PromptFiller 加载 system/user Prompt 并填充变量
+  → RiskAnalysisService 使用固定 system/user Prompt，动态字段通过 String.formatted 注入
   → Spring AI ChatClient 调用 OpenAI 兼容模型
   → 读取 content；为空时回退到 reasoningContent
   → Fastjson2 解析并校验 riskLevel/summary/suggestions
@@ -350,8 +401,10 @@ RiskAnalysisController
 | `InvitationForBidController` | `/invitation-for-bid/*`：CRUD、批量新增、状态变更 |
 | `BidRecordController` | `/bid-record/*`：CRUD、分页、批量删除、按公告查询 |
 | `RiskAnalysisController` | `GET /risk-analysis`、`GET /risk-analysis/by-bid-record/{id}`、`POST /bid-record/analyze-risk/{id}` |
-| `BidderBidRecordController` | `/bidder/bid-records/*`：我的投标 CRUD、`POST /{id}/credential-files` 上传、`DELETE /{id}/credential-files/{fileId}` 删除 |
+| `BidderBidRecordController` | `/bidder/bid-records/*`：我的投标 CRUD、`GET/POST /{id}/credential-files` 列表/上传、`DELETE /{id}/credential-files/{fileId}` 删除 |
 | `FileConvertController` | `POST /credential-files/bid-records/{bidRecordId}/convert` |
+| `CredentialFileOperationHistoryController` | `GET /credential-files/{fileId}/history`：资信文件生命周期历史 |
+| `KnowledgeFileController` | `/knowledge-files`：上传入库、分页列表、详情、`POST /{uuid}/retry` 重试、`DELETE /{uuid}` 删除、`GET /{uuid}/history` 历史 |
 | `ChatAgentController` | `POST /chat-agent/chat`：单轮问答代理 |
 
 完整请求字段和响应示例见 `docs/api.md`；实际 Controller 注解优先于文档中的历史端点数量。
@@ -363,6 +416,7 @@ RiskAnalysisController
 | `LocalFileStorage` | Java 本地文件系统 | original/converted/merged 的本地持久化 |
 | `MinioFileStorage` | MinIO | 与本地实现相同的 `store/open/delete` 抽象 |
 | `ToMarkdownClient` | Python `to-markdown` | multipart 发送单个原文件流并接收 Markdown 文件 |
+| `ChatAgentIngestionClient` | Python `chat-agent` | 单文件向量化、按 UUID 查询/删除 Chroma 向量状态 |
 | `ChatAgentController` | Python `chat-agent` | 转发单轮 JSON 问题并包装平台响应 |
 | `RiskAnalysisService` | OpenAI 兼容模型/LM Studio | 结构化风险分析 |
 | `MailService` | SMTP | 纯文本和 HTML 邮件 |
@@ -487,8 +541,8 @@ tests/postman/credential-file-flow.postman_collection.json
 
 ### 未完成或已知限制
 
-- 资信文件删除已实现真实删除（对象 + DB + `bid_record.credentials` 投影同步），但删除不级联投标记录；
-- 上传不会自动把原始文件转换为 Markdown；风险分析入口会在需要时自动调用转换；
+- 资信文件删除已实现软删 + 删除状态机（对象 + `deleted_at` 软删 + 历史 + `bid_record.credentials` 投影同步），但删除不级联投标记录；
+- 上传已自动同步转换（对齐 knowledge_file）；转换失败保留 original，可通过无差别转换接口重试；
 - 风险分析 `ANALYZING` 没有超时恢复；
 - 手动转换与风险分析没有投标记录级互斥；
 - 租户隔离、数据库硬外键、级联删除和孤儿数据清理仍缺失；演示鉴权为 HTTP Basic 明文密码；

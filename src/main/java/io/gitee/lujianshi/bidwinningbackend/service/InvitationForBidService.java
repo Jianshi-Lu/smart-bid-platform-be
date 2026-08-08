@@ -1,15 +1,17 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.AddRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
-import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBidStatusHistory;
+import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidStatusHistory;
 import io.gitee.lujianshi.bidwinningbackend.enums.BidNoticeStatus;
+import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidStatusHistoryMapper;
 import jakarta.annotation.Resource;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +33,9 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
 
     @Resource
     private InvitationForBidStatusHistoryMapper historyMapper;
+
+    @Resource
+    private OperationHistoryService operationHistoryService;
 
     @Override
     protected BaseMapper<InvitationForBid, Integer> getMapper() {
@@ -54,6 +59,39 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
         entity.setCreatedAt(LocalDateTime.now());
         entity.setStatus(BidNoticeStatus.DRAFT);
         return super.add(entity);
+    }
+
+    @Override
+    protected void afterAdd(InvitationForBid entity) {
+        operationHistoryService.recordInvitation(
+                entity.getInvitationId(),
+                OperationType.CREATE,
+                null,
+                entity,
+                null);
+    }
+
+    @Override
+    protected void afterUpdate(InvitationForBid before, InvitationForBid after) {
+        operationHistoryService.recordInvitation(
+                after.getInvitationId(),
+                OperationType.UPDATE,
+                before,
+                after,
+                null);
+    }
+
+    @Override
+    protected void afterDelete(InvitationForBid deleted) {
+        if (deleted == null) {
+            return;
+        }
+        operationHistoryService.recordInvitation(
+                deleted.getInvitationId(),
+                OperationType.DELETE,
+                deleted,
+                null,
+                null);
     }
 
     /**
@@ -87,6 +125,12 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
             entity.setTenderingParty(item.getTenderingParty());
             entity.setStatus(BidNoticeStatus.DRAFT);
             mapper.insert(entity);
+            operationHistoryService.recordInvitation(
+                    entity.getInvitationId(),
+                    OperationType.CREATE,
+                    null,
+                    entity,
+                    null);
             created.add(entity);
         }
         return created;
@@ -142,6 +186,16 @@ public class InvitationForBidService extends BaseService<InvitationForBid> {
         history.setToStatus(toStatus);
         history.setRemark(remark);
         historyMapper.insert(history);
+
+        InvitationForBid after = new InvitationForBid();
+        BeanUtils.copyProperties(entity, after);
+        after.setStatus(toStatus);
+        operationHistoryService.recordInvitation(
+                invitationId,
+                OperationType.UPDATE,
+                entity,
+                after,
+                remark);
 
         entity.setStatus(toStatus);
         return entity;

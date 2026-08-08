@@ -14,21 +14,21 @@ public final class StoragePath {
     }
 
     /**
-     * 为原始文件生成以投标方账号为顶层归属、以文件单元 UUID 为目录的存储路径。
+     * 为原始文件生成以投标方用户名为顶层归属、以文件名为目录的存储路径。
      *
      * <p>MinIO 中的目录是 object key 前缀，本地文件系统则会将同一个逻辑路径解释为
      * 存储根目录下的相对路径。</p>
      *
-     * @param bidderAccountId 投标方账号 ID（资信文件归属与溯源根）
+     * @param username 投标方登录用户名（资信文件归属与溯源根）
      * @param fileUuid 文件单元 UUID
      * @param originalFilename 客户端提供的原始文件名
      * @return 安全原始文件名及逻辑存储路径
      */
     public static OriginalFilePath createOriginalFilePath(
-            Long bidderAccountId,
+            String username,
             String fileUuid,
             String originalFilename) {
-        validateBidderAccountId(bidderAccountId);
+        validateUsername(username);
         String normalizedFileUuid;
         try {
             normalizedFileUuid = UUID.fromString(fileUuid).toString();
@@ -40,8 +40,7 @@ public final class StoragePath {
         String storedFilename = normalizedFileUuid + "_" + safeOriginalFilename;
         return new OriginalFilePath(
                 safeOriginalFilename,
-                bidderAccountId
-                        + "/files/" + normalizedFileUuid
+                username + "/" + safeOriginalFilename
                         + "/original/" + storedFilename);
     }
 
@@ -52,10 +51,26 @@ public final class StoragePath {
      * 因而由存储实现覆盖旧的派生 Markdown。</p>
      *
      * @param originalFilePath 已落库的 original 相对路径或 MinIO object key
-     * @return 同文件单元 converted 目录下的固定 {@code content.md} 逻辑路径
+     * @return 同文件单元 converted 目录下、后缀固定为 {@code .md} 的 Markdown 逻辑路径
      * @throws IllegalArgumentException 路径不合法或不位于 original 目录
      */
     public static String createConvertedMarkdownPath(String originalFilePath) {
+        return createConvertedMarkdownPath(originalFilePath, null);
+    }
+
+    /**
+     * 根据 original 逻辑路径和转换服务返回的 Markdown 文件名生成 converted 路径。
+     *
+     * <p>转换服务负责确定 Markdown 文件名（固定 {@code .md} 后缀）；本方法只负责把
+     * 文件单元 UUID 前缀拼回去，保证同一文件单元的 converted 对象唯一。</p>
+     *
+     * @param originalFilePath 已落库的 original 相对路径或 MinIO object key
+     * @param markdownFilename 转换服务返回的 Markdown 文件名；为空时按原文件名推导
+     * @return 同文件单元 converted 目录下的 Markdown 逻辑路径
+     */
+    public static String createConvertedMarkdownPath(
+            String originalFilePath,
+            String markdownFilename) {
         String normalizedPath = normalizeRelativePath(originalFilePath);
         String marker = "/original/";
         int markerIndex = normalizedPath.indexOf(marker);
@@ -68,8 +83,12 @@ public final class StoragePath {
         if (relativeFilename.isBlank()) {
             throw new IllegalArgumentException("原始文件路径必须位于 original 目录");
         }
+        String targetFilename = markdownFilename == null
+                || markdownFilename.isBlank()
+                ? toMarkdownFilename(relativeFilename)
+                : markdownFilename;
         return normalizedPath.substring(0, markerIndex)
-                + "/converted/content.md";
+                + "/converted/" + targetFilename;
     }
 
     /**
@@ -79,15 +98,15 @@ public final class StoragePath {
      * 前重新生成并覆盖同一个对象。</p>
      *
      * @param bidRecordId 投标记录 ID
-     * @param bidderAccountId 投标方账号 ID
+     * @param username 投标方登录用户名
      * @return 汇总 Markdown 的逻辑存储路径
      */
     public static String createMergedMarkdownPath(
             Integer bidRecordId,
-            Long bidderAccountId) {
+            String username) {
         validateBidRecordId(bidRecordId);
-        validateBidderAccountId(bidderAccountId);
-        return bidderAccountId
+        validateUsername(username);
+        return username
                 + "/merged/" + bidRecordId + "/credentials.md";
     }
 
@@ -136,11 +155,21 @@ public final class StoragePath {
         }
     }
 
-    /** 校验投标方账号 ID，资信文件路径必须以账号为顶层归属。 */
-    private static void validateBidderAccountId(Long bidderAccountId) {
-        if (bidderAccountId == null || bidderAccountId <= 0) {
-            throw new IllegalArgumentException("投标方账号 ID 不正确");
+    /** 校验用户名，文件路径必须以用户名为顶层归属。 */
+    private static void validateUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("用户名不能为空");
         }
+    }
+
+    /** 将存储文件名统一转为 Markdown 文件名：去掉原扩展名并固定为 .md。 */
+    private static String toMarkdownFilename(String storedFilename) {
+        int lastDot = storedFilename.lastIndexOf('.');
+        int lastSlash = storedFilename.lastIndexOf('/');
+        if (lastDot > lastSlash + 1) {
+            return storedFilename.substring(0, lastDot) + ".md";
+        }
+        return storedFilename + ".md";
     }
 
     /** 原始文件安全命名和逻辑路径结果。 */

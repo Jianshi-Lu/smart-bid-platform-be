@@ -3,7 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.LoginRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.RegisterRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidInviterAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidinviteraccount.BidInviterAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidInviterAccountMapper;
@@ -20,7 +20,7 @@ import java.util.Base64;
  *
  * <p>每次请求携带用户名+密码（HTTP Basic），服务端直接校验，不签发令牌。</p>
  *
- * @since V31
+ * @since V39
  */
 @Service
 public class BidInviterAccountService {

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidOperationHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidOperationHistory">
+        <id     column="history_id"      property="historyId"/>
+        <result column="invitation_id"   property="invitationId"/>
+        <result column="operation"       property="operation"/>
+        <result column="operator_type"   property="operatorType"/>
+        <result column="operator_id"     property="operatorId"/>
+        <result column="before_snapshot" property="beforeSnapshot"/>
+        <result column="after_snapshot"  property="afterSnapshot"/>
+        <result column="remark"          property="remark"/>
+        <result column="created_at"      property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidOperationHistory"
+            useGeneratedKeys="true"
+            keyProperty="historyId">
+        INSERT INTO invitation_for_bid_operation_history
+            (invitation_id, operation, operator_type, operator_id,
+             before_snapshot, after_snapshot, remark, created_at)
+        VALUES
+            (#{invitationId}, #{operation}, #{operatorType}, #{operatorId},
+             #{beforeSnapshot}, #{afterSnapshot}, #{remark}, #{createdAt})
+    </insert>
+
+    <select id="selectByInvitationId" resultMap="BaseResultMap">
+        SELECT history_id, invitation_id, operation, operator_type, operator_id,
+               before_snapshot, after_snapshot, remark, created_at
+        FROM invitation_for_bid_operation_history
+        WHERE invitation_id = #{invitationId}
+        ORDER BY created_at DESC, history_id DESC
+    </select>
+
+</mapper>

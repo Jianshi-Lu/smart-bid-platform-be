@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRecord">
+        <id     column="knowledge_file_id"  property="knowledgeFileId"/>
+        <result column="document_uuid"      property="documentUuid"/>
+        <result column="original_filename"  property="originalFilename"/>
+        <result column="content_type"       property="contentType"/>
+        <result column="file_size"          property="fileSize"/>
+        <result column="original_sha256"    property="originalSha256"/>
+        <result column="converted_sha256"   property="convertedSha256"/>
+        <result column="storage_type"       property="storageType"/>
+        <result column="original_file_path" property="originalFilePath"/>
+        <result column="original_storage_status" property="originalStorageStatus"/>
+        <result column="markdown_file_path" property="markdownFilePath"/>
+        <result column="convert_status"     property="convertStatus"/>
+        <result column="index_status"       property="indexStatus"/>
+        <result column="chunk_count"        property="chunkCount"/>
+        <result column="error_message"      property="errorMessage"/>
+        <result column="error_stage"        property="errorStage"/>
+        <result column="created_at"         property="createdAt"/>
+        <result column="converted_at"       property="convertedAt"/>
+        <result column="indexed_at"         property="indexedAt"/>
+        <result column="deleted_at"         property="deletedAt"/>
+        <result column="deletion_status"           property="deletionStatus"/>
+        <result column="deletion_failed_stage"     property="deletionFailedStage"/>
+        <result column="deletion_error_message"    property="deletionErrorMessage"/>
+        <result column="deletion_started_at"       property="deletionStartedAt"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        knowledge_file_id, document_uuid, original_filename, content_type, file_size,
+        original_sha256, converted_sha256, storage_type, original_file_path, original_storage_status, markdown_file_path,
+        convert_status, index_status, chunk_count, error_message, error_stage,
+        created_at, converted_at, indexed_at, deleted_at,
+        deletion_status, deletion_failed_stage, deletion_error_message, deletion_started_at
+    </sql>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRecord"
+            useGeneratedKeys="true"
+            keyProperty="knowledgeFileId">
+        INSERT INTO knowledge_file
+            (document_uuid, original_filename, content_type, file_size,
+             original_sha256, converted_sha256, storage_type, original_file_path,
+             original_storage_status, markdown_file_path, convert_status, index_status, chunk_count,
+             error_message, error_stage, created_at, converted_at, indexed_at, deleted_at)
+        VALUES
+            (#{documentUuid}, #{originalFilename}, #{contentType}, #{fileSize},
+             #{originalSha256}, #{convertedSha256}, #{storageType}, #{originalFilePath},
+             #{originalStorageStatus}, #{markdownFilePath}, #{convertStatus}, #{indexStatus}, #{chunkCount},
+             #{errorMessage}, #{errorStage}, #{createdAt}, #{convertedAt}, #{indexedAt}, #{deletedAt})
+    </insert>
+
+    <select id="selectByDocumentUuid" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="selectByDocumentUuidIncludingDeleted" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+        WHERE document_uuid = #{documentUuid}
+    </select>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+        WHERE knowledge_file_id = #{knowledgeFileId}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+    </select>
+
+    <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+        WHERE knowledge_file_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM knowledge_file
+        <where>
+            deleted_at IS NULL
+            <if test="keyword != null and keyword != ''">
+                AND (original_filename LIKE CONCAT('%', #{keyword}, '%')
+                     OR document_uuid LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="convertStatus != null and convertStatus != ''">
+                AND convert_status = #{convertStatus}
+            </if>
+            <if test="indexStatus != null and indexStatus != ''">
+                AND index_status = #{indexStatus}
+            </if>
+        </where>
+    </select>
+
+    <update id="updateOriginalMetadata">
+        UPDATE knowledge_file
+        SET original_file_path = #{originalFilePath},
+            original_sha256    = #{originalSha256},
+            storage_type       = #{storageType},
+            original_storage_status = 'STORED'
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markOriginalStorageFailed">
+        UPDATE knowledge_file
+        SET original_storage_status = 'FAILED',
+            error_message = #{errorMessage},
+            error_stage = 'UPLOAD'
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="updateById"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRecord">
+        UPDATE knowledge_file
+        <set>
+            <if test="documentUuid != null">document_uuid = #{documentUuid},</if>
+            <if test="originalFilename != null">original_filename = #{originalFilename},</if>
+            <if test="contentType != null">content_type = #{contentType},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="originalSha256 != null">original_sha256 = #{originalSha256},</if>
+            <if test="convertedSha256 != null">converted_sha256 = #{convertedSha256},</if>
+            <if test="storageType != null">storage_type = #{storageType},</if>
+            <if test="originalFilePath != null">original_file_path = #{originalFilePath},</if>
+            <if test="originalStorageStatus != null">original_storage_status = #{originalStorageStatus},</if>
+            <if test="markdownFilePath != null">markdown_file_path = #{markdownFilePath},</if>
+            <if test="convertStatus != null">convert_status = #{convertStatus},</if>
+            <if test="indexStatus != null">index_status = #{indexStatus},</if>
+            <if test="chunkCount != null">chunk_count = #{chunkCount},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="errorStage != null">error_stage = #{errorStage},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="convertedAt != null">converted_at = #{convertedAt},</if>
+            <if test="indexedAt != null">indexed_at = #{indexedAt},</if>
+            <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+        </set>
+        WHERE knowledge_file_id = #{knowledgeFileId}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Long">
+        DELETE FROM knowledge_file
+        WHERE knowledge_file_id = #{knowledgeFileId}
+    </delete>
+
+    <delete id="deleteByIds" parameterType="java.util.List">
+        DELETE FROM knowledge_file
+        WHERE knowledge_file_id IN
+        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="markConverting">
+        UPDATE knowledge_file
+        SET convert_status = 'CONVERTING',
+            error_message  = NULL,
+            error_stage    = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND convert_status IN ('UPLOADED', 'FAILED')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markConverted">
+        UPDATE knowledge_file
+        SET convert_status     = 'CONVERTED',
+            markdown_file_path = #{markdownFilePath},
+            converted_sha256   = #{convertedSha256},
+            converted_at       = #{convertedAt},
+            error_message      = NULL,
+            error_stage        = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND convert_status = 'CONVERTING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markVectorizing">
+        UPDATE knowledge_file
+        SET index_status  = 'VECTORIZING',
+            error_message = NULL,
+            error_stage   = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND convert_status = 'CONVERTED'
+          AND index_status IN ('PENDING', 'FAILED', 'VECTORIZED')
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markVectorized">
+        UPDATE knowledge_file
+        SET index_status  = 'VECTORIZED',
+            chunk_count    = #{chunkCount},
+            indexed_at     = #{indexedAt},
+            error_message  = NULL,
+            error_stage    = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND index_status = 'VECTORIZING'
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markConvertFailed">
+        UPDATE knowledge_file
+        SET convert_status = 'FAILED',
+            error_message  = #{errorMessage},
+            error_stage    = 'CONVERT'
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markVectorizeFailed">
+        UPDATE knowledge_file
+        SET index_status  = 'FAILED',
+            error_message = #{errorMessage},
+            error_stage   = 'VECTORIZE'
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="markDeleted">
+        UPDATE knowledge_file
+        SET deleted_at = #{deletedAt}
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="beginDeletion">
+        UPDATE knowledge_file
+        SET deletion_status = 'DELETING',
+            deletion_failed_stage = NULL,
+            deletion_error_message = NULL,
+            deletion_started_at = #{startedAt}
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+          AND (deletion_status IS NULL
+               OR deletion_status = 'FAILED'
+               OR (deletion_status = 'DELETING'
+                   AND deletion_started_at &lt; #{staleBefore}))
+    </update>
+
+    <update id="markDeletionFailed">
+        UPDATE knowledge_file
+        SET deletion_status = 'FAILED',
+            deletion_failed_stage = #{stage},
+            deletion_error_message = #{errorMessage}
+        WHERE document_uuid = #{documentUuid}
+          AND deletion_status = 'DELETING'
+    </update>
+
+    <update id="markDeletionSucceeded">
+        UPDATE knowledge_file
+        SET deletion_status = 'DELETED',
+            deletion_failed_stage = NULL,
+            deletion_error_message = NULL,
+            deletion_started_at = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND (deletion_status IS NULL OR deletion_status &lt;&gt; 'DELETED')
+    </update>
+
+</mapper>

@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
@@ -36,6 +37,9 @@ public class BidRecordService extends BaseService<BidRecord> {
     @Resource
     private BidRecordMapper mapper;
 
+    @Resource
+    private OperationHistoryService operationHistoryService;
+
     @Override
     protected BaseMapper<BidRecord, Integer> getMapper() {
         return mapper;
@@ -44,6 +48,39 @@ public class BidRecordService extends BaseService<BidRecord> {
     @Override
     protected Function<BidRecord, Integer> getIdExtractor() {
         return BidRecord::getBidRecordId;
+    }
+
+    @Override
+    protected void afterAdd(BidRecord entity) {
+        operationHistoryService.recordBidRecord(
+                entity.getBidRecordId(),
+                OperationType.CREATE,
+                null,
+                entity,
+                null);
+    }
+
+    @Override
+    protected void afterUpdate(BidRecord before, BidRecord after) {
+        operationHistoryService.recordBidRecord(
+                after.getBidRecordId(),
+                OperationType.UPDATE,
+                before,
+                after,
+                null);
+    }
+
+    @Override
+    protected void afterDelete(BidRecord deleted) {
+        if (deleted == null) {
+            return;
+        }
+        operationHistoryService.recordBidRecord(
+                deleted.getBidRecordId(),
+                OperationType.DELETE,
+                deleted,
+                null,
+                null);
     }
 
     /**

@@ -6,17 +6,37 @@
 
 ## 1. 结论与约束
 
-当前最终结构包含 6 张业务表：
+当前最终结构包含 9 张业务表 + 5 张操作历史表：
 
 1. `bid_handler_info`
 2. `invitation_for_bid`
 3. `invitation_for_bid_status_history`
 4. `bid_record`
 5. `credential_file`
-6. `risk_analysis`
+6. `knowledge_file`
+7. `bidder_account`
+8. `bid_inviter_account`
+9. `risk_analysis`
+
+操作历史表（结构同构，只做主键列差异）：
+
+1. `invitation_for_bid_operation_history`（V33）
+2. `bid_handler_info_operation_history`（V34）
+3. `bid_record_operation_history`（V35）
+4. `credential_file_operation_history`（V40）
+5. `knowledge_file_operation_history`（V41）
 
 > 说明：`credential_file_batch`（上传批次）已随批次概念移除而废弃并删除；
 > 文件单元唯一标识由 `credential_file.file_uuid` 承担。
+> `knowledge_file`（V32）是知识入库链路的生命周期追溯表，转换与向量化分列跟踪。
+> V44 为 `knowledge_file`、V45 为 `credential_file` 增加删除状态机：
+> `deletion_status`（DELETING/FAILED/DELETED）、失败点、失败原因与开始时间，
+> 删除失败保留 active 行，重试删除幂等续跑直至软删终态。
+> V46 将 `credential_file` 字段对齐 `knowledge_file`：`sha256→original_sha256`、
+> `status→convert_status`，新增 `converted_sha256` 与 `error_stage`，`file_uuid` 加唯一约束。
+> V47 将 `original_sha256` 改为可空：对齐先落库（UPLOADED）再存储回填的流程。
+> 账号表在 V36（bidder_account）/ V39（bid_inviter_account）创建，版本号与
+> chat-agent 独立库的 V28 标题来源脚本不再冲突。
 
 数据库设计有三个必须先明确的事实：
 
@@ -109,6 +129,46 @@ erDiagram
         DATETIME bound_at
     }
 
+    KNOWLEDGE_FILE {
+        BIGINT knowledge_file_id PK
+        CHAR document_uuid
+        VARCHAR original_filename
+        VARCHAR content_type
+        BIGINT file_size
+        CHAR original_sha256
+        CHAR converted_sha256
+        VARCHAR storage_type
+        VARCHAR original_file_path
+        VARCHAR markdown_file_path
+        VARCHAR convert_status
+        VARCHAR index_status
+        INT chunk_count
+        VARCHAR error_message
+        VARCHAR error_stage
+        DATETIME created_at
+        DATETIME converted_at
+        DATETIME indexed_at
+        DATETIME deleted_at
+    }
+
+    BIDDER_ACCOUNT {
+        BIGINT bidder_account_id PK
+        VARCHAR username
+        VARCHAR password
+        VARCHAR phone
+        VARCHAR display_name
+        DATETIME created_at
+    }
+
+    BID_INVITER_ACCOUNT {
+        BIGINT bid_inviter_account_id PK
+        VARCHAR username
+        VARCHAR password
+        VARCHAR phone
+        VARCHAR display_name
+        DATETIME created_at
+    }
+
     RISK_ANALYSIS {
         INT analysis_id PK
         INT bid_record_id FK
@@ -133,7 +193,7 @@ bid_handler_info
 └── invitation_for_bid
     ├── invitation_for_bid_status_history
     └── bid_record
-        ├── credential_file（通过 bid_record_id 归属）
+        ├── credential_file（通过 bid_record_id + bidder_account_id 归属）
         └── risk_analysis
 ```
 
@@ -141,16 +201,16 @@ bid_handler_info
 
 - 一个经办人可以负责多个招标公告。
 - 一个公告可以产生多个状态历史和多个投标记录。
-- 一个投标记录可以上传多个资信批次。
-- 一个批次包含多个文件。
+- 一个投标记录可以上传多个资信文件，每个文件独立成 file_uuid 文件单元。
 - 一个投标记录可以产生多次风险分析结果。
+- `knowledge_file` 独立于资信文件，通过 document_uuid 串联对象、Markdown 与向量。
 
 ### 3.2 不存在的继承
 
-- 7 张表没有“父表字段自动继承到子表”的数据库机制。
+- 9 张业务表没有“父表字段自动继承到子表”的数据库机制。
 - Java 实体也没有共同实体基类。
 - `risk_analysis.bidder_name` 是分析时复制的冗余快照，不是从 `bid_record` 动态继承。
-- `credential_file.bid_record_id` 与批次表中的 `bid_record_id` 是重复关系字段，数据库不会自动保证两者一致。
+- 5 张操作历史表只做审计快照，不参与业务查询路径。
 
 ### 3.3 历史表名迁移继承
 
@@ -198,6 +258,33 @@ flowchart LR
 - 删除子记录；
 - 把子表关联列置空；
 - 删除 MinIO/本地文件。
+
+### 4.1 操作历史表（审计快照）
+
+五张历史表结构一致，只是业务主键列不同：
+
+| 表 | 业务主键列 | 来源 |
+|---|---|---|
+| `invitation_for_bid_operation_history` | `invitation_id` | V33 |
+| `bid_handler_info_operation_history` | `bid_handler_id` | V34 |
+| `bid_record_operation_history` | `bid_record_id` | V35 |
+| `credential_file_operation_history` | `credential_file_id` | V40 |
+| `knowledge_file_operation_history` | `document_uuid` | V41 |
+
+公共列：`operation`（V42 起收敛为枚举 `CREATE/UPDATE/DELETE`，具体业务阶段
+如状态变更、文件转换/向量化/重试通过 before/after 快照差异推导）、`operator_type` / `operator_id`（来自
+`CurrentAccountContext`，内部任务为 NULL）、`before_snapshot` / `after_snapshot`
+（整行 JSON，创建只有 after、删除只有 before）、`remark`、`created_at`。
+
+文件历史的写入粒度：资信文件在上传（CREATE）、转换（UPDATE）、删除（DELETE）
+时记录；知识文件在上传（CREATE）、转换/向量化/重试（UPDATE）、删除（DELETE）
+时记录。查询接口：
+
+- `GET /credential-files/{fileId}/history`
+- `GET /knowledge-files/{documentUuid}/history`
+- `GET /invitation-for-bid/{id}/history`
+- `GET /bid-handler-info/{id}/history`
+- `GET /bid-record/{id}/history`
 
 ## 5. `bid_handler_info`
 
@@ -453,11 +540,11 @@ flowchart LR
 
 ### 14.2 仅由应用维护
 
-- 经办人、公告、投标、批次、文件和风险记录之间的父记录存在性。
-- 同一文件的 `credential_file.bid_record_id` 与其批次 `bid_record_id` 一致。
-- `file_count` 等于批次实际文件行数。
-- `converted_file_count` 等于状态为 `CONVERTED` 的文件数。
+- 经办人、公告、投标、账号、文件和风险记录之间的父记录存在性。
+- `credential_file.bid_record_id` 与 `bid_record.bidder_account_id` 归属一致。
 - `credentials` 与已转换文件路径一致。
+- `knowledge_file.convert_status/index_status` 与对象存储、Chroma 实际状态一致。
+- 文件操作历史（UPLOAD/CONVERT/VECTORIZE/DELETE/RETRY）与文件状态变化一一对应。
 - 状态机合法跳转。
 - 删除父记录时对子记录和对象存储的处理。
 

@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper">
 
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo">
         <id     column="bid_handler_id"      property="bidHandlerId"/>
         <result column="handler_name"    property="handlerName"/>
         <result column="company_name"    property="companyName"/>
@@ -12,7 +12,7 @@
     </resultMap>
 
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo"
             useGeneratedKeys="true"
             keyProperty="bidHandlerId">
         INSERT INTO bid_handler_info (handler_name, company_name, department_name, target_email)
@@ -20,7 +20,7 @@
     </insert>
 
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo">
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo">
         UPDATE bid_handler_info
         <set>
             <if test="handlerName != null">handler_name = #{handlerName},</if>

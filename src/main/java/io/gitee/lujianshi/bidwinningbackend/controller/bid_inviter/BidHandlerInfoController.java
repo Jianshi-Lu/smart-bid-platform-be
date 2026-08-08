@@ -8,10 +8,12 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidhandler.DeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandler.UpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Diff;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfoOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.BidHandlerInfoService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,9 @@ public class BidHandlerInfoController {
 
     @Resource
     private BidHandlerInfoService service;
+
+    @Resource
+    private OperationHistoryService operationHistoryService;
 
     /**
      * 创建经办人。创建后异步发送通知邮件。
@@ -149,6 +154,14 @@ public class BidHandlerInfoController {
     public Result<List<BidHandlerInfo>> batchDeleteBidHandlerInfo(@Valid @RequestBody DeleteRequest request) {
         List<BidHandlerInfo> deleted = service.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
+    }
+
+    /** 查询招标经办人的操作历史（创建/修改/删除，时间倒序）。 */
+    @GetMapping("/bid-handler-info/{id}/history")
+    public Result<List<BidHandlerInfoOperationHistory>> listOperationHistory(
+            @PathVariable Integer id) {
+        return Result.success(
+                operationHistoryService.listBidHandlerHistory(id), "查询成功");
     }
 
     /** 构造招标经办人不存在异常，统一交给全局异常处理器返回。 */

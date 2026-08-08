@@ -48,7 +48,8 @@ class UploadItemProcessorTest {
         };
 
         VerifiedStoredFileMetadata verifiedMetadata = processor.process(
-                new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
+                new UploadFileContext(
+                        1001, 55L, "bidder01", UUID.randomUUID().toString()),
                 new UploadItem(
                         "license.pdf",
                         "application/pdf",
@@ -86,7 +87,8 @@ class UploadItemProcessorTest {
         assertThrows(
                 IOException.class,
                 () -> processor.process(
-                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
+                        new UploadFileContext(
+                                1001, 55L, "bidder01", UUID.randomUUID().toString()),
                         item("license.pdf", "content")));
 
         assertNull(storage.storeRequest);
@@ -103,7 +105,8 @@ class UploadItemProcessorTest {
         assertThrows(
                 AppException.class,
                 () -> processor.process(
-                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
+                        new UploadFileContext(
+                                1001, 55L, "bidder01", UUID.randomUUID().toString()),
                         item("license.pdf", "original-content")));
 
         try (var paths = Files.walk(tempDir)) {
@@ -135,7 +138,8 @@ class UploadItemProcessorTest {
         assertThrows(
                 IOException.class,
                 () -> processor.process(
-                        new UploadFileContext(1001, 55L, UUID.randomUUID().toString()),
+                        new UploadFileContext(
+                                1001, 55L, "bidder01", UUID.randomUUID().toString()),
                         new UploadItem(
                                 "license.pdf",
                                 "application/pdf",

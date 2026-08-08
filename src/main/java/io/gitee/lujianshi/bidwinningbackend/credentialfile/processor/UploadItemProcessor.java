@@ -64,7 +64,7 @@ public class UploadItemProcessor {
         StoragePath.OriginalFilePath storagePath;
         try {
             storagePath = StoragePath.createOriginalFilePath(
-                    context.bidderAccountId(),
+                    context.username(),
                     context.fileUuid(),
                     item.originalFilename());
         } catch (IllegalArgumentException failure) {

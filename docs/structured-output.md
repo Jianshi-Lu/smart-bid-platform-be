@@ -295,7 +295,7 @@ private String getReasoningContent(ChatCompletion.Choice choice) {
 
 ```java
 ChatResponse response = chatClient.prompt()
-    .system(systemPrompt).user(userPrompt)
+    .system(SYSTEM_PROMPT).user(userPrompt)
     .call().chatResponse();
 String raw = extractRawContent(response);  // 优先 content,空时降级 reasoningContent
 ```
@@ -338,7 +338,7 @@ String raw = extractRawContent(response);  // 优先 content,空时降级 reason
 
 1. **模型支持不可靠** — LM Studio 官方明确警告"7B 以下模型可能不支持 Structured Output"。本项目曾用 gemma-4-e4b 实测 OK；当前 Qwen3.6 Hybrid Reasoning 模型还需要 `reasoningContent` 兜底。
 2. **JSON Schema 受支持子集** — 不是完整 JSON Schema。当前用的子集(`object` + `string` + `enum` + `required` + `additionalProperties:false`)是 OpenAI/LM Studio 都保证支持的。复杂特性(`$ref`、`oneOf`、`pattern`)部分支持。
-3. **prompt 强化仍是必要的纵深防御** — `risk-analysis-system-v1.txt` 末尾追加的"输出格式(严格)"段保留,作为 schema 失败时的 fallback。
+3. **prompt 强化仍是必要的纵深防御** — `RiskAnalysisService.SYSTEM_PROMPT` 内的“输出格式（严格）”段保留，作为 schema 失败时的 fallback；提示词直接固化在模型调用服务中，不再从资源文件加载。
 
 ### 替代方案(Layer 2 fallback)
 

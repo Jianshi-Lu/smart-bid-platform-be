@@ -306,6 +306,36 @@ bid-records/{bidRecordId}/
 - merged 路径由 Java 固定为 `bid-records/{bidRecordId}/merged/credentials.md`，每次风险分析前覆盖。
 - `bid_record.credentials` 是已转换文件路径的 JSON 投影，不存正文，也不是风险分析的唯一事实来源。
 
+### 9.4 资信文件访问权限
+
+资信文件的访问边界按角色分为两条链路：
+
+```mermaid
+flowchart TD
+    BREQ["投标方 /bidder/bid-records/{bidRecordId}/credential-files/**"]
+    BAUTH["authenticateBasic → 当前 bidderAccountId"]
+    BOWN["requireOwned → bid_record.bidder_account_id == 当前账号"]
+    BFILE["FileDownloadService → fileId 属于 bidRecordId"]
+    BREQ --> BAUTH --> BOWN --> BFILE
+
+    IREQ["招标方 /credential-files/{fileId}/download/*"]
+    IAUTH["BidInviterAuthInterceptor → 招标方 Basic 鉴权"]
+    IFILE["FileDownloadService → fileId / 删除状态 / ready 状态"]
+    IREQ --> IAUTH --> IFILE
+```
+
+- 投标方下载接口必须同时满足：当前 Basic 账号有效、目标 `bidRecord` 属于当前
+  `bidderAccountId`、目标 `fileId` 属于该 `bidRecord`。
+- 招标方下载接口只做招标方 Basic 鉴权，不按投标方账号限制资源范围；
+  已认证的招标方账号可以访问所有未删除且已准备完成的投标资信文件。
+- `BidInviterFileDownloadController` 调用 `openCredentialOriginal(fileId, null)` /
+  `openCredentialMarkdown(fileId, null)`，`null` 表示不执行投标方记录归属检查，
+  但文件存在、删除状态和转换完成状态仍由 `FileDownloadService` 校验。
+- `credential_file` 不直接保存 `bidder_account_id`，通过
+  `credential_file.bid_record_id → bid_record.bidder_account_id` 建立投标方归属链。
+- 当前前端招标方投标记录页只展示 `bid_record.credentials` 投影，尚未接入招标方
+  资信文件下载接口；这是前端页面接入状态，不是后端权限限制。
+
 ### 9.3 存储适配选择
 
 ```mermaid
@@ -461,7 +491,7 @@ flowchart TD
 
 | 项目 | 当前事实 | 影响 |
 |---|---|---|
-| 鉴权 | Controller 未接入认证授权 | 所有端点默认可访问 |
+| 鉴权 | 投标方按 Controller 内的 Basic + 记录归属校验；招标方管理接口由 `BidInviterAuthInterceptor` 统一 Basic 鉴权 | 投标方只能访问本人投标文件；招标方可访问所有未删除且已准备完成的投标资信文件；当前没有 RBAC/租户隔离 |
 | 数据库外键 | 只有逻辑关系 | 可产生孤儿数据，删除不会级联 |
 | 上传父记录校验 | 上传服务不查询 `bid_record` 是否存在 | 可写入不存在 `bidRecordId` 的元数据和对象路径 |
 | 文件删除 | 删除端点是占位实现 | 返回成功但不删除对象和数据库行 |

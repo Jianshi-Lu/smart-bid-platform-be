@@ -12,13 +12,17 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +62,9 @@ public class FileConvertService {
     @Resource
     private FileStorageProperties storageProperties;
 
+    @Resource
+    private OperationHistoryService operationHistoryService;
+
     @Resource(name = "sha256FileChecksumCalculator")
     private FileChecksumCalculator fileChecksumCalculator;
 
@@ -66,6 +73,9 @@ public class FileConvertService {
 
     @Resource
     private BidRecordMapper bidRecordMapper;
+
+    @Resource
+    private FileStatusEventPublisher fileStatusEventPublisher;
 
     /** 通过 Spring 代理开启路径汇总事务，避免同类调用绕过事务注解。 */
     @Resource
@@ -132,8 +142,13 @@ public class FileConvertService {
                 toFileItems(latestFiles));
     }
 
-    /** 抢占单个文件，并由 Java 完成该文件的转换与状态更新。 */
-    private void convertFile(CredentialFile file) {
+    /**
+     * 抢占单个文件，并由 Java 完成该文件的转换与状态更新。
+     *
+     * <p>上传链路与风险分析共用；转换失败只在该文件上留痕（FAILED + CONVERT），
+     * 不向上抛错，由调用方按最新状态决定后续。</p>
+     */
+    public void convertFile(CredentialFile file) {
         int claimed = fileMapper.markConverting(file.getFileId());
         if (claimed != 1) {
             // 没有获得文件处理权不代表转换失败，由后续状态聚合决定整体结果。
@@ -141,10 +156,11 @@ public class FileConvertService {
         }
 
         try {
-            String markdownPath = convertAndStore(file);
+            ConvertedMarkdown converted = convertAndStore(file);
             int rows = fileMapper.markConverted(
                     file.getFileId(),
-                    markdownPath,
+                    converted.markdownPath(),
+                    converted.sha256(),
                     LocalDateTime.now());
             if (rows != 1) {
                 throw persistenceFailure(
@@ -152,21 +168,60 @@ public class FileConvertService {
                         "资信文件完成状态更新失败: " + file.getFileId(),
                         null);
             }
+            operationHistoryService.recordCredentialFile(
+                    file.getFileId(),
+                    OperationType.UPDATE,
+                    file,
+                    fileMapper.selectById(file.getFileId()),
+                    null);
+            publishStatus(file);
             // 单文件转换成功后立即同步当前 bid_record 下已完成文件的 Markdown 路径。
             self.syncBidRecordCredentials(file.getBidRecordId());
         } catch (RuntimeException failure) {
             String message = toErrorMessage(failure);
-            int rows = fileMapper.markFailed(file.getFileId(), message);
+            int rows = fileMapper.markFailed(
+                    file.getFileId(), message, "CONVERT");
             if (rows != 1) {
                 throw persistenceFailure(
                         "MARK_FILE_FAILED",
                         "资信文件失败状态更新失败: " + file.getFileId(),
                         failure);
             }
+            operationHistoryService.recordCredentialFile(
+                    file.getFileId(),
+                    OperationType.UPDATE,
+                    file,
+                    fileMapper.selectById(file.getFileId()),
+                    message);
+            publishStatus(file);
             // 重试已转换文件失败时，立即从 bid_record.credentials 投影中移除
             // 失效路径；对象和文件状态仍以 credential_file 为事实源。
             self.syncBidRecordCredentials(file.getBidRecordId());
         }
+    }
+
+    /** 上传完成后的后台转换入口；不阻塞原始文件上传请求。 */
+    @Async("fileProcessingExecutor")
+    public void convertFileAsync(Long fileId) {
+        CredentialFile latest = fileMapper.selectById(fileId);
+        if (latest != null) {
+            convertFile(latest);
+        }
+    }
+
+    private void publishStatus(CredentialFile file) {
+        if (fileStatusEventPublisher == null) return;
+        CredentialFile latest = fileMapper.selectById(file.getFileId());
+        if (latest == null) return;
+                fileStatusEventPublisher.publish(
+                        FileStatusEventPublisher.CREDENTIAL_TOPIC_PREFIX
+                                + latest.getBidRecordId(),
+                        String.valueOf(latest.getFileId()),
+                        latest.getConvertStatus() == null
+                                ? null
+                                : latest.getConvertStatus().name(),
+                        null,
+                        latest.getOriginalStorageStatus());
     }
 
     /**
@@ -175,10 +230,11 @@ public class FileConvertService {
      * <p>原文件流在 HTTP 请求完成后关闭。Python 返回正文先保存在内存中，以便计算
      * Markdown SHA-256、声明准确 Content-Length，并在存储后回读校验。</p>
      */
-    private String convertAndStore(CredentialFile file) {
+    private ConvertedMarkdown convertAndStore(CredentialFile file) {
         validateFileMetadata(file);
-        String markdownPath = createMarkdownPath(file.getOriginalFilePath());
         PythonMarkdownResponse response = requestMarkdown(file);
+        String markdownPath = createMarkdownPath(
+                file.getOriginalFilePath(), response.filename());
         return storeAndVerifyMarkdown(file, markdownPath, response);
     }
 
@@ -204,7 +260,7 @@ public class FileConvertService {
 
         String actualSha256 =
                 HexFormat.of().formatHex(sourceDigest.digest());
-        if (!file.getSha256().equalsIgnoreCase(actualSha256)) {
+        if (!file.getOriginalSha256().equalsIgnoreCase(actualSha256)) {
             throw new AppException(
                     AppErrorCode.CREDENTIAL_FILE_INTEGRITY_CHECK_FAILED,
                     "credential-file",
@@ -216,7 +272,7 @@ public class FileConvertService {
     }
 
     /** 上传 Python 返回的 Markdown，并通过存储属性和正文回读校验写入结果。 */
-    private String storeAndVerifyMarkdown(
+    private ConvertedMarkdown storeAndVerifyMarkdown(
             CredentialFile file,
             String markdownPath,
             PythonMarkdownResponse response) {
@@ -226,7 +282,7 @@ public class FileConvertService {
                 BID_RECORD_ID_METADATA, file.getBidRecordId().toString(),
                 FILE_UUID_METADATA, file.getFileUuid(),
                 SOURCE_FILE_ID_METADATA, file.getFileId().toString(),
-                SOURCE_SHA256_METADATA, file.getSha256(),
+                SOURCE_SHA256_METADATA, file.getOriginalSha256(),
                 MARKDOWN_SHA256_METADATA, markdownSha256);
 
         FileStorage.StoredFile storedFile = null;
@@ -253,7 +309,8 @@ public class FileConvertService {
                             "转换后的 Markdown 完整性校验失败");
                 }
             }
-            return storedFile.relativePath();
+            return new ConvertedMarkdown(
+                    storedFile.relativePath(), markdownSha256);
         } catch (IOException failure) {
             if (storedFile != null) {
                 cleanupConvertedMarkdown(
@@ -309,8 +366,8 @@ public class FileConvertService {
                 || file.getOriginalFilePath().isBlank()
                 || file.getFileSize() == null
                 || file.getFileSize() <= 0
-                || file.getSha256() == null
-                || !file.getSha256().matches("(?i)[0-9a-f]{64}")
+                || file.getOriginalSha256() == null
+                || !file.getOriginalSha256().matches("(?i)[0-9a-f]{64}")
                 || file.getStorageType() == null
                 || storageProperties == null
                 || storageProperties.getType() == null
@@ -322,9 +379,12 @@ public class FileConvertService {
     }
 
     /** 将 original 路径映射为文件单元内固定的 converted Markdown 路径。 */
-    private String createMarkdownPath(String originalFilePath) {
+    private String createMarkdownPath(
+            String originalFilePath,
+            String markdownFilename) {
         try {
-            return StoragePath.createConvertedMarkdownPath(originalFilePath);
+            return StoragePath.createConvertedMarkdownPath(
+                    originalFilePath, markdownFilename);
         } catch (IllegalArgumentException failure) {
             throw conversionFailure(
                     "BUILD_MARKDOWN_PATH",
@@ -404,7 +464,7 @@ public class FileConvertService {
         }
 
         List<String> markdownPaths = files.stream()
-                .filter(file -> file.getStatus() == ConvertStatus.CONVERTED)
+                .filter(file -> file.getConvertStatus() == ConvertStatus.CONVERTED)
                 .map(CredentialFile::getMarkdownFilePath)
                 .filter(path -> path != null && !path.isBlank())
                 .distinct()
@@ -496,14 +556,18 @@ public class FileConvertService {
             List<CredentialFile> files,
             ConvertStatus status) {
         return (int) files.stream()
-                .filter(file -> file.getStatus() == status)
+                .filter(file -> file.getConvertStatus() == status)
                 .count();
+    }
+
+    /** 已通过存储回读校验的 Markdown 转换产物。 */
+    private record ConvertedMarkdown(String markdownPath, String sha256) {
     }
 
     private List<FileConvertItem> toFileItems(List<CredentialFile> files) {
         List<FileConvertItem> items = new ArrayList<>();
         for (CredentialFile file : files) {
-            String message = switch (file.getStatus()) {
+            String message = switch (file.getConvertStatus()) {
                 case UPLOADING -> "文件仍在上传中";
                 case UPLOADED -> "等待转换";
                 case CONVERTING -> "正在转换";
@@ -515,7 +579,7 @@ public class FileConvertService {
             items.add(new FileConvertItem(
                     file.getFileId(),
                     file.getOriginalFilename(),
-                    file.getStatus(),
+                    file.getConvertStatus(),
                     message));
         }
         return items;

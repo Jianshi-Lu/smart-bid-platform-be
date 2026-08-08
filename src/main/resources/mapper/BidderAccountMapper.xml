@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper">
 
-    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount">
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount">
         <id     column="bidder_account_id" property="bidderAccountId"/>
         <result column="username"          property="username"/>
         <result column="password"          property="password"/>
@@ -13,7 +13,7 @@
     </resultMap>
 
     <insert id="insert"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount"
             useGeneratedKeys="true"
             keyProperty="bidderAccountId">
         INSERT INTO bidder_account
@@ -23,7 +23,7 @@
     </insert>
 
     <update id="updateById"
-            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount">
+            parameterType="io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount">
         UPDATE bidder_account
         <set>
             <if test="username != null">username = #{username},</if>

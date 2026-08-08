@@ -1,7 +1,8 @@
 package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandler.AddRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidHandlerInfo;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo;
+import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
 import jakarta.annotation.Resource;
@@ -21,6 +22,9 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
     @Resource
     private BidHandlerInfoMapper mapper;
 
+    @Resource
+    private OperationHistoryService operationHistoryService;
+
     @Override
     protected BaseMapper<BidHandlerInfo, Integer> getMapper() {
         return mapper;
@@ -29,6 +33,39 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
     @Override
     protected Function<BidHandlerInfo, Integer> getIdExtractor() {
         return BidHandlerInfo::getBidHandlerId;
+    }
+
+    @Override
+    protected void afterAdd(BidHandlerInfo entity) {
+        operationHistoryService.recordBidHandler(
+                entity.getBidHandlerId(),
+                OperationType.CREATE,
+                null,
+                entity,
+                null);
+    }
+
+    @Override
+    protected void afterUpdate(BidHandlerInfo before, BidHandlerInfo after) {
+        operationHistoryService.recordBidHandler(
+                after.getBidHandlerId(),
+                OperationType.UPDATE,
+                before,
+                after,
+                null);
+    }
+
+    @Override
+    protected void afterDelete(BidHandlerInfo deleted) {
+        if (deleted == null) {
+            return;
+        }
+        operationHistoryService.recordBidHandler(
+                deleted.getBidHandlerId(),
+                OperationType.DELETE,
+                deleted,
+                null,
+                null);
     }
 
     /**
@@ -47,6 +84,12 @@ public class BidHandlerInfoService extends BaseService<BidHandlerInfo> {
             entity.setDepartmentName(item.getDepartmentName());
             entity.setTargetEmail(item.getTargetEmail());
             mapper.insert(entity);
+            operationHistoryService.recordBidHandler(
+                    entity.getBidHandlerId(),
+                    OperationType.CREATE,
+                    null,
+                    entity,
+                    null);
             created.add(entity);
         }
         return created;

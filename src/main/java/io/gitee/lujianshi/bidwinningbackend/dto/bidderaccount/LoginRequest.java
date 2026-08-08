@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 投标方账号登录请求。
  *
- * @since V28
+ * @since V36
  */
 @Data
 public class LoginRequest {

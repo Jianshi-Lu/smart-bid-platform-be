@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Web MVC 配置：为招标方管理接口注册统一登录鉴权拦截器。
  *
- * @since V31
+ * @since V39
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {

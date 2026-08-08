@@ -12,22 +12,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StoragePathTest {
 
     private static final int BID_RECORD_ID = 1001;
-    private static final Long BIDDER_ACCOUNT_ID = 55L;
+    private static final String USERNAME = "bidder01";
 
     @Test
-    void shouldCreateDeterministicOriginalPathUnderAccountAndFileUuid() {
+    void shouldCreateDeterministicOriginalPathUnderUsernameAndFilename() {
         String fileUuid = UUID.randomUUID().toString();
 
         StoragePath.OriginalFilePath first =
                 StoragePath.createOriginalFilePath(
-                        BIDDER_ACCOUNT_ID, fileUuid, "../营业执照.pdf");
+                        USERNAME, fileUuid, "../营业执照.pdf");
         StoragePath.OriginalFilePath second =
                 StoragePath.createOriginalFilePath(
-                        BIDDER_ACCOUNT_ID, fileUuid, "../营业执照.pdf");
+                        USERNAME, fileUuid, "../营业执照.pdf");
 
         assertEquals("营业执照.pdf", first.safeOriginalFilename());
         assertTrue(first.relativePath().startsWith(
-                BIDDER_ACCOUNT_ID + "/files/" + fileUuid + "/original/"));
+                USERNAME + "/营业执照.pdf/original/"));
         assertTrue(first.relativePath().endsWith(fileUuid + "_营业执照.pdf"));
         assertEquals(first.relativePath(), second.relativePath());
 
@@ -35,12 +35,12 @@ class StoragePathTest {
         assertNotEquals(
                 first.relativePath(),
                 StoragePath.createOriginalFilePath(
-                        BIDDER_ACCOUNT_ID, otherUuid, "../营业执照.pdf")
+                        USERNAME, otherUuid, "../营业执照.pdf")
                         .relativePath());
     }
 
     @Test
-    void shouldRejectOriginalPathWithoutBidderAccount() {
+    void shouldRejectOriginalPathWithoutUsername() {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> StoragePath.createOriginalFilePath(
@@ -48,22 +48,26 @@ class StoragePathTest {
     }
 
     @Test
-    void shouldCreateStableMergedMarkdownPathUnderAccountAndBidRecord() {
+    void shouldCreateStableMergedMarkdownPathUnderUsernameAndBidRecord() {
         assertEquals(
-                "55/merged/1001/credentials.md",
+                "bidder01/merged/1001/credentials.md",
                 StoragePath.createMergedMarkdownPath(
-                        BID_RECORD_ID, BIDDER_ACCOUNT_ID));
+                        BID_RECORD_ID, USERNAME));
     }
 
     @Test
-    void shouldMapOriginalObjectToFixedConvertedMarkdownPath() {
+    void shouldMapOriginalObjectToConvertedMarkdownPathWithSameFilename() {
         String fileUuid = UUID.randomUUID().toString();
-        String originalPath = "55/files/" + fileUuid
-                + "/original/" + fileUuid + "_file.v2.pdf";
+        String originalPath = "bidder01/file.v2.pdf/original/"
+                + fileUuid + "_file.v2.pdf";
 
         assertEquals(
-                "55/files/" + fileUuid + "/converted/content.md",
+                "bidder01/file.v2.pdf/converted/" + fileUuid + "_file.v2.md",
                 StoragePath.createConvertedMarkdownPath(originalPath));
+        assertEquals(
+                "bidder01/file.v2.pdf/converted/source.md",
+                StoragePath.createConvertedMarkdownPath(
+                        originalPath, "source.md"));
     }
 
     @Test
@@ -71,6 +75,6 @@ class StoragePathTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> StoragePath.createConvertedMarkdownPath(
-                        "55/merged/1001/credentials.md"));
+                        "bidder01/merged/1001/credentials.md"));
     }
 }

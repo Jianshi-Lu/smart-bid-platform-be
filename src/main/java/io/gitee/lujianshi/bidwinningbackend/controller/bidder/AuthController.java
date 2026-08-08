@@ -4,7 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.RegisterRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.service.BidderAccountService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 最小鉴权实现不提供服务端登出，受保护接口统一调用
  * {@link BidderAccountService#authenticateBasic} 校验。</p>
  *
- * @since V28
+ * @since V36
  */
 @RestController
 @RequestMapping("/bidder/auth")

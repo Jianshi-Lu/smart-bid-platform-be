@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

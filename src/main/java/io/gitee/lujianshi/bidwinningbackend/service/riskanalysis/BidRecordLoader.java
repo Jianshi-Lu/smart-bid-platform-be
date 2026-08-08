@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.service.riskanalysis;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;

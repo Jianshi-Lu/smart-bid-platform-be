@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+import io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;

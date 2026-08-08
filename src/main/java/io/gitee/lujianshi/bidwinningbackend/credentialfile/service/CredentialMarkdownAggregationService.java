@@ -6,9 +6,11 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,9 @@ public class CredentialMarkdownAggregationService {
     @Resource
     private BidRecordMapper bidRecordMapper;
 
+    @Resource
+    private BidderAccountMapper bidderAccountMapper;
+
     /**
      * 汇总指定投标记录下的全部已转换 Markdown，并写入投标记录级路径。
      *
@@ -61,6 +66,11 @@ public class CredentialMarkdownAggregationService {
         if (record == null || record.getBidderAccountId() == null) {
             throw inputNotReady("投标记录不存在或未绑定投标方账号，不能进行风险分析");
         }
+        BidderAccount bidderAccount =
+                bidderAccountMapper.selectById(record.getBidderAccountId());
+        if (bidderAccount == null) {
+            throw inputNotReady("投标记录绑定的投标方账号不存在，不能进行风险分析");
+        }
         List<CredentialFile> orderedFiles = loadReadyFiles(bidRecordId);
         Path temporaryPath = null;
         try {
@@ -68,7 +78,7 @@ public class CredentialMarkdownAggregationService {
             long characterCount = writeMergedMarkdown(temporaryPath, bidRecordId, orderedFiles);
             long contentLength = Files.size(temporaryPath);
             String mergedPath = StoragePath.createMergedMarkdownPath(
-                    bidRecordId, record.getBidderAccountId());
+                    bidRecordId, bidderAccount.getUsername());
 
             try (InputStream input = Files.newInputStream(temporaryPath)) {
                 fileStorage.store(new FileStorage.StoreRequest(
@@ -110,7 +120,7 @@ public class CredentialMarkdownAggregationService {
         List<CredentialFile> orderedFiles = new ArrayList<>();
         for (CredentialFile file : files) {
             if (file == null
-                    || file.getStatus() != ConvertStatus.CONVERTED
+                    || file.getConvertStatus() != ConvertStatus.CONVERTED
                     || file.getMarkdownFilePath() == null
                     || file.getMarkdownFilePath().isBlank()) {
                 String filename = file == null ? "未知" : file.getOriginalFilename();

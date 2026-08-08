@@ -1,6 +1,6 @@
 # API 文档（bid-winning-backend）
 
-> 本文档描述 bid-winning-backend 提供的全部对外 HTTP 接口。共 32 个显式业务端点（含 3 个资信文件端点、1 个 AI 风险分析触发端点、2 个风险记录只读查询端点和 1 个 chat-agent 问答端点）。
+> 本文档描述 bid-winning-backend 提供的对外 HTTP 接口。接口按角色拆分；资信文件的当前上传、状态、转换和下载链路见第 5 节，具体路径以端点速览和 Controller 源码为准。
 >
 > 内部架构：[`docs/architecture.md`](architecture.md) · 数据库结构：[`docs/database.md`](database.md)
 
@@ -24,7 +24,7 @@
 | 服务状态 + 邮件测试 | 3 | `/service-status`、`/send-email`、`/send-notification` |
 | 招标经办人 (BidHandlerInfo) | 7 | `/bid-handler-info/...` |
 | 招标公告 (InvitationForBid) | 8 | `/invitation-for-bid/...` |
-| 资信文件 (CredentialFile) | 3 | `/credential-files/...` |
+| 资信文件 (CredentialFile) | 上传/管理/转换/下载 | `/bidder/bid-records/...`、`/credential-files/...` |
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+） | 1 | `/bid-record/analyze-risk/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
@@ -440,124 +440,59 @@ curl -X POST http://{host}:{port}/invitation-for-bid/status-update \
 
 ## 5. 资信文件上传（CredentialFile）
 
-| Method | Path | 用途 | 返回 |
+### 5.0 访问权限边界（当前实现）
+
+资信文件按角色使用两套接口，不能把投标方接口和招标方接口混用：
+
+| 角色 | 接口范围 | 访问范围 | 归属校验 |
+|---|---|---|---|
+| 投标方 | `/bidder/bid-records/{bidRecordId}/credential-files/**` | 仅当前账号自己的投标记录及其文件 | `bid_record.bidder_account_id == 当前 bidderAccountId`，并继续校验文件属于 `bidRecordId` |
+| 招标方 | `/credential-files/{fileId}/download/*` | 所有投标记录下的资信文件 | 只要求招标方 Basic 鉴权，不要求文件所属投标人是当前招标方账号 |
+
+投标方的 Basic 认证只回答“当前请求是哪一个投标方账号”；
+`BidRecordController` 的 `requireOwned` 再回答“该投标记录是否属于这个账号”。
+这两层校验共同防止投标方通过修改 URL 中的 `bidRecordId` 越权访问其他投标人的文件。
+
+招标方下载接口由 `BidInviterAuthInterceptor` 统一校验招标方 Basic 凭据，
+调用 `FileDownloadService.openCredentialOriginal(fileId, null)` 或
+`openCredentialMarkdown(fileId, null)`。传入 `null` 是有意跳过投标方记录归属校验，
+但仍会检查文件存在、未删除且已达到可下载状态。
+
+因此，当前权限结论是：任意已认证的招标方账号可以访问所有未删除且已准备完成的投标资信文件；
+当前招标方前端页面尚未接入这两个下载接口，页面未接入不改变后端权限边界。
+
+| Method | Path | 角色 | 用途 |
 |--------|------|------|------|
-| POST | `/credential-files/upload` | 一次性上传当前批次的全部原始资信文件并落盘 | `Result<UploadResponse>` |
-| DELETE | `/credential-files/{uploadBatchId}/files/{fileId}` | 删除未提交文件 | `Result<Void>`（当前占位） |
+| POST | `/bidder/bid-records/{bidRecordId}/credential-files` | 投标方 | 上传当前账号投标记录的多个资信文件；`multipart/form-data`，字段为重复的 `files` |
+| GET | `/bidder/bid-records/{bidRecordId}/credential-files` | 投标方 | 查询当前账号投标记录下未删除的文件及转换状态 |
+| DELETE | `/bidder/bid-records/{bidRecordId}/credential-files/{fileId}` | 投标方 | 删除当前账号投标记录下的一个资信文件 |
+| GET | `/bidder/bid-records/{bidRecordId}/credential-files/events` | 投标方 | 通过 SSE 订阅该投标记录的转换状态变化 |
+| GET | `/bidder/bid-records/{bidRecordId}/credential-files/{fileId}/download/original` | 投标方 | 下载本人文件的原始文件 |
+| GET | `/bidder/bid-records/{bidRecordId}/credential-files/{fileId}/download/markdown` | 投标方 | 下载本人文件的 Markdown 转换结果 |
+| GET | `/credential-files/{fileId}/download/original` | 招标方 | 下载任意投标记录下已准备完成的原始文件 |
+| GET | `/credential-files/{fileId}/download/markdown` | 招标方 | 下载任意投标记录下已准备完成的 Markdown 文件 |
+| POST | `/credential-files/bid-records/{bidRecordId}/convert` | 招标方 | 转换指定投标记录下的全部资信文件 |
+| GET | `/credential-files/{fileId}/history` | 招标方 | 查询资信文件的上传、转换、删除操作历史 |
 
-### 5.1 `POST /credential-files/upload`
-
-请求类型为 `multipart/form-data`。多个文件使用同一个 `files` 字段重复提交：
-
-| Form 字段 | 类型 | 必填 | 说明 |
-|-----------|------|:---:|------|
-| `bidRecordId` | Integer | ✅ | 文件所属的投标记录 ID |
-| `files` | File，可重复 | ✅ | 本次请求中的原始资信文件；单文件最大 150MB |
-| `uploadBatchId` | — | — | 不由请求方传入，由后端为本次上传请求生成 |
+投标方上传示例：
 
 ```bash
-curl -X POST http://localhost:8080/credential-files/upload \
-  -F 'bidRecordId=1001' \
+curl -X POST http://localhost:8080/bidder/bid-records/1001/credential-files \
+  -H 'Authorization: Basic ...' \
   -F 'files=@/path/to/license.pdf' \
-  -F 'files=@/path/to/qualification.docx'
+  -F 'files=@/path/to/qualification.docx' \
+  -F 'username=bidder'
 ```
 
-成功响应：
+投标方的上传、查询、删除和下载接口均要求投标方 Basic 凭据，并校验
+`bid_record.bidder_account_id == 当前 bidderAccountId`；下载 Service 还会校验
+文件属于 URL 中的 `bidRecordId`。招标方接口由 `BidInviterAuthInterceptor` 校验招标方
+Basic 凭据，但不按投标人账号限制文件范围，因此任意已认证招标方可以访问所有未删除且
+已准备完成的投标资信文件。
 
-```json
-{
-  "success": true,
-  "code": "SUCCESS",
-  "message": "上传成功",
-  "data": {
-    "uploadBatchId": "550e8400-e29b-41d4-a716-446655440000",
-    "files": [
-      {
-        "fileOrder": 0,
-        "originalFilename": "license.pdf",
-        "contentType": "application/pdf",
-        "fileSize": 102400,
-        "sha256": "64位小写十六进制摘要",
-        "originalFilePath": "bid-records/8/batches/550e8400-e29b-41d4-a716-446655440000/original/文件UUID_license.pdf",
-        "convertStatus": "UPLOADED"
-      }
-    ]
-  }
-}
-```
-
-**存储行为**：
-
-- 开发环境根目录默认为 `/Users/lujianshi/Desktop/projects/MinIO`，可用 `CREDENTIAL_FILE_LOCAL_ROOT` 覆盖。
-- 物理目录为 `{root}/bid-records/{bidRecordId}/batches/{uploadBatchId}/original/`，文件名为 `{fileUuid}_{安全原文件名}`。
-- API 只返回相对路径，不暴露环境绝对路径。
-- SHA-256 在落盘后重新读取实际文件计算。
-- 同一次请求任一步失败时，补偿删除本次请求已经创建的文件；批次不会封口。
-- 全部文件成功后，后端将 `credential_file_batch.status` 更新为 `UPLOADED`，当前批次不可继续追加。
-- 每个文件成功验证后立即写入 `credential_file`；`fileOrder` 表示该批次内的文件顺序。
-
-**错误响应**：
-
-| 场景 | HTTP 状态 / code | message |
-|------|:---:|---------|
-| 文件集合为空、空文件 | 400 / `CREDENTIAL_FILE.INVALID_UPLOAD_REQUEST` | `资信文件上传请求不合法` |
-| 原始文件名为空或文件不合法 | 400 / `CREDENTIAL_FILE.INVALID_FILE` | `上传文件不合法` |
-| 单文件超过 150MB 或请求总体超过 200MB | 413 / `COMMON.FILE_TOO_LARGE` | `文件大小超过限制` |
-| 文件存储失败 | 503 / `CREDENTIAL_FILE.STORAGE_FAILED` | `资信文件存储失败` |
-| 文件完整性校验失败 | 500 / `CREDENTIAL_FILE.INTEGRITY_CHECK_FAILED` | `文件完整性校验失败` |
-| 文件元数据落库失败 | 500 / `CREDENTIAL_FILE.PERSISTENCE_FAILED` | `资信文件保存失败` |
-
-> **当前阶段边界**：上传请求只负责原始文件落盘、完整性校验和 `credential_file` 写入，不在同一请求内自动转换。转换可以通过下方独立入口手动触发，也会在风险分析入口检测到未完成材料时按需触发。
-
-### 5.2 `POST /credential-files/bid-records/{bidRecordId}/convert`
-
-无差别转换指定投标记录下的全部资信文件批次。Java 按批次逐文件从当前
-`FileStorage` 读取 `original`，使用 multipart 调用 Python `/convert`，接收
-`text/markdown` 文件，再由 Java 生成同级 `converted` 路径、上传并回读校验。
-完成后 Java 更新文件、批次状态，并将 Markdown object key 列表回写
-`bid_record.credentials`。
-
-重复调用会重新转换并覆盖对应的 `converted` 对象，不根据当前状态跳过文件。
-
-```bash
-curl -X POST http://localhost:8080/credential-files/bid-records/1001/convert
-```
-
-返回结果包含投标记录级汇总状态和每个批次的转换状态：
-
-```json
-{
-  "success": true,
-  "code": "SUCCESS",
-  "data": {
-    "bidRecordId": 1001,
-    "status": "ALL_CONVERTED",
-    "totalBatchCount": 1,
-    "convertedBatchCount": 1,
-    "processingBatchCount": 0,
-    "failedBatchCount": 0,
-    "batches": []
-  }
-}
-```
-
-文件转换失败时，文件和批次分别记录 `FAILED` 状态及错误信息；已经成功转换的文件
-仍保留其 `CONVERTED` 状态和 Markdown 路径。
-
-### 5.3 `DELETE /credential-files/{uploadBatchId}/files/{fileId}`
-
-当前仅用于前后端联调，打印删除成功并返回：
-
-```json
-{
-  "success": true,
-  "code": "SUCCESS",
-  "message": "删除成功（占位）",
-  "data": null
-}
-```
-
-当前不会删除物理文件或数据库记录。真实删除、批次归属校验和已绑定文件保护留到后续阶段。
+转换不是上传请求内的同步步骤。上传成功后文件进入转换流程，前端可以通过
+`GET .../credential-files/events` 接收状态变化，也可以重新查询列表；只有原始文件或
+Markdown 投影达到可下载状态时，下载接口才返回文件。
 
 ---
 

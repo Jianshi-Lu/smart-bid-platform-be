@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileOperationHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileOperationHistory">
+        <id     column="history_id"      property="historyId"/>
+        <result column="document_uuid"   property="documentUuid"/>
+        <result column="operation"       property="operation"/>
+        <result column="operator_type"   property="operatorType"/>
+        <result column="operator_id"     property="operatorId"/>
+        <result column="before_snapshot" property="beforeSnapshot"/>
+        <result column="after_snapshot"  property="afterSnapshot"/>
+        <result column="remark"          property="remark"/>
+        <result column="created_at"      property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert"
+            parameterType="io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileOperationHistory"
+            useGeneratedKeys="true"
+            keyProperty="historyId">
+        INSERT INTO knowledge_file_operation_history
+            (document_uuid, operation, operator_type, operator_id,
+             before_snapshot, after_snapshot, remark, created_at)
+        VALUES
+            (#{documentUuid}, #{operation}, #{operatorType}, #{operatorId},
+             #{beforeSnapshot}, #{afterSnapshot}, #{remark}, #{createdAt})
+    </insert>
+
+    <select id="selectByDocumentUuid" resultMap="BaseResultMap">
+        SELECT history_id, document_uuid, operation, operator_type, operator_id,
+               before_snapshot, after_snapshot, remark, created_at
+        FROM knowledge_file_operation_history
+        WHERE document_uuid = #{documentUuid}
+        ORDER BY created_at DESC, history_id DESC
+    </select>
+
+</mapper>

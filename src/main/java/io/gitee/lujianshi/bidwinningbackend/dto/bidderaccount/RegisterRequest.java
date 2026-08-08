@@ -10,7 +10,7 @@ import lombok.Data;
  * <p>最小身份模型：用户名 + 密码必填，手机号/显示名称可选。
  * 密码由服务端使用 PBKDF2 哈希后入库，不保存明文。</p>
  *
- * @since V28
+ * @since V36
  */
 @Data
 public class RegisterRequest {

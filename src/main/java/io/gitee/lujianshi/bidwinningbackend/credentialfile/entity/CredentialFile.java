@@ -37,21 +37,45 @@ public class CredentialFile {
 
     private Long fileSize;
 
-    private String sha256;
+    private String originalSha256;
+
+    /** 转换后 Markdown 正文 SHA-256（V46 起，对齐 knowledge_file）。 */
+    private String convertedSha256;
 
     private String storageType;
 
     private String originalFilePath;
 
+    /** 原始文件对象存储状态：STORING/STORED/FAILED。 */
+    private String originalStorageStatus;
+
     private String markdownFilePath;
 
-    private ConvertStatus status;
+    private ConvertStatus convertStatus;
 
     private String errorMessage;
+
+    /** 失败阶段：UPLOAD/CONVERT/UNKNOWN（V46 起，对齐 knowledge_file）。 */
+    private String errorStage;
 
     private LocalDateTime createdAt;
 
     private LocalDateTime convertedAt;
 
     private LocalDateTime boundAt;
+
+    /** 软删除时间；非空表示已删除，历史追溯记录保留（V45 起）。 */
+    private LocalDateTime deletedAt;
+
+    /** 删除状态：NULL/DELETING/FAILED/DELETED。 */
+    private String deletionStatus;
+
+    /** 删除失败阶段：DELETE_OBJECT_ORIGINAL/DELETE_OBJECT_CONVERTED/MARK_DELETED/HISTORY/SYNC_CREDENTIALS。 */
+    private String deletionFailedStage;
+
+    /** 删除失败原因（内部排查用）。 */
+    private String deletionErrorMessage;
+
+    /** 删除开始时间，用于进程崩溃后超时抢占。 */
+    private LocalDateTime deletionStartedAt;
 }

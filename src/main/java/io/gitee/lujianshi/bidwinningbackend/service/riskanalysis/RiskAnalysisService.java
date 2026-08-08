@@ -4,8 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
-import io.gitee.lujianshi.bidwinningbackend.entity.RiskAnalysis;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
@@ -19,8 +19,6 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
-
-import io.gitee.lujianshi.bidwinningbackend.utils.PromptFiller;
 
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
@@ -61,6 +59,44 @@ public class RiskAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(RiskAnalysisService.class);
     private static final String PROMPT_VERSION = "v1";
+
+    /** 风险分析模型的固定 system prompt，与当前 Structured Output schema 配套。 */
+    private static final String SYSTEM_PROMPT =
+            """
+            你是一位专业的政府采购风险分析师。请根据提供的供应商信息，从以下维度进行风险评估：
+
+            1. 资质合规性
+            2. 报价合理性
+            3. 历史履约情况
+            4. 关联风险（关联供应商、同一控制人等）
+
+            请以 JSON 格式返回分析结果，包含以下字段：
+            - riskLevel: 风险等级（LOW / MEDIUM / HIGH / CRITICAL）
+            - summary: 风险摘要（200字以内）
+            - suggestions: 建议措施（100字以内）
+
+            只返回 JSON，不要包含任何其他文字说明。
+
+            输出格式（严格）：
+            - 仅输出一个 JSON 对象，字段完全对齐 schema（riskLevel ∈ {LOW, MEDIUM, HIGH, CRITICAL}）
+            - 不得前置思考/推理/解释过程
+            - 不得使用 ```json``` 围栏或其他任何包裹
+            - 不得输出尾随文字
+            """;
+
+    /** 风险分析模型的固定 user prompt；仅业务字段使用 {@link String#formatted} 注入。 */
+    private static final String USER_PROMPT_TEMPLATE =
+            """
+            请分析以下投标人的风险情况：
+
+            ## 投标人信息
+            - 投标人名称：%s
+            - 报价：%s元
+            - 联系方式：%s
+            - 资信材料：%s
+
+            %s
+            """;
 
     /**
      * Structured Output JSON Schema，约束 LLM 仅输出符合此结构的 JSON 对象。
@@ -111,9 +147,6 @@ public class RiskAnalysisService {
 
     @Resource
     private FileStorage fileStorage;
-
-    @Resource
-    private PromptFiller promptFiller;
 
     /**
      * 构造风险分析 ChatClient，并把 Structured Output JSON Schema 固化到默认调用参数中。
@@ -182,18 +215,14 @@ public class RiskAnalysisService {
         String mergedMarkdownPath = markdownAggregationService.aggregate(bidRecordId);
         String mergedMarkdown = readMergedMarkdown(mergedMarkdownPath);
         String detailInfo = loader.loadDetail(bidRecordId);
-        Map<String, String> vars = Map.of(
-                "bidderName", record.getBidderName() != null ? record.getBidderName() : "",
-                "quotePrice", record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
-                "bidderContact", record.getBidderContact() != null ? record.getBidderContact() : "",
-                "credentials", mergedMarkdown,
-                "detail", detailInfo
-        );
+        String userPrompt = USER_PROMPT_TEMPLATE.formatted(
+                record.getBidderName() != null ? record.getBidderName() : "",
+                record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
+                record.getBidderContact() != null ? record.getBidderContact() : "",
+                mergedMarkdown,
+                detailInfo);
 
-        String systemPrompt = promptFiller.loadFromResource("prompts/risk-analysis-system-v1.txt");
-        String userPrompt = promptFiller.fillFromResource("prompts/risk-analysis-user-v1.txt", vars);
-
-        log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", systemPrompt, userPrompt);
+        log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", SYSTEM_PROMPT, userPrompt);
 
         long startNs = System.nanoTime();
 
@@ -201,7 +230,7 @@ public class RiskAnalysisService {
         ChatResponse chatResponse;
         try {
             chatResponse = chatClient.prompt()
-                    .system(systemPrompt)
+                    .system(SYSTEM_PROMPT)
                     .user(userPrompt)
                     .call()
                     .chatResponse();
@@ -269,7 +298,7 @@ public class RiskAnalysisService {
             return false;
         }
         return files.stream().allMatch(file -> file != null
-                && file.getStatus() == ConvertStatus.CONVERTED
+                && file.getConvertStatus() == ConvertStatus.CONVERTED
                 && file.getMarkdownFilePath() != null
                 && !file.getMarkdownFilePath().isBlank());
     }

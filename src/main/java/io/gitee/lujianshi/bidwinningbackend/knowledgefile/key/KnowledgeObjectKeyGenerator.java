@@ -4,26 +4,45 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/** 生成以 document_uuid 为根目录的 knowledge-file object key。 */
+/** 生成以用户名为根目录、文件名为第二层的 knowledge-file object key。 */
 @Component
 public class KnowledgeObjectKeyGenerator {
 
-    /** 生成 {@code {uuid}/original/{uuid}_{safeFilename}}。 */
+    /** 生成 {@code {username}/{safeFilename}/original/{uuid}_{safeFilename}}。 */
     public OriginalObjectKey original(
+            String username,
             UUID documentUuid,
             String originalFilename) {
+        validateUsername(username);
         requireUuid(documentUuid);
         String safeFilename = normalizeFilename(originalFilename);
         String storedFilename = documentUuid + "_" + safeFilename;
         return new OriginalObjectKey(
                 safeFilename,
-                documentUuid + "/original/" + storedFilename);
+                username + "/" + safeFilename + "/original/" + storedFilename);
     }
 
-    /** 生成 {@code {uuid}/converted/content.md}。 */
-    public String converted(UUID documentUuid) {
-        requireUuid(documentUuid);
-        return documentUuid + "/converted/content.md";
+    /**
+     * 生成 {@code {username}/{safeFilename}/converted/{markdownFilename}}。
+     *
+     * <p>Markdown 文件名由转换服务返回（固定 {@code .md} 后缀），
+     * 与 original 同名不同后缀，不再拼接 UUID 前缀。</p>
+     */
+    public String converted(
+            String username,
+            String safeOriginalFilename,
+            String markdownFilename) {
+        validateUsername(username);
+        String safeFilename = normalizeFilename(safeOriginalFilename);
+        String safeMarkdownFilename = normalizeFilename(markdownFilename);
+        return username + "/" + safeFilename
+                + "/converted/" + safeMarkdownFilename;
+    }
+
+    private void validateUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("用户名不能为空");
+        }
     }
 
     private void requireUuid(UUID documentUuid) {

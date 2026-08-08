@@ -4,7 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.LoginRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidinviteraccount.RegisterRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidInviterAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidinviteraccount.BidInviterAccount;
 import io.gitee.lujianshi.bidwinningbackend.service.BidInviterAccountService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>与投标方对称：注册/登录不需要鉴权；查询当前账号通过 HTTP Basic 凭据实时校验。
  * 招标方管理接口由 {@code BidInviterAuthInterceptor} 统一校验该账号。</p>
  *
- * @since V31
+ * @since V39
  */
 @RestController("bidInviterAuthController")
 @RequestMapping("/bid-inviter/auth")

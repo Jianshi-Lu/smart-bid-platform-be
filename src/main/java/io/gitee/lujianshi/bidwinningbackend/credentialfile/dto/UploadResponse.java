@@ -41,10 +41,18 @@ public class UploadResponse {
 
         private Long fileSize;
 
-        private String sha256;
+        private String originalSha256;
 
         private String originalFilePath;
 
+        /** 原始文件对象存储状态：STORING/STORED/FAILED。 */
+        private String originalStorageStatus;
+
         private ConvertStatus convertStatus;
+
+        private String errorMessage;
+
+        /** 失败阶段：UPLOAD/CONVERT/UNKNOWN（对齐 knowledge_file）。 */
+        private String errorStage;
     }
 }

@@ -1,13 +1,13 @@
 package io.gitee.lujianshi.bidwinningbackend.mapper;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.BidInviterAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidinviteraccount.BidInviterAccount;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
  * 招标方账号 Mapper。继承 {@link BaseMapper}，绑定 {@code BidInviterAccountMapper.xml}。
  *
- * @since V31
+ * @since V39
  */
 @Mapper
 public interface BidInviterAccountMapper extends BaseMapper<BidInviterAccount, Long> {

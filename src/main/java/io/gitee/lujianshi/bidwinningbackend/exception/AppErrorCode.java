@@ -160,6 +160,18 @@ public enum AppErrorCode {
     CREDENTIAL_FILE_NOT_FOUND(
             "CREDENTIAL_FILE.NOT_FOUND", 404, "资信文件不存在", false),
 
+    /** CREDENTIAL_FILE：文件已上传但当前没有可下载的原始/Markdown产物。 */
+    CREDENTIAL_FILE_DOWNLOAD_NOT_READY(
+            "CREDENTIAL_FILE.DOWNLOAD_NOT_READY", 409, "资信文件尚未准备好下载", false),
+
+    /** CREDENTIAL_FILE：删除资信文件（对象/记录）失败。 */
+    CREDENTIAL_FILE_DELETE_FAILED(
+            "CREDENTIAL_FILE.DELETE_FAILED", 503, "资信文件删除失败", true),
+
+    /** CREDENTIAL_FILE：另一请求正在删除该资信文件。 */
+    CREDENTIAL_FILE_DELETE_IN_PROGRESS(
+            "CREDENTIAL_FILE.DELETE_IN_PROGRESS", 409, "资信文件正在删除中，请稍后重试", false),
+
     // ==================== KNOWLEDGE_FILE：知识文件 ====================
 
     /** KNOWLEDGE_FILE：多文件上传请求不合法。 */
@@ -177,6 +189,26 @@ public enum AppErrorCode {
     /** KNOWLEDGE_FILE：对象正文回读哈希不一致。 */
     KNOWLEDGE_FILE_INTEGRITY_CHECK_FAILED(
             "KNOWLEDGE_FILE.INTEGRITY_CHECK_FAILED", 500, "知识文件完整性校验失败", true),
+
+    /** KNOWLEDGE_FILE：知识文件数据库持久化失败。 */
+    KNOWLEDGE_FILE_PERSISTENCE_FAILED(
+            "KNOWLEDGE_FILE.PERSISTENCE_FAILED", 500, "知识文件保存失败", true),
+
+    /** KNOWLEDGE_FILE：知识文件记录不存在或已删除。 */
+    KNOWLEDGE_FILE_NOT_FOUND(
+            "KNOWLEDGE_FILE.NOT_FOUND", 404, "知识文件不存在", false),
+
+    /** KNOWLEDGE_FILE：文件已上传但当前没有可下载的原始/Markdown产物。 */
+    KNOWLEDGE_FILE_DOWNLOAD_NOT_READY(
+            "KNOWLEDGE_FILE.DOWNLOAD_NOT_READY", 409, "知识文件尚未准备好下载", false),
+
+    /** KNOWLEDGE_FILE：删除知识文件（向量/对象/记录）失败。 */
+    KNOWLEDGE_FILE_DELETE_FAILED(
+            "KNOWLEDGE_FILE.DELETE_FAILED", 503, "知识文件删除失败", true),
+
+    /** KNOWLEDGE_FILE：另一请求正在删除该知识文件。 */
+    KNOWLEDGE_FILE_DELETE_IN_PROGRESS(
+            "KNOWLEDGE_FILE.DELETE_IN_PROGRESS", 409, "知识文件正在删除中，请稍后重试", false),
 
     /** KNOWLEDGE_FILE：original 转 Markdown 失败。 */
     KNOWLEDGE_FILE_CONVERSION_FAILED(

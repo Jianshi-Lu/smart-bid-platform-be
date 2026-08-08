@@ -10,7 +10,7 @@ import lombok.Data;
  * <p>与投标方注册请求对称：用户名 + 密码必填，手机号/显示名称可选。
  * 演示环境密码明文存储。</p>
  *
- * @since V31
+ * @since V39
  */
 @Data
 public class RegisterRequest {

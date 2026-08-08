@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.enums;
 
-import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid;
 
 /**
  * 招标公告状态枚举（V18 重命名自 TenderNoticeStatus）。

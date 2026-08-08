@@ -3,7 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.bidderaccount;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.RegisterRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.BidderAccountService;

@@ -9,10 +9,12 @@ import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.BatchAddRequest
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.BatchDeleteRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.StatusUpdateRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid.UpdateRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid;
+import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,9 @@ public class InvitationForBidController {
 
     @Resource
     private InvitationForBidService service;
+
+    @Resource
+    private OperationHistoryService operationHistoryService;
 
     /**
      * 创建招标公告。Service 自动设 {@code createdAt} 和 {@code status=DRAFT}。
@@ -194,6 +199,14 @@ public class InvitationForBidController {
         InvitationForBid updated = service.transitionStatus(
                 request.getInvitationId(), request.getStatus(), request.getRemark());
         return Result.success(updated, "状态变更成功");
+    }
+
+    /** 查询招标公告的操作历史（创建/修改/删除/状态变更，时间倒序）。 */
+    @GetMapping("/invitation-for-bid/{id}/history")
+    public Result<List<InvitationForBidOperationHistory>> listOperationHistory(
+            @PathVariable Integer id) {
+        return Result.success(
+                operationHistoryService.listInvitationHistory(id), "查询成功");
     }
 
     /** 构造招标公告不存在异常，统一交给全局异常处理器返回。 */

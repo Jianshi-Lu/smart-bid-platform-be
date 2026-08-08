@@ -7,9 +7,11 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,6 +33,7 @@ class CredentialMarkdownAggregationServiceTest {
 
     private static final int BID_RECORD_ID = 8;
     private static final Long BIDDER_ACCOUNT_ID = 55L;
+    private static final String USERNAME = "bidder01";
 
     @TempDir
     Path tempDir;
@@ -60,7 +63,7 @@ class CredentialMarkdownAggregationServiceTest {
         String mergedPath = service.aggregate(BID_RECORD_ID);
 
         assertEquals(
-                BIDDER_ACCOUNT_ID + "/merged/" + BID_RECORD_ID
+                USERNAME + "/merged/" + BID_RECORD_ID
                         + "/credentials.md",
                 mergedPath);
         String merged = new String(
@@ -127,6 +130,13 @@ class CredentialMarkdownAggregationServiceTest {
         ReflectionTestUtils.setField(service, "fileStorage", storage);
         ReflectionTestUtils.setField(service, "riskAnalysisProperties", properties);
         ReflectionTestUtils.setField(service, "bidRecordMapper", bidRecordMapper);
+        BidderAccountMapper bidderAccountMapper = mock(BidderAccountMapper.class);
+        BidderAccount bidderAccount = new BidderAccount();
+        bidderAccount.setBidderAccountId(BIDDER_ACCOUNT_ID);
+        bidderAccount.setUsername(USERNAME);
+        when(bidderAccountMapper.selectById(BIDDER_ACCOUNT_ID))
+                .thenReturn(bidderAccount);
+        ReflectionTestUtils.setField(service, "bidderAccountMapper", bidderAccountMapper);
         return service;
     }
 
@@ -141,8 +151,8 @@ class CredentialMarkdownAggregationServiceTest {
             String fileUuid,
             String content) throws Exception {
         String path = StoragePath.createConvertedMarkdownPath(
-                BIDDER_ACCOUNT_ID + "/files/" + fileUuid
-                        + "/original/" + fileUuid + "_source.pdf");
+                USERNAME + "/source.pdf/original/"
+                        + fileUuid + "_source.pdf");
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
         storage.store(new FileStorage.StoreRequest(
                 path,
@@ -172,7 +182,7 @@ class CredentialMarkdownAggregationServiceTest {
         file.setBidRecordId(BID_RECORD_ID);
         file.setFileOrder(fileOrder);
         file.setOriginalFilename(filename);
-        file.setStatus(ConvertStatus.CONVERTED);
+        file.setConvertStatus(ConvertStatus.CONVERTED);
         file.setMarkdownFilePath(markdownPath);
         return file;
     }
@@ -182,7 +192,7 @@ class CredentialMarkdownAggregationServiceTest {
         file.setFileId(99L);
         file.setBidRecordId(BID_RECORD_ID);
         file.setOriginalFilename("failed.pdf");
-        file.setStatus(ConvertStatus.FAILED);
+        file.setConvertStatus(ConvertStatus.FAILED);
         return file;
     }
 }

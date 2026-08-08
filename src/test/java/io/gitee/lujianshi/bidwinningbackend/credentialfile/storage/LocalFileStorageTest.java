@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LocalFileStorageTest {
 
     private static final int BID_RECORD_ID = 1001;
+    private static final String USERNAME = "bidder01";
     private static final String BID_RECORD_ID_METADATA = "bid-record-id";
     private static final String FILE_UUID_METADATA = "file-uuid";
     private static final String SHA256_METADATA = "sha256";
@@ -43,7 +44,7 @@ class LocalFileStorageTest {
         assertEquals(content.length, storedFile.fileSize());
         assertEquals(metadata(batchId), storedFile.metadata());
         assertTrue(storedFile.relativePath().startsWith(
-                "55/files/" + batchId + "/original/"));
+                USERNAME + "/营业执照.pdf/original/"));
         assertFalse(storedFile.relativePath().startsWith(tempDir.toString()));
         assertTrue(Files.isRegularFile(tempDir.resolve(storedFile.relativePath())));
         try (InputStream input = storage.open(storedFile.relativePath())) {
@@ -74,7 +75,7 @@ class LocalFileStorageTest {
     @Test
     void shouldReplaceExistingDerivedFileAtSamePath() throws Exception {
         LocalFileStorage storage = createStorage();
-        String path = StoragePath.createMergedMarkdownPath(BID_RECORD_ID, 55L);
+        String path = StoragePath.createMergedMarkdownPath(BID_RECORD_ID, USERNAME);
 
         storage.store(new FileStorage.StoreRequest(
                 path, "text/markdown", 3, Map.of(),
@@ -101,7 +102,7 @@ class LocalFileStorageTest {
         byte[] content = "content".getBytes(StandardCharsets.UTF_8);
         String batchId = UUID.randomUUID().toString();
         StoragePath.OriginalFilePath storagePath =
-                StoragePath.createOriginalFilePath(55L, batchId, "license.pdf");
+                StoragePath.createOriginalFilePath(USERNAME, batchId, "license.pdf");
         FileStorage.StoreRequest request =
                 new FileStorage.StoreRequest(
                         storagePath.relativePath(),
@@ -142,7 +143,7 @@ class LocalFileStorageTest {
             String contentType,
             byte[] content) {
         return new FileStorage.StoreRequest(
-                StoragePath.createOriginalFilePath(55L, batchId, filename).relativePath(),
+                StoragePath.createOriginalFilePath(USERNAME, batchId, filename).relativePath(),
                 contentType,
                 content.length,
                 metadata(batchId),

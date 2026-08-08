@@ -3,7 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.service;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.RegisterRequest;
-import io.gitee.lujianshi.bidwinningbackend.entity.BidderAccount;
+import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper;
@@ -19,9 +19,9 @@ import java.util.Base64;
  * 投标方账号服务：注册、登录与明文密码校验（演示环境最小实现）。
  *
  * <p>最小鉴权实现：每次请求携带用户名+密码，服务端直接校验，不签发令牌。
- * 演示环境明文存储密码（V29），禁止用于生产。</p>
+ * 演示环境明文存储密码（V37），禁止用于生产。</p>
  *
- * @since V28
+ * @since V36
  */
 @Service
 public class BidderAccountService {

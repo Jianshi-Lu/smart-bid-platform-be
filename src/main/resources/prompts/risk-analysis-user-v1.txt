@@ -1,9 +1,0 @@
-请分析以下投标人的风险情况：
-
-## 投标人信息
-- 投标人名称：{{bidderName}}
-- 报价：{{quotePrice}}元
-- 联系方式：{{bidderContact}}
-- 资信材料：{{credentials}}
-
-{{detail}}
