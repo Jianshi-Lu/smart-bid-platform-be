@@ -2,8 +2,8 @@ package io.gitee.lujianshi.bidwinningbackend.controller;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.statuscheck.BidWinningMailRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.statuscheck.PlainTextMailRequest;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
-import io.gitee.lujianshi.bidwinningbackend.service.statuscheck.StatusCheckService;
+import io.gitee.lujianshi.bidwinningbackend.service.MailService;
+import io.gitee.lujianshi.bidwinningbackend.service.StatusCheckService;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

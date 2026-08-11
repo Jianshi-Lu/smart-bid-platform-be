@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.invitation;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid;
@@ -7,7 +7,6 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 

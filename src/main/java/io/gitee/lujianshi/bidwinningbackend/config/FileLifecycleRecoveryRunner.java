@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.config;
 
-import io.gitee.lujianshi.bidwinningbackend.service.lifecycle.FileLifecycleReconciliationService;
+import io.gitee.lujianshi.bidwinningbackend.service.FileLifecycleReconciliationService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;

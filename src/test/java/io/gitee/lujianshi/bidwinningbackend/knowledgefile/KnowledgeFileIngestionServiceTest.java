@@ -18,7 +18,7 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileI
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileObjectService;
 import io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;

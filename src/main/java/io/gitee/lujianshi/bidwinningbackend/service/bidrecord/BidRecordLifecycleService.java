@@ -9,7 +9,7 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidderAccountMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.invitation.InvitationForBidService;
+import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

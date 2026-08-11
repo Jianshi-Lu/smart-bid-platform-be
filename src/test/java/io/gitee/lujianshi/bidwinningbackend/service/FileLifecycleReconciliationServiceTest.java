@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.lifecycle;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;

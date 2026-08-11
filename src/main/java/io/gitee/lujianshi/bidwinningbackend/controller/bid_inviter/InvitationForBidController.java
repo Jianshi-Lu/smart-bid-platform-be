@@ -13,9 +13,9 @@ import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationFo
 import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.invitation.InvitationForBidService;
+import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
 import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;

@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Param;
  * 招标公告 Mapper 接口 — 继承 {@link BaseMapper}，绑定 {@code InvitationForBidMapper.xml}（V18 重命名自 TenderNoticeMapper）。
  *
  * @see io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid
- * @see io.gitee.lujianshi.bidwinningbackend.service.invitation.InvitationForBidService
+ * @see io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService
  */
 @Mapper
 public interface InvitationForBidMapper extends BaseMapper<InvitationForBid, Integer> {

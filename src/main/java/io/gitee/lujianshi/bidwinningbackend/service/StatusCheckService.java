@@ -1,7 +1,6 @@
-package io.gitee.lujianshi.bidwinningbackend.service.statuscheck;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.statuscheck.BidWinningMailRequest;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
 import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import io.gitee.lujianshi.bidwinningbackend.utils.ResourceSearcher;
 import jakarta.annotation.Resource;

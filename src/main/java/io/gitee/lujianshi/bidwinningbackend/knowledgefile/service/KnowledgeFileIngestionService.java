@@ -15,7 +15,7 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpl
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.PreparedKnowledgeDocument;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.StoredKnowledgeObject;
 import io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
 import io.gitee.lujianshi.bidwinningbackend.storage.vector.KnowledgeFileVectorStorage;
 import org.slf4j.Logger;

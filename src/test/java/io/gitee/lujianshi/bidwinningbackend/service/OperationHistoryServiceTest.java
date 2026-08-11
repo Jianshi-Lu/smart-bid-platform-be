@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.audit;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.config.CurrentAccountContext;
 import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBid;

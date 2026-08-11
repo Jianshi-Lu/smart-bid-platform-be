@@ -7,7 +7,7 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.dto.KnowledgeFileUploa
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpload;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileIngestionService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.service.file.FileDownloadService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

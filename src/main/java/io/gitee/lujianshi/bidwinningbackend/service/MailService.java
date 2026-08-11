@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.mail;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.statuscheck.PlainTextMailRequest;
 import jakarta.annotation.Resource;

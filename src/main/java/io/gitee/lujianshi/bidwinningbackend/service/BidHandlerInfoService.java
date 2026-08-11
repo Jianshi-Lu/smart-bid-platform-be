@@ -1,4 +1,4 @@
-package io.gitee.lujianshi.bidwinningbackend.service.bidhandler;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.dto.bidhandler.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidhandler.BidHandlerInfo;
@@ -8,8 +8,6 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidHandlerInfoMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.InvitationForBidMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
-import io.gitee.lujianshi.bidwinningbackend.service.support.BaseService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

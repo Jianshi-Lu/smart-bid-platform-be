@@ -1,7 +1,6 @@
-package io.gitee.lujianshi.bidwinningbackend.service.support;
+package io.gitee.lujianshi.bidwinningbackend.service;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.mail.MailService;
 import io.gitee.lujianshi.bidwinningbackend.utils.AsyncTaskManager;
 import io.gitee.lujianshi.bidwinningbackend.utils.ResourceSearcher;
 import jakarta.annotation.Resource;

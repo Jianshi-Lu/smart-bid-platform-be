@@ -21,7 +21,7 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordService;
 import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
 import io.gitee.lujianshi.bidwinningbackend.storage.vector.CredentialFileVectorStorage;
 import jakarta.annotation.Resource;

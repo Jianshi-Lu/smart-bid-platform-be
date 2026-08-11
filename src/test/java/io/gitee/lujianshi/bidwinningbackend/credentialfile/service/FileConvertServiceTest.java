@@ -20,7 +20,7 @@ import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
 import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordService;
 import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;

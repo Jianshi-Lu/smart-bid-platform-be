@@ -16,7 +16,7 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRe
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpload;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileIngestionService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.service.file.FileDownloadService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;

@@ -111,16 +111,16 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── mapper/                             # 核心 Mapper 抽象与接口
 ├── service/                            # CRUD 与业务编排
 │   ├── account/                         # 投标方/招标方账号与 Basic 鉴权业务
-│   ├── audit/                           # 操作历史与审计快照
-│   ├── bidhandler/                      # 招标经办人业务
 │   ├── bidrecord/                      # 投标记录事实、生命周期和向量索引编排
 │   ├── file/                            # 投标方/招标方文件应用服务与下载
-│   ├── invitation/                      # 招标公告业务
-│   ├── lifecycle/                       # 启动恢复与跨存储生命周期对账
-│   ├── mail/                            # 邮件发送
 │   ├── riskanalysis/                    # 风险分析
-│   ├── statuscheck/                     # 服务状态与邮件测试
-│   └── support/                         # 通用 CRUD 基类等支撑代码
+│   ├── BaseService.java                 # 通用 CRUD 基类
+│   ├── BidHandlerInfoService.java       # 招标经办人业务
+│   ├── InvitationForBidService.java     # 招标公告业务
+│   ├── OperationHistoryService.java     # 操作历史与审计快照
+│   ├── FileLifecycleReconciliationService.java # 启动恢复与跨存储生命周期对账
+│   ├── MailService.java                 # 邮件发送
+│   └── StatusCheckService.java          # 服务状态与邮件测试
 ├── storage/
 │   ├── object/                         # ObjectStorage 及 Local/MinIO 实现
 │   └── vector/                         # Java 到 vector-service 的三类向量协议适配

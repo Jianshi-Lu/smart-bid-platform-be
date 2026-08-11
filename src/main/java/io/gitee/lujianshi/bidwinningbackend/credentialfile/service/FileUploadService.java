@@ -14,7 +14,7 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.VerifiedSto
 import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
 import io.gitee.lujianshi.bidwinningbackend.storage.vector.CredentialFileVectorStorage;
 import jakarta.annotation.Resource;
