@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.config;
 
-import io.gitee.lujianshi.bidwinningbackend.service.BidInviterAccountService;
+import io.gitee.lujianshi.bidwinningbackend.service.account.BidInviterAccountService;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidinviteraccount.BidInviterAccount;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;

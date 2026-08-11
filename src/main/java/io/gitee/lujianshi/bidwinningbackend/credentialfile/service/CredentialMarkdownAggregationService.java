@@ -4,7 +4,7 @@ import io.gitee.lujianshi.bidwinningbackend.config.RiskAnalysisProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
@@ -42,7 +42,7 @@ public class CredentialMarkdownAggregationService {
     private CredentialFileMapper fileMapper;
 
     @Resource
-    private FileStorage fileStorage;
+    private ObjectStorage fileStorage;
 
     @Resource
     private RiskAnalysisProperties riskAnalysisProperties;
@@ -81,7 +81,7 @@ public class CredentialMarkdownAggregationService {
                     bidRecordId, bidderAccount.getUsername());
 
             try (InputStream input = Files.newInputStream(temporaryPath)) {
-                fileStorage.store(new FileStorage.StoreRequest(
+                fileStorage.store(new ObjectStorage.StoreRequest(
                         mergedPath,
                         MARKDOWN_CONTENT_TYPE,
                         contentLength,
@@ -136,7 +136,7 @@ public class CredentialMarkdownAggregationService {
         return orderedFiles;
     }
 
-    /** 将各个 Markdown 按批次和文件边界写入临时文件。 */
+    /** 将各个 Markdown 按文件边界写入临时文件。 */
     private long writeMergedMarkdown(
             Path temporaryPath,
             Integer bidRecordId,

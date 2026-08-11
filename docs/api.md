@@ -28,7 +28,7 @@
 | 投标记录 (BidRecord) | 7 | `/bid-record/...` |
 | **AI 风险分析**（v0.1+） | 1 | `/bid-record/analyze-risk/{id}` |
 | **风险记录查询**（v0.2+，敏感数据只读） | 2 | `/risk-analysis/...` |
-| **chat-agent 单轮问答**（最小接入） | 1 | `/chat-agent/chat` |
+| **chat-agent 会话与问答** | 6 | `/chat-agent/conversations`、`/chat-agent/chat` |
 
 > **v18 命名变更**：招标方相关表统一使用 World Bank 术语"Invitation for Bids"；经办人使用"bid handler"。详见 [database.md §1](database.md#1-表结构总览)。
 
@@ -36,7 +36,7 @@
 
 | Method | Path | 说明 |
 |--------|------|------|
-| POST | `/bid-record/analyze-risk/{id}` | 检查资信批次和文件状态，必要时自动转换；全部完成后汇总 Markdown，同步调用 OpenAI 兼容模型，解析 JSON，落库并返回 `RiskAnalysis` |
+| POST | `/bid-record/analyze-risk/{id}` | 检查资信文件状态，必要时同步重试未完成文件；全部完成后汇总 Markdown，同步调用 OpenAI 兼容模型，解析 JSON，落库并返回 `RiskAnalysis` |
 
 ---
 
@@ -593,9 +593,9 @@ curl -X PATCH http://{host}:{port}/bid-record/1 \
 
 ### 6.8 `POST /bid-record/analyze-risk/{id}`
 
-**同步调用 OpenAI 兼容 LM Studio**。服务端先联查当前投标记录下的所有批次和文件；如果存在未完成批次或文件，
-入口会先调用 `FileConvertService.convertAllBatches`，再重新查询数据库；
-只有重新查询后全部为 `CONVERTED` 才会按 `batch_no`、`file_order` 顺序读取 converted Markdown，合并并写入
+**同步调用 OpenAI 兼容 LM Studio**。服务端先联查当前投标记录下的所有资信文件；如果存在未完成文件，
+入口会先调用 `FileConvertService.convertAll`，再重新查询数据库；
+只有重新查询后全部为 `CONVERTED` 才会按 `file_order`、`file_id` 顺序读取 converted Markdown，合并并写入
 `bid-records/{bidRecordId}/merged/credentials.md`，最后将汇总文本一次性提交给大模型，解析 JSON，落库
 `risk_analysis` 表。若转换后仍未完成，返回 `RISK_ANALYSIS.INPUT_NOT_READY`，不调用大模型。分析开始前会原子抢占
 `bid_record` 的分析状态；同一投标记录已有分析处于执行中时，不会再次调用大模型，返回 HTTP 409 和
@@ -740,10 +740,20 @@ curl "http://{host}:{port}/risk-analysis/by-bid-record/1"
 
 ---
 
-## 8. chat-agent 单轮问答
+## 8. chat-agent 会话与问答
 
-Java 平台通过 Controller 同步代理 Python `chat-agent` 的 `POST /chat`，前端只调用
-Java 端点，不直接连接 Python。当前仅支持单轮问答，不保存会话历史，也不提供流式输出。
+前端只调用 Java，不直接连接 Python。Java 在本地持久化会话、用户/助手消息、标题和幂等
+请求标识，并把 `conversationId` 映射为调用 Python `chat-agent` 的 `thread_id`。单次问答为
+同步 HTTP；当前没有流式输出。所有 `/chat-agent/**` 路由受招标方 Basic 鉴权拦截器保护。
+
+| Method | Path | 请求体 | 用途 |
+|---|---|---|---|
+| POST | `/chat-agent/conversations` | 可选 `{ "title": "..." }` | 创建会话；未传标题时使用“新对话” |
+| GET | `/chat-agent/conversations` | — | 查询当前单用户边界下的会话列表 |
+| GET | `/chat-agent/conversations/{conversationId}/messages` | — | 查询已校验归属的历史消息 |
+| PATCH | `/chat-agent/conversations/{conversationId}/title` | `{ "title": "..." }` | 手动修改标题，并标记为 `MANUAL` |
+| DELETE | `/chat-agent/conversations/{conversationId}` | — | 软删除会话；重复删除幂等返回删除后的视图 |
+| POST | `/chat-agent/chat` | 见下表 | 执行一次带持久化和幂等保护的问答 |
 
 ### 8.1 `POST /chat-agent/chat`
 
@@ -751,31 +761,30 @@ Java 端点，不直接连接 Python。当前仅支持单轮问答，不保存�
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|:---:|------|
+| `conversationId` | String | ✅ | 已创建会话 ID，最多 36 个字符 |
+| `clientMessageId` | String | ✅ | 客户端生成的幂等键；同一会话重复提交同一键会返回已完成结果，最多 64 个字符 |
 | `question` | String | ✅ | 用户问题，不能为空 |
 
-**成功响应**：`Result<ChatResponse>`。
+**成功响应**：`Result<ChatResponse>`，其中 `data` 包含 `conversationId`、`requestId`、
+`clientMessageId`、`answer` 和当前 `title`。
 
 ```json
 {
-  "success": true,
-  "code": "SUCCESS",
-  "message": "知识问答完成",
-  "data": {
-    "answer": "这是 chat-agent 返回的回答。"
-  }
+  "conversationId": "d6c9181e-3f92-47c3-a0d7-7c4d2eec3de4",
+  "clientMessageId": "web-0001",
+  "question": "请概括当前投标项目的资信要求"
 }
 ```
 
-```bash
-curl -X POST http://localhost:8080/chat-agent/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question":"请概括当前投标项目的资信要求"}'
-```
-
 Java 端通过 `chat-agent.python-base-url` 配置 Python 服务基础地址，默认值为
-`http://127.0.0.1:8082`；Java 启动时在 `RestClientConfig` 中构造绑定该地址的单例
-`RestClient`。调用失败或 Python 返回空回答时，统一返回
-`CHAT_AGENT.PYTHON_CALL_FAILED`。
+`http://127.0.0.1:8082`；`ChatAgentConversationService` 使用启动时构造的专用
+`RestClient` 调用 Python。调用失败或 Python 返回空回答时，Java 会把本次消息标记为失败，
+并返回 `CHAT_AGENT.PYTHON_CALL_FAILED`。
+
+文件向量化不再经过 chat-agent。Java 通过 `vector-service.base-url`（默认
+`http://127.0.0.1:8083`）调用 vector-service 完成知识、资信和投标记录的向量写入、
+状态查询与删除；chat-agent 也通过该服务执行检索。该调整不改变本文件列出的公开 HTTP
+路径、请求字段或响应结构。
 
 ## 附录 A：业务错误码速查
 
@@ -791,7 +800,7 @@ Java 端通过 `chat-agent.python-base-url` 配置 Python 服务基础地址，�
 | `CREDENTIAL_FILE.CONVERSION_FAILED` | Python 转换服务调用失败 |
 | `CREDENTIAL_FILE.PERSISTENCE_FAILED` | 资信文件元数据落库失败 |
 | `CHAT_AGENT.PYTHON_CALL_FAILED` | chat-agent Python 服务调用失败或返回空回答 |
-| `RISK_ANALYSIS.INPUT_NOT_READY` | 自动转换后仍有批次或文件未完成 |
+| `RISK_ANALYSIS.INPUT_NOT_READY` | 自动转换后仍有资信文件未完成 |
 | `RISK_ANALYSIS.IN_PROGRESS` | 同一投标记录已有风险分析正在执行 |
 | `RISK_ANALYSIS.LLM_CALL_FAILED` | 大模型服务调用失败 |
 | `RISK_ANALYSIS.INVALID_LLM_RESPONSE` | 大模型返回内容无法解析/校验 |

@@ -9,14 +9,53 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.QueryTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import java.lang.reflect.Method;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class GlobalExceptionHandlerTest {
+
+    @Test
+    void shouldNotWriteJsonAfterAsyncResponseBecomesUnusable()
+            throws NoSuchMethodException {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        Method method = GlobalExceptionHandler.class.getDeclaredMethod(
+                "handleAsyncRequestNotUsable",
+                AsyncRequestNotUsableException.class);
+        ExceptionHandler mapping = method.getAnnotation(ExceptionHandler.class);
+
+        assertNotNull(mapping);
+        assertEquals(void.class, method.getReturnType());
+        assertEquals(AsyncRequestNotUsableException.class, mapping.value()[0]);
+        assertDoesNotThrow(() -> handler.handleAsyncRequestNotUsable(
+                new AsyncRequestNotUsableException(
+                        "response already completed")));
+    }
+
+    @Test
+    void shouldNotWriteJsonAfterSseRequestTimesOut()
+            throws NoSuchMethodException {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        Method method = GlobalExceptionHandler.class.getDeclaredMethod(
+                "handleAsyncRequestTimeout",
+                AsyncRequestTimeoutException.class);
+        ExceptionHandler mapping = method.getAnnotation(ExceptionHandler.class);
+
+        assertNotNull(mapping);
+        assertEquals(void.class, method.getReturnType());
+        assertEquals(AsyncRequestTimeoutException.class, mapping.value()[0]);
+        assertDoesNotThrow(() -> handler.handleAsyncRequestTimeout(
+                new AsyncRequestTimeoutException()));
+    }
 
     @Test
     void shouldReturnClearMessageWhenUploadSizeExceeded() {

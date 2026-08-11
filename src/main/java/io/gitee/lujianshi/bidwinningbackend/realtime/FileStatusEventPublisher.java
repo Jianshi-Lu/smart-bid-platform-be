@@ -59,25 +59,24 @@ public class FileStatusEventPublisher {
             String resourceId,
             String convertStatus,
             String indexStatus) {
-        publish(topic, resourceId, convertStatus, indexStatus, null);
+        publish(topic, resourceId, null, convertStatus, indexStatus);
     }
 
-    /** 发布文件所有可观察的阶段状态。 */
     public void publish(
             String topic,
             String resourceId,
+            String originalStorageStatus,
             String convertStatus,
-            String indexStatus,
-            String originalStorageStatus) {
+            String indexStatus) {
         Set<SseEmitter> topicEmitters = emitters.get(topic);
         if (topicEmitters == null || topicEmitters.isEmpty()) return;
 
         Map<String, Object> data = Map.of(
                 "resourceId", resourceId,
+                "originalStorageStatus", originalStorageStatus == null
+                        ? "" : originalStorageStatus,
                 "convertStatus", convertStatus == null ? "" : convertStatus,
                 "indexStatus", indexStatus == null ? "" : indexStatus,
-                "originalStorageStatus",
-                originalStorageStatus == null ? "" : originalStorageStatus,
                 "occurredAt", Instant.now().toString());
         for (SseEmitter emitter : topicEmitters) {
             try {

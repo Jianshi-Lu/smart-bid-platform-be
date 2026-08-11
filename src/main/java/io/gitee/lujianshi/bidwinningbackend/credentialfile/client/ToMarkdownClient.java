@@ -30,6 +30,7 @@ public class ToMarkdownClient {
 
     private static final MediaType MARKDOWN_MEDIA_TYPE =
             MediaType.parseMediaType("text/markdown");
+    private static final String CONVERSION_PARTIAL_HEADER = "X-Conversion-Partial";
 
     private final RestClient restClient;
 
@@ -122,6 +123,14 @@ public class ToMarkdownClient {
         if (response == null) {
             throw conversionFailure(
                     "PYTHON_RESPONSE", "资信文件转换服务返回为空", null);
+        }
+
+        if ("true".equalsIgnoreCase(
+                response.getHeaders().getFirst(CONVERSION_PARTIAL_HEADER))) {
+            throw conversionFailure(
+                    "PYTHON_PARTIAL_OUTPUT",
+                    "资信文件转换服务检测到不完整或退化的 Markdown 输出",
+                    null);
         }
 
         MediaType contentType = response.getHeaders().getContentType();

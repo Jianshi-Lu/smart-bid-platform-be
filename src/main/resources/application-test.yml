@@ -5,11 +5,47 @@ server:
 custom:
   url: https://baidu.com
 
+credential-file:
+  converter:
+    base-url: http://127.0.0.1:8081
+  storage:
+    type: LOCAL
+    local:
+      root: ${java.io.tmpdir}/smart-bid-platform-be-test/credential-files
+
+knowledge-file:
+  storage:
+    type: LOCAL
+    local:
+      root: ${java.io.tmpdir}/smart-bid-platform-be-test/knowledge-files
+
+chat-agent:
+  python-base-url: http://127.0.0.1:8082
+  user-id: 1
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/chat_agent_test
+    username: test
+    password: test
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+vector-service:
+  base-url: http://127.0.0.1:8083
+
+file-lifecycle:
+  recovery:
+    enabled: false
+
 spring:
   datasource:
-    url: ${MYSQL_URL:jdbc:mysql://192.168.76.177:53306/bid-winning?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
-    username: ${MYSQL_USERNAME}
-    password: ${MYSQL_PASSWORD}
+    url: jdbc:mysql://127.0.0.1:3306/bid_winning_test
+    username: test
+    password: test
+
+  ai:
+    deepseek:
+      api-key: test
+    openai:
+      api-key: test
 
   mail:
     host: smtp.qq.com

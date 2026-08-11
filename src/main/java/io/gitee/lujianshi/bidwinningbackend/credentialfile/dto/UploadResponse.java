@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 /**
  * 资信文件上传响应。
@@ -45,10 +46,15 @@ public class UploadResponse {
 
         private String originalFilePath;
 
-        /** 原始文件对象存储状态：STORING/STORED/FAILED。 */
         private String originalStorageStatus;
 
         private ConvertStatus convertStatus;
+
+        private String indexStatus;
+
+        private Integer chunkCount;
+
+        private LocalDateTime indexedAt;
 
         private String errorMessage;
 

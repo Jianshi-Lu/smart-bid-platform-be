@@ -16,6 +16,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -173,6 +175,28 @@ public class GlobalExceptionHandler {
     }
 
     // ==================== 通用异常与系统兜底 ====================
+
+    /**
+     * 客户端已断开时，Servlet 异步响应已经不可再写入。
+     *
+     * <p>尤其是 SSE 重连、页面切换或浏览器关闭期间，Spring 会将底层写入失败
+     * 转换为该异常。此时不能再尝试输出统一 JSON {@link Result}，否则会在
+     * {@code text/event-stream} 响应上触发二次消息转换异常，掩盖真正的断连原因。</p>
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(
+            AsyncRequestNotUsableException e) {
+        log.debug("异步响应已不可用，跳过错误响应: {}", e.getMessage());
+    }
+
+    /**
+     * SSE 连接超时或应用重启取消异步请求时，响应已是 event-stream，不能再写 JSON。
+     * 前端订阅器会自行重连；此处仅结束异常处理，避免把正常重连记录成系统错误。
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncRequestTimeout(AsyncRequestTimeoutException e) {
+        log.debug("异步响应超时，交由 SSE 客户端重连: {}", e.getMessage());
+    }
 
     /** 处理业务层抛出的通用非法参数异常。 */
     @ExceptionHandler(IllegalArgumentException.class)

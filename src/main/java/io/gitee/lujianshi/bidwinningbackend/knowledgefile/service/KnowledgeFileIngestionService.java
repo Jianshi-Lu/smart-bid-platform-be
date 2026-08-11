@@ -1,5 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.knowledgefile.service;
 
+import io.gitee.lujianshi.bidwinningbackend.config.CurrentAccountContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.ToMarkdownClient;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.KnowledgeFileStorageProperties;
@@ -7,7 +8,6 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRe
 import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.knowledgefile.client.ChatAgentIngestionClient;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.dto.KnowledgeFileUploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.key.DocumentUuidGenerator;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.key.KnowledgeObjectKeyGenerator;
@@ -15,8 +15,9 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpl
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.PreparedKnowledgeDocument;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.StoredKnowledgeObject;
 import io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
+import io.gitee.lujianshi.bidwinningbackend.storage.vector.KnowledgeFileVectorStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.Resource;
@@ -25,10 +26,14 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.context.annotation.Lazy;
 
 import java.io.ByteArrayInputStream;
+import java.security.DigestInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -73,7 +78,7 @@ public class KnowledgeFileIngestionService {
     private final KnowledgeObjectKeyGenerator keyGenerator;
     private final KnowledgeFileObjectService objectService;
     private final ToMarkdownClient toMarkdownClient;
-    private final ChatAgentIngestionClient chatAgentClient;
+    private final KnowledgeFileVectorStorage vectorStorage;
     private final KnowledgeFileMapper knowledgeFileMapper;
     private final KnowledgeFileStorageProperties storageProperties;
 
@@ -93,14 +98,14 @@ public class KnowledgeFileIngestionService {
             KnowledgeObjectKeyGenerator keyGenerator,
             KnowledgeFileObjectService objectService,
             ToMarkdownClient toMarkdownClient,
-            ChatAgentIngestionClient chatAgentClient,
+            KnowledgeFileVectorStorage vectorStorage,
             KnowledgeFileMapper knowledgeFileMapper,
             KnowledgeFileStorageProperties storageProperties) {
         this.uuidGenerator = uuidGenerator;
         this.keyGenerator = keyGenerator;
         this.objectService = objectService;
         this.toMarkdownClient = toMarkdownClient;
-        this.chatAgentClient = chatAgentClient;
+        this.vectorStorage = vectorStorage;
         this.knowledgeFileMapper = knowledgeFileMapper;
         this.storageProperties = storageProperties;
     }
@@ -142,21 +147,28 @@ public class KnowledgeFileIngestionService {
     /**
      * 按失败点重试知识文件：未 CONVERTED 则重转，未 VECTORIZED 则重向量化。
      *
-     * <p>向量化重试前先向 chat-agent 查询当前 chunk 数：向量已存在则直接落库
-     * VECTORIZED，否则重新向量化（chat-agent 对同一 UUID 采用替换语义，不会重复）。</p>
+     * <p>向量化重试始终从已校验的 Markdown 重新执行替换写入。多分片文档不能仅凭
+     * “当前 chunk 数大于 0”判断历史未知结果是否完整。</p>
      *
      * @return 重试后的最新记录（无论成功或失败，状态都会更新）
      */
     public KnowledgeFileRecord retry(String documentUuid) {
         KnowledgeFileRecord record = loadActive(documentUuid);
+        String stage = STAGE_CONVERT;
         try {
             if (!ST_CONVERTED.equals(record.getConvertStatus())) {
                 markConverting(documentUuid);
                 KnowledgeFileRecord beforeConvert =
                         knowledgeFileMapper.selectByDocumentUuid(documentUuid);
                 PreparedKnowledgeDocument prepared = convertFromRecord(record);
-                markConverted(documentUuid, prepared);
-                operationHistoryService.recordKnowledgeFile(
+                try {
+                    markConverted(documentUuid, prepared);
+                } catch (RuntimeException failure) {
+                    cleanupUncommittedConvertedObject(
+                            documentUuid, prepared, failure);
+                    throw failure;
+                }
+                recordHistorySafely(
                         documentUuid,
                         OperationType.UPDATE,
                         beforeConvert,
@@ -166,39 +178,133 @@ public class KnowledgeFileIngestionService {
             }
 
             if (record != null && !ST_VECTORIZED.equals(record.getIndexStatus())) {
-                Integer existingChunkCount =
-                        chatAgentClient.getVectorStatus(documentUuid);
-                if (existingChunkCount != null && existingChunkCount > 0) {
-                    markVectorizing(documentUuid);
-                    markVectorized(documentUuid, existingChunkCount);
-                    operationHistoryService.recordKnowledgeFile(
-                            documentUuid,
-                            OperationType.UPDATE,
-                            record,
-                            knowledgeFileMapper.selectByDocumentUuid(documentUuid),
-                            "向量已存在，直接对账落库");
-                } else {
-                    PreparedKnowledgeDocument prepared =
-                            preparedFromRecord(record);
-                    markVectorizing(documentUuid);
-                    int chunkCount = chatAgentClient.vectorizeDocument(prepared);
-                    markVectorized(documentUuid, chunkCount);
-                    operationHistoryService.recordKnowledgeFile(
-                            documentUuid,
-                            OperationType.UPDATE,
-                            record,
-                            knowledgeFileMapper.selectByDocumentUuid(documentUuid),
-                            null);
-                }
+                stage = STAGE_VECTORIZE;
+                PreparedKnowledgeDocument prepared =
+                        preparedFromRecord(record);
+                markVectorizing(documentUuid);
+                int chunkCount = vectorStorage.vectorizeDocument(prepared);
+                markVectorized(documentUuid, chunkCount);
+                recordHistorySafely(
+                        documentUuid,
+                        OperationType.UPDATE,
+                        record,
+                        knowledgeFileMapper.selectByDocumentUuid(documentUuid),
+                        null);
             }
             return knowledgeFileMapper.selectByDocumentUuid(documentUuid);
         } catch (AppException failure) {
-            markRetryFailure(documentUuid, failure);
+            markRetryFailure(documentUuid, failure, stage);
             return knowledgeFileMapper.selectByDocumentUuid(documentUuid);
         } catch (RuntimeException failure) {
-            markRetryFailure(documentUuid, failure);
+            markRetryFailure(documentUuid, failure, stage);
             return knowledgeFileMapper.selectByDocumentUuid(documentUuid);
         }
+    }
+
+    /**
+     * JVM 重启后的知识文件对账入口：续删、清理未提交对象、恢复处理中断并校验 Chroma。
+     */
+    public void reconcileLifecycle(KnowledgeFileRecord snapshot) {
+        if (snapshot == null || snapshot.getDocumentUuid() == null
+                || snapshot.getDocumentUuid().isBlank()) {
+            return;
+        }
+        String documentUuid = snapshot.getDocumentUuid();
+        if (snapshot.getDeletedAt() != null
+                && DELETION_DELETED.equals(snapshot.getDeletionStatus())) {
+            return;
+        }
+        if (snapshot.getDeletedAt() != null
+                || snapshot.getDeletionStatus() != null) {
+            if ("DELETING".equals(snapshot.getDeletionStatus())) {
+                knowledgeFileMapper.resetInterruptedDeletion(documentUuid);
+            }
+            delete(documentUuid);
+            return;
+        }
+
+        if ("STORING".equals(snapshot.getOriginalStorageStatus())
+                || "FAILED".equals(snapshot.getOriginalStorageStatus())) {
+            RuntimeException cleanupFailure = null;
+            try {
+                vectorStorage.deleteDocument(documentUuid);
+                deleteObjectIfUnreferenced(
+                        snapshot.getMarkdownFilePath(),
+                        documentUuid,
+                        "RECOVER_DELETE_CONVERTED",
+                        true);
+                deleteObjectIfUnreferenced(
+                        snapshot.getOriginalFilePath(),
+                        documentUuid,
+                        "RECOVER_DELETE_ORIGINAL",
+                        false);
+            } catch (RuntimeException failure) {
+                cleanupFailure = failure;
+            }
+            if ("STORING".equals(snapshot.getOriginalStorageStatus())) {
+                knowledgeFileMapper.markInterruptedProcessingFailed(
+                        documentUuid, "后端进程重启，未提交上传已清理");
+                publishStatus(documentUuid);
+            }
+            if (cleanupFailure != null) {
+                throw cleanupFailure;
+            }
+            return;
+        }
+
+        boolean interrupted = ST_CONVERTING.equals(snapshot.getConvertStatus())
+                || ST_VECTORIZING.equals(snapshot.getIndexStatus());
+        if (interrupted) {
+            RuntimeException cleanupFailure = null;
+            try {
+                vectorStorage.deleteDocument(documentUuid);
+                deleteObjectIfUnreferenced(
+                        snapshot.getMarkdownFilePath(),
+                        documentUuid,
+                        "RECOVER_DELETE_CONVERTED",
+                        true);
+            } catch (RuntimeException failure) {
+                cleanupFailure = failure;
+            }
+            knowledgeFileMapper.markInterruptedProcessingFailed(
+                    documentUuid, "后端进程重启，自动恢复文件处理");
+            if (cleanupFailure != null) {
+                throw cleanupFailure;
+            }
+            snapshot = knowledgeFileMapper.selectByDocumentUuid(documentUuid);
+        }
+
+        if (snapshot == null || snapshot.getDeletedAt() != null
+                || snapshot.getDeletionStatus() != null) {
+            return;
+        }
+        if (ST_CONVERTED.equals(snapshot.getConvertStatus())) {
+            int actualCount = vectorStorage.getVectorStatus(documentUuid);
+            Integer expectedCount = snapshot.getChunkCount();
+            if (ST_VECTORIZED.equals(snapshot.getIndexStatus())
+                    && expectedCount != null && expectedCount > 0
+                    && actualCount == expectedCount) {
+                return;
+            }
+            vectorStorage.deleteDocument(documentUuid);
+            if (knowledgeFileMapper.markIndexInconsistent(
+                    documentUuid,
+                    "数据库与 Chroma chunk 数不一致，自动重建") != 1) {
+                throw persistenceFailure(
+                        "MARK_INDEX_INCONSISTENT",
+                        "知识文件无法进入索引重建状态");
+            }
+            retry(documentUuid);
+            return;
+        }
+
+        // 历史转换失败可能已预留 converted key；重试前先幂等清理。
+        deleteObjectIfUnreferenced(
+                snapshot.getMarkdownFilePath(),
+                documentUuid,
+                "RECOVER_DELETE_CONVERTED",
+                true);
+        retry(documentUuid);
     }
 
     /**
@@ -245,19 +351,21 @@ public class KnowledgeFileIngestionService {
 
         try {
             try {
-                chatAgentClient.deleteDocument(documentUuid);
+                vectorStorage.deleteDocument(documentUuid);
             } catch (AppException failure) {
                 throw deleteFailure(
                         "DELETE_VECTORS", "知识文件向量删除失败", failure);
             }
-            deleteObject(
+            deleteObjectIfUnreferenced(
                     record.getOriginalFilePath(),
                     documentUuid,
-                    "DELETE_OBJECT_ORIGINAL");
-            deleteObject(
+                    "DELETE_OBJECT_ORIGINAL",
+                    false);
+            deleteObjectIfUnreferenced(
                     record.getMarkdownFilePath(),
                     documentUuid,
-                    "DELETE_OBJECT_CONVERTED");
+                    "DELETE_OBJECT_CONVERTED",
+                    true);
             int rows = knowledgeFileMapper.markDeleted(documentUuid, startedAt);
             if (rows != 1) {
                 throw deleteFailure(
@@ -300,13 +408,49 @@ public class KnowledgeFileIngestionService {
             KnowledgeFileUpload upload,
             String username) {
         String documentUuid = uuidGenerator.generate().toString();
-        insertRecord(documentUuid, upload);
+        KnowledgeObjectKeyGenerator.OriginalObjectKey originalKey;
+        try {
+            originalKey = keyGenerator.original(
+                    username,
+                    UUID.fromString(documentUuid),
+                    upload.originalFilename());
+        } catch (IllegalArgumentException failure) {
+            insertRecord(documentUuid, upload, "");
+            return markIngestFailure(
+                    documentUuid,
+                    new AppException(
+                            AppErrorCode.KNOWLEDGE_FILE_INVALID_FILE,
+                            "knowledge-file",
+                            "INGEST",
+                            "BUILD_ORIGINAL_KEY",
+                            "知识文件名不合法",
+                            failure),
+                    STAGE_UPLOAD);
+        }
+        insertRecord(documentUuid, upload, originalKey.objectKey());
 
         String stage = STAGE_UPLOAD;
+        OriginalFile original;
         try {
-            OriginalFile original = storeOriginal(documentUuid, upload, username);
+            original = storeOriginal(documentUuid, upload, originalKey);
+        } catch (AppException failure) {
+            return markIngestFailure(documentUuid, failure, stage);
+        } catch (RuntimeException failure) {
+            return markIngestFailure(documentUuid, failure, stage);
+        }
+
+        try {
             updateOriginalMetadata(documentUuid, original);
-            operationHistoryService.recordKnowledgeFile(
+        } catch (AppException failure) {
+            cleanupUncommittedOriginalObject(documentUuid, original, failure);
+            return markIngestFailure(documentUuid, failure, stage);
+        } catch (RuntimeException failure) {
+            cleanupUncommittedOriginalObject(documentUuid, original, failure);
+            return markIngestFailure(documentUuid, failure, stage);
+        }
+
+        try {
+            recordHistorySafely(
                     documentUuid,
                     OperationType.CREATE,
                     null,
@@ -315,10 +459,11 @@ public class KnowledgeFileIngestionService {
             publishStatus(documentUuid);
             // 单元测试直接构造 Service 时没有 Spring 代理，回退为同步执行；
             // 正式运行由 self 代理触发 @Async。
+            CurrentAccountContext.CurrentAccount operator = CurrentAccountContext.get();
             if (self == null) {
-                processStoredFileAsync(documentUuid);
+                processStoredFileAsync(documentUuid, operator);
             } else {
-                self.processStoredFileAsync(documentUuid);
+                self.processStoredFileAsync(documentUuid, operator);
             }
             return toQueuedResponse(
                     knowledgeFileMapper.selectByDocumentUuid(documentUuid));
@@ -329,9 +474,34 @@ public class KnowledgeFileIngestionService {
         }
     }
 
-    /** 原始对象成功落库后，在后台完成转换和向量化，不阻塞上传请求。 */
+    /**
+     * 原始对象成功落库后，在后台完成转换和向量化，不阻塞上传请求。
+     *
+     * <p>操作人上下文是请求线程的 ThreadLocal；调度时显式传入快照，只在此后台任务运行期
+     * 恢复，避免操作历史落库时失去上传人的账号归属。</p>
+     */
     @Async("fileProcessingExecutor")
-    public void processStoredFileAsync(String documentUuid) {
+    public void processStoredFileAsync(
+            String documentUuid,
+            CurrentAccountContext.CurrentAccount operator) {
+        CurrentAccountContext.CurrentAccount previous = CurrentAccountContext.get();
+        try {
+            if (operator == null) {
+                CurrentAccountContext.clear();
+            } else {
+                CurrentAccountContext.set(operator);
+            }
+            processStoredFile(documentUuid);
+        } finally {
+            if (previous == null) {
+                CurrentAccountContext.clear();
+            } else {
+                CurrentAccountContext.set(previous);
+            }
+        }
+    }
+
+    private void processStoredFile(String documentUuid) {
         String stage = STAGE_CONVERT;
         try {
             KnowledgeFileRecord record = loadActive(documentUuid);
@@ -339,8 +509,14 @@ public class KnowledgeFileIngestionService {
             KnowledgeFileRecord beforeConvert =
                     knowledgeFileMapper.selectByDocumentUuid(documentUuid);
             PreparedKnowledgeDocument prepared = convertFromRecord(record);
-            markConverted(documentUuid, prepared);
-            operationHistoryService.recordKnowledgeFile(
+            try {
+                markConverted(documentUuid, prepared);
+            } catch (RuntimeException failure) {
+                cleanupUncommittedConvertedObject(
+                        documentUuid, prepared, failure);
+                throw failure;
+            }
+            recordHistorySafely(
                     documentUuid,
                     OperationType.UPDATE,
                     beforeConvert,
@@ -351,41 +527,29 @@ public class KnowledgeFileIngestionService {
             markVectorizing(documentUuid);
             KnowledgeFileRecord beforeIndex =
                     knowledgeFileMapper.selectByDocumentUuid(documentUuid);
-            int chunkCount = chatAgentClient.vectorizeDocument(prepared);
+            int chunkCount = vectorStorage.vectorizeDocument(prepared);
             markVectorized(documentUuid, chunkCount);
-            operationHistoryService.recordKnowledgeFile(
+            recordHistorySafely(
                     documentUuid,
                     OperationType.UPDATE,
                     beforeIndex,
                     knowledgeFileMapper.selectByDocumentUuid(documentUuid),
                     null);
         } catch (AppException failure) {
-            markIngestFailure(documentUuid, failure, stage);
+            if (!hasDeletionStarted(documentUuid)) {
+                markIngestFailure(documentUuid, failure, stage);
+            }
         } catch (RuntimeException failure) {
-            markIngestFailure(documentUuid, failure, stage);
+            if (!hasDeletionStarted(documentUuid)) {
+                markIngestFailure(documentUuid, failure, stage);
+            }
         }
     }
 
     private OriginalFile storeOriginal(
             String documentUuid,
             KnowledgeFileUpload upload,
-            String username) {
-        KnowledgeObjectKeyGenerator.OriginalObjectKey key;
-        try {
-            key = keyGenerator.original(
-                    username,
-                    UUID.fromString(documentUuid),
-                    upload.originalFilename());
-        } catch (IllegalArgumentException failure) {
-            throw new AppException(
-                    AppErrorCode.KNOWLEDGE_FILE_INVALID_FILE,
-                    "knowledge-file",
-                    "INGEST",
-                    "BUILD_ORIGINAL_KEY",
-                    "知识文件名不合法",
-                    failure);
-        }
-
+            KnowledgeObjectKeyGenerator.OriginalObjectKey key) {
         try {
             StoredKnowledgeObject stored = objectService.storeAndVerify(
                     key.objectKey(),
@@ -411,15 +575,13 @@ public class KnowledgeFileIngestionService {
             OriginalFile originalFile,
             String username) {
         PythonMarkdownResponse response;
-        try (InputStream input = objectService.open(
-                originalFile.storedObject())) {
-            response = toMarkdownClient.convert(
-                    input,
+        try {
+            response = requestVerifiedMarkdown(
+                    originalFile.storedObject(),
                     originalFile.safeOriginalFilename(),
                     originalFile.upload().contentType(),
-                    originalFile.storedObject().fileSize());
-        } catch (IOException failure) {
-            throw storageFailure("READ_ORIGINAL", "原始知识文件读取失败", failure);
+                    originalFile.storedObject().fileSize(),
+                    "INGEST");
         } catch (AppException failure) {
             throw new AppException(
                     AppErrorCode.KNOWLEDGE_FILE_CONVERSION_FAILED,
@@ -433,8 +595,14 @@ public class KnowledgeFileIngestionService {
 
         String convertedKey = keyGenerator.converted(
                 username,
+                UUID.fromString(documentUuid),
                 originalFile.safeOriginalFilename(),
                 response.filename());
+        requireRow(
+                knowledgeFileMapper.reserveMarkdownPath(
+                        documentUuid, convertedKey),
+                "RESERVE_MARKDOWN_PATH",
+                "知识文件 Markdown 路径预留失败");
         try {
             StoredKnowledgeObject converted = objectService.storeAndVerify(
                     convertedKey,
@@ -468,14 +636,13 @@ public class KnowledgeFileIngestionService {
                 record.getOriginalSha256(),
                 null);
         PythonMarkdownResponse response;
-        try (InputStream input = objectService.open(original)) {
-            response = toMarkdownClient.convert(
-                    input,
+        try {
+            response = requestVerifiedMarkdown(
+                    original,
                     record.getOriginalFilename(),
                     record.getContentType(),
-                    record.getFileSize() == null ? 0 : record.getFileSize());
-        } catch (IOException failure) {
-            throw storageFailure("READ_ORIGINAL", "知识文件原始内容读取失败", failure);
+                    record.getFileSize() == null ? 0 : record.getFileSize(),
+                    "RETRY");
         } catch (AppException failure) {
             throw new AppException(
                     AppErrorCode.KNOWLEDGE_FILE_CONVERSION_FAILED,
@@ -489,8 +656,14 @@ public class KnowledgeFileIngestionService {
 
         String convertedKey = keyGenerator.converted(
                 username,
+                UUID.fromString(record.getDocumentUuid()),
                 safeFilenameFromStored(storedFilename(record.getOriginalFilePath())),
                 response.filename());
+        requireRow(
+                knowledgeFileMapper.reserveMarkdownPath(
+                        record.getDocumentUuid(), convertedKey),
+                "RESERVE_MARKDOWN_PATH",
+                "知识文件 Markdown 路径预留失败");
         try {
             StoredKnowledgeObject converted = objectService.storeAndVerify(
                     convertedKey,
@@ -527,6 +700,12 @@ public class KnowledgeFileIngestionService {
         } catch (IOException failure) {
             throw storageFailure("READ_CONVERTED", "知识文件 Markdown 读取失败", failure);
         }
+        verifyObjectSha256(
+                record.getConvertedSha256(),
+                markdown,
+                "RETRY",
+                "VERIFY_CONVERTED",
+                "知识文件 Markdown 完整性校验失败");
         return new PreparedKnowledgeDocument(
                 record.getDocumentUuid(),
                 record.getOriginalFilename(),
@@ -539,14 +718,17 @@ public class KnowledgeFileIngestionService {
 
     // ==================== 数据库状态推进 ====================
 
-    private void insertRecord(String documentUuid, KnowledgeFileUpload upload) {
+    private void insertRecord(
+            String documentUuid,
+            KnowledgeFileUpload upload,
+            String reservedOriginalObjectKey) {
         KnowledgeFileRecord record = new KnowledgeFileRecord();
         record.setDocumentUuid(documentUuid);
         record.setOriginalFilename(upload.originalFilename());
         record.setContentType(upload.contentType());
         record.setFileSize(upload.fileSize());
         record.setStorageType(storageProperties.getType().name());
-        record.setOriginalFilePath("");
+        record.setOriginalFilePath(reservedOriginalObjectKey);
         record.setOriginalStorageStatus("STORING");
         record.setConvertStatus("UPLOADED");
         record.setIndexStatus("PENDING");
@@ -618,8 +800,18 @@ public class KnowledgeFileIngestionService {
             Throwable failure,
             String stage) {
         String message = toErrorMessage(failure);
+        if (hasDeletionStarted(documentUuid)) {
+            KnowledgeFileRecord deleting =
+                    knowledgeFileMapper.selectByDocumentUuid(documentUuid);
+            return toFailureResponse(
+                    deleting, documentUuid, "知识文件正在删除或等待删除重试");
+        }
         try {
-            if (STAGE_UPLOAD.equals(stage)) {
+            KnowledgeFileRecord current =
+                    knowledgeFileMapper.selectByDocumentUuid(documentUuid);
+            if (STAGE_UPLOAD.equals(stage)
+                    && (current == null
+                    || !"STORED".equals(current.getOriginalStorageStatus()))) {
                 knowledgeFileMapper.markOriginalStorageFailed(documentUuid, message);
             } else if (STAGE_VECTORIZE.equals(stage)) {
                 knowledgeFileMapper.markVectorizeFailed(documentUuid, message);
@@ -634,7 +826,7 @@ public class KnowledgeFileIngestionService {
         }
         KnowledgeFileRecord record =
                 knowledgeFileMapper.selectByDocumentUuid(documentUuid);
-        operationHistoryService.recordKnowledgeFile(
+        recordHistorySafely(
                 documentUuid,
                 OperationType.UPDATE,
                 null,
@@ -646,15 +838,11 @@ public class KnowledgeFileIngestionService {
 
     private void markRetryFailure(
             String documentUuid,
-            Throwable failure) {
-        KnowledgeFileRecord record =
-                knowledgeFileMapper.selectByDocumentUuid(documentUuid);
-        String stage = record == null ? STAGE_UNKNOWN
-                : ST_CONVERTING.equals(record.getConvertStatus())
-                ? STAGE_CONVERT
-                : ST_VECTORIZING.equals(record.getIndexStatus())
-                ? STAGE_VECTORIZE
-                : STAGE_UNKNOWN;
+            Throwable failure,
+            String stage) {
+        if (hasDeletionStarted(documentUuid)) {
+            return;
+        }
         String message = toErrorMessage(failure);
         try {
             if (STAGE_VECTORIZE.equals(stage)) {
@@ -668,13 +856,107 @@ public class KnowledgeFileIngestionService {
                     documentUuid,
                     persistenceFailure);
         }
-        operationHistoryService.recordKnowledgeFile(
+        recordHistorySafely(
                 documentUuid,
                 OperationType.UPDATE,
                 null,
                 knowledgeFileMapper.selectByDocumentUuid(documentUuid),
                 message);
         publishStatus(documentUuid);
+    }
+
+    /**
+     * 从对象存储读取原件、发送给转换服务，并在流消费完成后校验数据库保存的 SHA-256。
+     *
+     * <p>初次存储的回读校验只能证明“写入当时”一致；重试会再次从 MinIO/本地存储读取，
+     * 因此必须在接受转换结果、写 Markdown 和推进状态前确认本次读取的原始内容仍然对应
+     * 文件记录。</p>
+     */
+    private PythonMarkdownResponse requestVerifiedMarkdown(
+            StoredKnowledgeObject original,
+            String filename,
+            String contentType,
+            long contentLength,
+            String operation) {
+        MessageDigest digest = createSha256Digest();
+        PythonMarkdownResponse response;
+        try (InputStream input = objectService.open(original);
+             DigestInputStream verifiedInput = new DigestInputStream(input, digest)) {
+            response = toMarkdownClient.convert(
+                    verifiedInput, filename, contentType, contentLength);
+        } catch (IOException failure) {
+            throw storageFailure("READ_ORIGINAL", "知识文件原始内容读取失败", failure);
+        }
+        verifyObjectSha256(
+                original.sha256(),
+                HexFormat.of().formatHex(digest.digest()),
+                operation,
+                "VERIFY_ORIGINAL",
+                "知识文件原始内容完整性校验失败");
+        return response;
+    }
+
+    private void verifyObjectSha256(
+            String expectedSha256,
+            byte[] content,
+            String operation,
+            String stage,
+            String message) {
+        verifyObjectSha256(
+                expectedSha256,
+                HexFormat.of().formatHex(createSha256Digest().digest(content)),
+                operation,
+                stage,
+                message);
+    }
+
+    private void verifyObjectSha256(
+            String expectedSha256,
+            String actualSha256,
+            String operation,
+            String stage,
+            String message) {
+        if (expectedSha256 == null
+                || !expectedSha256.matches("(?i)[0-9a-f]{64}")
+                || !expectedSha256.equalsIgnoreCase(actualSha256)) {
+            throw new AppException(
+                    AppErrorCode.KNOWLEDGE_FILE_INTEGRITY_CHECK_FAILED,
+                    "knowledge-file",
+                    operation,
+                    stage,
+                    message);
+        }
+    }
+
+    private MessageDigest createSha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("当前 Java 运行时不支持 SHA-256", failure);
+        }
+    }
+
+    /**
+     * 操作历史用于审计，不是转换或向量化事实状态的一部分。状态已成功落库后，
+     * 历史表异常只能记录日志，不能把 CONVERTED/VECTORIZED 反向改写为 FAILED。
+     */
+    private void recordHistorySafely(
+            String documentUuid,
+            OperationType operation,
+            KnowledgeFileRecord before,
+            KnowledgeFileRecord after,
+            String remark) {
+        try {
+            operationHistoryService.recordKnowledgeFile(
+                    documentUuid, operation, before, after, remark);
+        } catch (RuntimeException historyFailure) {
+            log.error(
+                    "知识文件状态已落库，但操作历史写入失败: documentUuid={}, "
+                            + "operation={}",
+                    documentUuid,
+                    operation,
+                    historyFailure);
+        }
     }
 
     private void publishStatus(String documentUuid) {
@@ -685,9 +967,9 @@ public class KnowledgeFileIngestionService {
         fileStatusEventPublisher.publish(
                 FileStatusEventPublisher.KNOWLEDGE_TOPIC,
                 latest.getDocumentUuid(),
+                latest.getOriginalStorageStatus(),
                 latest.getConvertStatus(),
-                latest.getIndexStatus(),
-                latest.getOriginalStorageStatus());
+                latest.getIndexStatus());
     }
 
     private KnowledgeFileUploadResponse.Document toQueuedResponse(
@@ -753,6 +1035,109 @@ public class KnowledgeFileIngestionService {
         return record;
     }
 
+    /** 删除已开始后，后台任务不得再推进文件状态或写入派生对象。 */
+    private boolean hasDeletionStarted(String documentUuid) {
+        KnowledgeFileRecord latest =
+                knowledgeFileMapper.selectByDocumentUuidIncludingDeleted(documentUuid);
+        return latest != null && latest.getDeletionStatus() != null;
+    }
+
+    /**
+     * 兼容旧版本的同 key 数据：仍有其他 active 记录引用时不删除该对象。
+     */
+    private void deleteObjectIfUnreferenced(
+            String objectKey,
+            String documentUuid,
+            String stage,
+            boolean converted) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+        int references = converted
+                ? knowledgeFileMapper.countActiveByMarkdownFilePathExcluding(
+                        objectKey, documentUuid)
+                : knowledgeFileMapper.countActiveByOriginalFilePathExcluding(
+                        objectKey, documentUuid);
+        if (references > 0) {
+            log.warn(
+                    "保留仍被其他 active 知识文件引用的历史对象: documentUuid={}, path={}, references={}",
+                    documentUuid,
+                    objectKey,
+                    references);
+            return;
+        }
+        deleteObject(objectKey, documentUuid, stage);
+    }
+
+    /**
+     * 原始对象已成功写入但数据库元数据尚未成功回填时，立即尝试删除，避免对象脱离记录。
+     */
+    private void cleanupUncommittedOriginalObject(
+            String documentUuid,
+            OriginalFile original,
+            RuntimeException originalFailure) {
+        if (original == null || original.storedObject() == null
+                || original.storedObject().objectKey() == null
+                || original.storedObject().objectKey().isBlank()) {
+            return;
+        }
+        String objectKey = original.storedObject().objectKey();
+        int references = knowledgeFileMapper.countActiveByOriginalFilePathExcluding(
+                objectKey, documentUuid);
+        if (references > 0) {
+            log.warn(
+                    "保留仍被其他 active 知识文件引用的未提交 original 对象: documentUuid={}, path={}, references={}",
+                    documentUuid,
+                    objectKey,
+                    references);
+            return;
+        }
+        try {
+            objectService.delete(objectKey);
+        } catch (IOException | RuntimeException cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
+            log.error(
+                    "知识文件原始对象元数据回填失败后的补偿删除失败: documentUuid={}, path={}",
+                    documentUuid,
+                    objectKey,
+                    cleanupFailure);
+        }
+    }
+
+    /**
+     * converted 对象已校验写入而状态回填失败时，删除尚未被任何 active 记录引用的对象。
+     */
+    private void cleanupUncommittedConvertedObject(
+            String documentUuid,
+            PreparedKnowledgeDocument prepared,
+            RuntimeException originalFailure) {
+        if (prepared == null || prepared.convertedObjectKey() == null
+                || prepared.convertedObjectKey().isBlank()) {
+            return;
+        }
+        String objectKey = prepared.convertedObjectKey();
+        int references = knowledgeFileMapper.countActiveByMarkdownFilePathExcluding(
+                objectKey, documentUuid);
+        if (references > 0) {
+            log.warn(
+                    "保留仍被其他 active 知识文件引用的未提交 Markdown: documentUuid={}, path={}, references={}",
+                    documentUuid,
+                    objectKey,
+                    references);
+            return;
+        }
+        try {
+            objectService.delete(objectKey);
+        } catch (IOException | RuntimeException cleanupFailure) {
+            originalFailure.addSuppressed(cleanupFailure);
+            log.error(
+                    "知识文件 Markdown 状态回填失败后的补偿删除失败: documentUuid={}, path={}",
+                    documentUuid,
+                    objectKey,
+                    cleanupFailure);
+        }
+    }
+
     private void deleteObject(
             String objectKey,
             String documentUuid,
@@ -807,7 +1192,7 @@ public class KnowledgeFileIngestionService {
                 "knowledge-file",
                 "DELETE",
                 "IN_PROGRESS",
-                "知识文件正在删除中，请稍后重试");
+                "知识文件正在处理或删除中，请稍后重试");
     }
 
     private void validateUploads(List<KnowledgeFileUpload> uploads) {

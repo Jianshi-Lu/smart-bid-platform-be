@@ -1,9 +1,5 @@
 package io.gitee.lujianshi.bidwinningbackend.controller.bidder;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.UploadResponse;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.FileUploadService;
 import io.gitee.lujianshi.bidwinningbackend.config.CurrentAccountContext;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.AddRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidrecord.UpdateRequest;
@@ -13,13 +9,12 @@ import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
-import io.gitee.lujianshi.bidwinningbackend.service.BidderAccountService;
-import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordLifecycleService;
+import io.gitee.lujianshi.bidwinningbackend.service.account.BidderAccountService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,10 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -52,13 +44,10 @@ public class BidRecordController {
     private BidRecordService bidRecordService;
 
     @Resource
-    private FileUploadService fileUploadService;
+    private BidRecordLifecycleService bidRecordLifecycleService;
 
     @Resource
     private BidderAccountService bidderAccountService;
-
-    @Resource
-    private FileStatusEventPublisher fileStatusEventPublisher;
 
     /** 当前账号的投标记录列表（按 bidAt 倒序）。 */
     @GetMapping
@@ -87,9 +76,9 @@ public class BidRecordController {
             entity.setBidderAccountId(account.getBidderAccountId());
             entity.setQuotePrice(request.getQuotePrice());
             entity.setBidderContact(request.getBidderContact());
-            entity.setCredentials(request.getCredentials());
-            bidRecordService.add(entity);
-            return Result.success(entity, "投标成功");
+            // credentials 是 credential_file 转换链路维护的派生投影，忽略客户端值。
+            return Result.success(
+                    bidRecordLifecycleService.create(entity), "投标成功");
         } finally {
             CurrentAccountContext.clear();
         }
@@ -128,18 +117,20 @@ public class BidRecordController {
             after.setQuotePrice(request.getQuotePrice());
             after.setBidderContact(request.getBidderContact());
             // 投标方不能改 credentials / invitationId / bidNo / bidAt / 账号归属。
-            int rows = bidRecordService.update(after);
-            if (rows == 0) {
-                throw bidRecordNotFound(id);
-            }
+            BidRecord updated = bidRecordLifecycleService.update(after);
             return Result.success(
-                    new Diff<>(before, bidRecordService.getById(id)), "修改成功");
+                    new Diff<>(before, updated), "修改成功");
         } finally {
             CurrentAccountContext.clear();
         }
     }
 
-    /** 删除自己的投标记录（物理删除，不级联资信文件）。 */
+    /**
+     * 删除自己的投标记录。
+     *
+     * <p>先同步删除资信文件的对象存储、软删记录与汇总 Markdown，再物理删除父记录；
+     * 子链路任何一步失败时父记录保留，用户可重试，不会形成失去归属的资信文件。</p>
+     */
     @DeleteMapping("/{id}")
     public Result<Void> delete(
             @PathVariable Integer id,
@@ -151,92 +142,11 @@ public class BidRecordController {
                 account.getUsername()));
         try {
             requireOwned(account, id);
-            int rows = bidRecordService.delete(id);
-            if (rows == 0) {
-                throw bidRecordNotFound(id);
-            }
+            bidRecordLifecycleService.delete(id, account.getUsername());
             return Result.success(null, "删除成功");
         } finally {
             CurrentAccountContext.clear();
         }
-    }
-
-    /** 向自己的投标记录上传资信材料。 */
-    @PostMapping(value = "/{id}/credential-files",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<UploadResponse> uploadCredentialFiles(
-            @PathVariable Integer id,
-            @RequestParam("files") List<MultipartFile> files,
-            @RequestParam("username") String username,
-            HttpServletRequest request) {
-        BidderAccount account = currentAccount(request);
-        if (username == null || !username.equals(account.getUsername())) {
-            throw new AppException(
-                    AppErrorCode.COMMON_INVALID_ARGUMENT,
-                    "bidder",
-                    "UPLOAD_CREDENTIAL_FILES",
-                    "VERIFY_USERNAME",
-                    "上传账号与当前登录账号不一致");
-        }
-        CurrentAccountContext.set(new CurrentAccountContext.CurrentAccount(
-                CurrentAccountContext.BIDDER,
-                account.getBidderAccountId(),
-                account.getUsername()));
-        try {
-            requireOwned(account, id);
-            return Result.success(
-                    fileUploadService.upload(
-                            id,
-                            account.getBidderAccountId(),
-                            account.getUsername(),
-                            toUploadItems(files)),
-                    "上传成功");
-        } finally {
-            CurrentAccountContext.clear();
-        }
-    }
-
-    /** 删除自己的投标记录下的一个资信文件（连同存储对象与 Markdown 投影）。 */
-    @DeleteMapping("/{id}/credential-files/{fileId}")
-    public Result<Void> deleteCredentialFile(
-            @PathVariable Integer id,
-            @PathVariable Long fileId,
-            HttpServletRequest request) {
-        BidderAccount account = currentAccount(request);
-        CurrentAccountContext.set(new CurrentAccountContext.CurrentAccount(
-                CurrentAccountContext.BIDDER,
-                account.getBidderAccountId(),
-                account.getUsername()));
-        try {
-            requireOwned(account, id);
-            fileUploadService.delete(id, fileId);
-            return Result.success(null, "删除成功");
-        } finally {
-            CurrentAccountContext.clear();
-        }
-    }
-
-    /** 查询自己的投标记录下的全部资信文件（含转换状态，已删除文件不可见）。 */
-    @GetMapping("/{id}/credential-files")
-    public Result<List<CredentialFile>> listCredentialFiles(
-            @PathVariable Integer id,
-            HttpServletRequest request) {
-        authenticate(request, id);
-        return Result.success(
-                fileUploadService.listByBidRecordId(id), "查询成功");
-    }
-
-    /** 订阅自己的投标记录下资信文件转换状态变化。 */
-    @GetMapping(
-            value = "/{id}/credential-files/events",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter credentialFileEvents(
-            @PathVariable Integer id,
-            HttpServletRequest request) {
-        BidderAccount account = currentAccount(request);
-        requireOwned(account, id);
-        return fileStatusEventPublisher.subscribe(
-                FileStatusEventPublisher.CREDENTIAL_TOPIC_PREFIX + id);
     }
 
     private BidderAccount currentAccount(HttpServletRequest request) {
@@ -288,34 +198,4 @@ public class BidRecordController {
                 "投标记录不存在: " + bidRecordId);
     }
 
-    private List<UploadItem> toUploadItems(List<MultipartFile> files) {
-        if (files == null || files.isEmpty()) {
-            throw invalidUpload("上传资信文件不能为空");
-        }
-        return files.stream()
-                .map(file -> {
-                    if (file == null) {
-                        throw invalidUpload("上传文件不能为空");
-                    }
-                    try {
-                        return new UploadItem(
-                                file.getOriginalFilename(),
-                                file.getContentType(),
-                                file.getSize(),
-                                file::getInputStream);
-                    } catch (IllegalArgumentException e) {
-                        throw invalidUpload("上传文件不合法");
-                    }
-                })
-                .toList();
-    }
-
-    private AppException invalidUpload(String message) {
-        return new AppException(
-                AppErrorCode.CREDENTIAL_FILE_INVALID_UPLOAD_REQUEST,
-                "credential-file",
-                "UPLOAD",
-                "VALIDATE_REQUEST",
-                message);
-    }
 }

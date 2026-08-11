@@ -1,7 +1,7 @@
 -- V32: 创建知识文件生命周期追溯表
 -- 每个上传的知识文件对应一行；document_uuid 同时作为对象存储目录根
 -- （{documentUuid}/original/...、{documentUuid}/converted/content.md）
--- 与 chat-agent Chroma chunk 的稳定身份。状态由 Java 编排推进，
+-- 与 vector-service Chroma chunk 的稳定身份。状态由 Java 编排推进，
 -- 转换与向量化分为两个独立状态列，失败留痕并支持按失败点重试。
 
 CREATE TABLE IF NOT EXISTS knowledge_file (
@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS knowledge_file (
 
     convert_status     VARCHAR(20) NOT NULL DEFAULT 'UPLOADED' COMMENT '转换状态：UPLOADED/CONVERTING/CONVERTED/FAILED',
     index_status       VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '向量化状态：PENDING/VECTORIZING/VECTORIZED/FAILED',
-    chunk_count        INT NULL COMMENT 'chat-agent 实际写入 Chroma 的 chunk 数',
+    chunk_count        INT NULL COMMENT 'vector-service 实际写入 Chroma 的 chunk 数',
     error_message      VARCHAR(1000) NULL COMMENT '失败原因（转换或向量化阶段）',
-    error_stage        VARCHAR(20) NULL COMMENT '失败阶段：CONVERT/VECTORIZE/UNKNOWN',
+    error_stage        VARCHAR(20) NULL COMMENT '失败阶段：UPLOAD/CONVERT/VECTORIZE/UNKNOWN',
 
     created_at         DATETIME NOT NULL COMMENT '记录创建时间',
     converted_at       DATETIME NULL COMMENT 'Markdown 转换完成时间',

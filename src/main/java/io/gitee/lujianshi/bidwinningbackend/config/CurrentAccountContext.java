@@ -4,7 +4,7 @@ package io.gitee.lujianshi.bidwinningbackend.config;
  * 当前请求操作人上下文（ThreadLocal）。
  *
  * <p>招标方管理接口由 {@link BidInviterAuthInterceptor} 在鉴权通过后写入；
- * 投标方接口由 {@code controller.bidder.BidRecordController} 在校验账号后写入。
+ * 投标方文件接口由 {@code BidderFileApplicationService} 在校验账号和记录归属后写入。
  * 操作历史服务在写历史时读取该上下文，不向业务方法传递账号参数。</p>
  *
  * @since V33
@@ -16,6 +16,9 @@ public final class CurrentAccountContext {
 
     /** 投标方账号。 */
     public static final String BIDDER = "BIDDER";
+
+    /** 无登录主体的启动恢复、补偿和内部治理任务。 */
+    public static final String SYSTEM = "SYSTEM";
 
     private static final ThreadLocal<CurrentAccount> HOLDER = new ThreadLocal<>();
 

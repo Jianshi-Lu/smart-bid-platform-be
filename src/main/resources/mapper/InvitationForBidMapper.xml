@@ -79,6 +79,12 @@
           AND status = #{fromStatus}
     </update>
 
+    <select id="countByBidHandlerId" resultType="int">
+        SELECT COUNT(*)
+        FROM invitation_for_bid
+        WHERE bid_handler_id = #{bidHandlerId}
+    </select>
+
     <delete id="deleteById" parameterType="java.lang.Integer">
         DELETE FROM invitation_for_bid WHERE invitation_id = #{invitationId}
     </delete>

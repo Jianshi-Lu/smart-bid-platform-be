@@ -78,6 +78,9 @@ chat-agent:
     password: ${CHAT_AGENT_MYSQL_PASSWORD:${MYSQL_PASSWORD}}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+vector-service:
+  base-url: ${VECTOR_SERVICE_BASE_URL:http://127.0.0.1:8083}
+
 logging:
   file:
     name: logs/app.log

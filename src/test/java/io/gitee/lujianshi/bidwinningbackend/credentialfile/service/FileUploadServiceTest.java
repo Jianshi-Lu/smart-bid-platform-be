@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.service;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
+import io.gitee.lujianshi.bidwinningbackend.storage.vector.CredentialFileVectorStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.UploadResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
@@ -9,12 +10,13 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileCh
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.processor.UploadItemProcessor;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.LocalObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.enums.OperationType;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -41,6 +43,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -111,6 +114,35 @@ class FileUploadServiceTest {
     }
 
     @Test
+    void shouldKeepUploadedWhenUploadHistoryFailsAfterStorage() {
+        FileUploadService service = createService(new Sha256FileChecksumCalculator());
+        OperationHistoryService history = mock(OperationHistoryService.class);
+        FileConvertService convertService = mock(FileConvertService.class);
+        ReflectionTestUtils.setField(service, "operationHistoryService", history);
+        ReflectionTestUtils.setField(service, "fileConvertService", convertService);
+        doThrow(new RuntimeException("history unavailable"))
+                .when(history)
+                .recordCredentialFile(
+                        anyLong(),
+                        eq(OperationType.CREATE),
+                        isNull(),
+                        any(CredentialFile.class),
+                        isNull());
+
+        UploadResponse response = service.upload(
+                BIDDER_ACCOUNT_ID.intValue(),
+                BIDDER_ACCOUNT_ID,
+                USERNAME,
+                List.of(item("license.pdf", "content")));
+
+        assertEquals(1, response.getFiles().size());
+        assertEquals(ConvertStatus.UPLOADED,
+                response.getFiles().getFirst().getConvertStatus());
+        verify(convertService).convertFileAsync(
+                eq(response.getFiles().getFirst().getFileId()), isNull());
+    }
+
+    @Test
     void shouldRejectUploadWithoutBidderAccount() {
         FileUploadService service = createService(new Sha256FileChecksumCalculator());
 
@@ -150,6 +182,10 @@ class FileUploadServiceTest {
             }
         };
         FileUploadService service = createService(failingCalculator);
+        FileStatusEventPublisher eventPublisher =
+                mock(FileStatusEventPublisher.class);
+        ReflectionTestUtils.setField(
+                service, "fileStatusEventPublisher", eventPublisher);
 
         UploadResponse response = service.upload(
                 BIDDER_ACCOUNT_ID.intValue(),
@@ -170,22 +206,34 @@ class FileUploadServiceTest {
         assertEquals("UPLOAD", response.getFiles().get(1).getErrorStage());
         assertTrue(response.getFiles().get(1).getErrorMessage()
                 .contains("checksum failed"));
+        verify(eventPublisher, atLeastOnce()).publish(
+                eq(FileStatusEventPublisher.CREDENTIAL_TOPIC_PREFIX
+                        + BIDDER_ACCOUNT_ID.intValue()),
+                anyString(),
+                anyString(),
+                eq("FAILED"),
+                eq("PENDING"));
     }
 
     @Test
     void shouldSoftDeleteCredentialFileWithDeletionStateMachine() throws Exception {
         FileUploadService service = new FileUploadService();
         CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
-        FileStorage storage = mock(FileStorage.class);
+        ObjectStorage storage = mock(ObjectStorage.class);
         FileConvertService convertService = mock(FileConvertService.class);
         OperationHistoryService history = mock(OperationHistoryService.class);
+        CredentialFileVectorStorage vectorClient =
+                mock(CredentialFileVectorStorage.class);
         ReflectionTestUtils.setField(service, "credentialFileMapper", fileMapper);
         ReflectionTestUtils.setField(service, "fileStorage", storage);
         ReflectionTestUtils.setField(service, "fileConvertService", convertService);
         ReflectionTestUtils.setField(service, "operationHistoryService", history);
+        ReflectionTestUtils.setField(
+                service, "credentialVectorStorage", vectorClient);
 
         CredentialFile file = new CredentialFile();
         file.setFileId(7L);
+        file.setFileUuid("550e8400-e29b-41d4-a716-446655440000");
         file.setBidRecordId(3);
         file.setOriginalFilePath("bidder01/license.pdf/original/uuid_license.pdf");
         file.setMarkdownFilePath("bidder01/license.pdf/converted/uuid_license.md");
@@ -203,23 +251,29 @@ class FileUploadServiceTest {
         verify(fileMapper).markDeletionSucceeded(7L);
         verify(history).recordCredentialFile(
                 eq(7L), eq(OperationType.DELETE), any(), isNull(), isNull());
-        verify(convertService).syncBidRecordCredentials(3);
+        verify(convertService).syncBidRecordCredentialsAfterDeletionSafely(3, 7L);
+        verify(vectorClient).deleteDocument(file.getFileUuid());
     }
 
     @Test
     void shouldMarkDeletionFailedWhenObjectDeleteFails() throws Exception {
         FileUploadService service = new FileUploadService();
         CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
-        FileStorage storage = mock(FileStorage.class);
+        ObjectStorage storage = mock(ObjectStorage.class);
         FileConvertService convertService = mock(FileConvertService.class);
         OperationHistoryService history = mock(OperationHistoryService.class);
+        CredentialFileVectorStorage vectorClient =
+                mock(CredentialFileVectorStorage.class);
         ReflectionTestUtils.setField(service, "credentialFileMapper", fileMapper);
         ReflectionTestUtils.setField(service, "fileStorage", storage);
         ReflectionTestUtils.setField(service, "fileConvertService", convertService);
         ReflectionTestUtils.setField(service, "operationHistoryService", history);
+        ReflectionTestUtils.setField(
+                service, "credentialVectorStorage", vectorClient);
 
         CredentialFile file = new CredentialFile();
         file.setFileId(7L);
+        file.setFileUuid("550e8400-e29b-41d4-a716-446655440000");
         file.setBidRecordId(3);
         file.setOriginalFilePath("bidder01/license.pdf/original/uuid_license.pdf");
         file.setConvertStatus(ConvertStatus.UPLOADED);
@@ -241,7 +295,7 @@ class FileUploadServiceTest {
     private FileUploadService createService(FileChecksumCalculator calculator) {
         FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        FileStorage storage = new LocalFileStorage(properties.getLocal().getRoot());
+        ObjectStorage storage = new LocalObjectStorage(properties.getLocal().getRoot());
 
         UploadItemProcessor processor = new UploadItemProcessor();
         ReflectionTestUtils.setField(processor, "fileStorage", storage);

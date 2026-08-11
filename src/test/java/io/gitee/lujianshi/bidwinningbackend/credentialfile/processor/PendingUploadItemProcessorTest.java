@@ -5,9 +5,9 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksum
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadFileContext;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.LocalObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -98,7 +98,7 @@ class UploadItemProcessorTest {
     void shouldDeleteCurrentStoredFileWhenIntegrityVerificationFails() throws Exception {
         FileStorageProperties properties = new FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        FileStorage storage = new TamperingLocalFileStorage(properties);
+        ObjectStorage storage = new TamperingLocalFileStorage(properties);
         UploadItemProcessor processor =
                 createProcessor(new Sha256FileChecksumCalculator(), storage);
 
@@ -153,7 +153,7 @@ class UploadItemProcessorTest {
 
     private UploadItemProcessor createProcessor(
             FileChecksumCalculator calculator,
-            FileStorage storage) {
+            ObjectStorage storage) {
         UploadItemProcessor processor = new UploadItemProcessor();
         ReflectionTestUtils.setField(processor, "fileStorage", storage);
         ReflectionTestUtils.setField(processor, "fileChecksumCalculator", calculator);
@@ -175,9 +175,9 @@ class UploadItemProcessorTest {
                 () -> new ByteArrayInputStream(bytes));
     }
 
-    private static final class RecordingLocalFileStorage extends LocalFileStorage {
+    private static final class RecordingLocalFileStorage extends LocalObjectStorage {
 
-        private FileStorage.StoreRequest storeRequest;
+        private ObjectStorage.StoreRequest storeRequest;
         private int openCalls;
 
         private RecordingLocalFileStorage(
@@ -198,7 +198,7 @@ class UploadItemProcessorTest {
         }
     }
 
-    private static final class TamperingLocalFileStorage extends LocalFileStorage {
+    private static final class TamperingLocalFileStorage extends LocalObjectStorage {
 
         private TamperingLocalFileStorage(
             FileStorageProperties properties) {

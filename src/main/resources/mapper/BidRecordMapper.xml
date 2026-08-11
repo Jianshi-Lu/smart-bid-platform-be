@@ -14,6 +14,14 @@
         <result column="bidder_contact"  property="bidderContact"/>
         <result column="credentials"     property="credentials"
                 typeHandler="com.baomidou.mybatisplus.extension.handlers.Fastjson2TypeHandler"/>
+        <result column="index_status" property="indexStatus"/>
+        <result column="chunk_count" property="chunkCount"/>
+        <result column="indexed_at" property="indexedAt"/>
+        <result column="index_error" property="indexError"/>
+        <result column="deletion_status" property="deletionStatus"/>
+        <result column="deletion_started_at" property="deletionStartedAt"/>
+        <result column="deletion_failed_stage" property="deletionFailedStage"/>
+        <result column="deletion_error" property="deletionError"/>
         <result column="risk_analysis_status" property="riskAnalysisStatus"/>
         <result column="risk_analysis_started_at" property="riskAnalysisStartedAt"/>
         <result column="risk_analysis_error" property="riskAnalysisError"/>
@@ -57,6 +65,8 @@
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id = #{bidRecordId}
@@ -65,6 +75,8 @@
     <select id="selectByIdForUpdate" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id = #{bidRecordId}
@@ -74,6 +86,8 @@
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
     </select>
@@ -89,6 +103,8 @@
     <select id="selectByIds" parameterType="java.util.List" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bid_record_id IN
@@ -117,20 +133,88 @@
     <select id="selectByInvitationId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE invitation_id = #{invitationId}
+          AND deletion_status IS NULL
         ORDER BY bid_at ASC
     </select>
 
     <select id="selectByBidderAccountId" resultMap="BaseResultMap">
         SELECT bid_record_id, invitation_id, bid_no, bid_at,
                bidder_name, bidder_account_id, quote_price, bidder_contact, credentials,
+               index_status, chunk_count, indexed_at, index_error,
+               deletion_status, deletion_started_at, deletion_failed_stage, deletion_error,
                risk_analysis_status, risk_analysis_started_at, risk_analysis_error
         FROM bid_record
         WHERE bidder_account_id = #{bidderAccountId}
+          AND deletion_status IS NULL
         ORDER BY bid_at DESC
     </select>
+
+    <update id="markVectorizing">
+        UPDATE bid_record
+        SET index_status = 'VECTORIZING',
+            chunk_count = NULL,
+            indexed_at = NULL,
+            index_error = NULL
+        WHERE bid_record_id = #{bidRecordId}
+          AND deletion_status IS NULL
+          AND index_status IN ('PENDING', 'FAILED', 'VECTORIZED', 'VECTORIZING')
+    </update>
+
+    <update id="beginDeletion">
+        UPDATE bid_record
+        SET deletion_status = 'DELETING',
+            deletion_started_at = #{startedAt},
+            deletion_failed_stage = NULL,
+            deletion_error = NULL
+        WHERE bid_record_id = #{bidRecordId}
+          AND (
+              deletion_status IS NULL
+              OR deletion_status = 'FAILED'
+              OR (deletion_status = 'DELETING' AND deletion_started_at &lt; #{staleBefore})
+          )
+    </update>
+
+    <update id="markDeletionFailed">
+        UPDATE bid_record
+        SET deletion_status = 'FAILED',
+            deletion_failed_stage = #{failedStage},
+            deletion_error = #{errorMessage}
+        WHERE bid_record_id = #{bidRecordId}
+          AND deletion_status = 'DELETING'
+    </update>
+
+    <update id="markInterruptedDeletionsFailed">
+        UPDATE bid_record
+        SET deletion_status = 'FAILED',
+            deletion_failed_stage = 'JVM_RESTART',
+            deletion_error = #{errorMessage}
+        WHERE deletion_status = 'DELETING'
+    </update>
+
+    <update id="markVectorized">
+        UPDATE bid_record
+        SET index_status = 'VECTORIZED',
+            chunk_count = #{chunkCount},
+            indexed_at = #{indexedAt},
+            index_error = NULL
+        WHERE bid_record_id = #{bidRecordId}
+          AND index_status = 'VECTORIZING'
+    </update>
+
+    <update id="markVectorizeFailed">
+        UPDATE bid_record
+        SET index_status = 'FAILED',
+            chunk_count = NULL,
+            indexed_at = NULL,
+            index_error = #{errorMessage}
+        WHERE bid_record_id = #{bidRecordId}
+          AND index_status = 'VECTORIZING'
+    </update>
 
     <update id="claimRiskAnalysis">
         UPDATE bid_record
@@ -155,6 +239,13 @@
             risk_analysis_error = #{errorMessage}
         WHERE bid_record_id = #{bidRecordId}
           AND risk_analysis_status = 'ANALYZING'
+    </update>
+
+    <update id="markInterruptedRiskAnalysesFailed">
+        UPDATE bid_record
+        SET risk_analysis_status = 'FAILED',
+            risk_analysis_error = #{errorMessage}
+        WHERE risk_analysis_status = 'ANALYZING'
     </update>
 
 </mapper>

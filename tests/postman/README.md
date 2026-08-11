@@ -1,62 +1,15 @@
-# Credential file 完整链路 Postman 测试
+# Credential file Postman 说明
 
-Collection：`credential-file-flow.postman_collection.json`
+`credential-file-flow.postman_collection.json` 保留的是批次化上传设计时期的历史 collection：
+它仍引用 `uploadBatchId`、`credential_file_batch` 和旧对象路径，不能作为当前接口的联调或回归依据。
 
-## 测试前提
+当前资信材料契约以 [docs/api.md](../../docs/api.md#5-资信文件上传credentialfile) 和
+[docs/business-process.md](../../docs/business-process.md#3-资信材料上传转换与下载) 为准：
 
-1. Java 服务已启动，例如 `http://127.0.0.1:8080`。
-2. Python `to-markdown` 服务已启动，例如 `http://127.0.0.1:8081`。
-3. Java 配置使用 MinIO：
+1. 使用投标方 Basic 凭据创建或选择属于该账号的 `bidRecordId`。
+2. `POST /bidder/bid-records/{bidRecordId}/credential-files`，以重复 `files` 和匹配的 `username` 提交多个文件。
+3. 立即检查上传响应的每个文件；它可能仍处于 `UPLOADED`，不应把它当作转换完成。
+4. 通过 `GET /bidder/bid-records/{bidRecordId}/credential-files` 和同路径 `/events` 观察 `originalStorageStatus`、`convertStatus`、错误阶段和最终路径。
+5. 原文件下载要求 original 路径与 SHA-256 已回填；`.md` 下载还要求转换完成。
 
-   ```bash
-   CREDENTIAL_FILE_STORAGE_TYPE=MINIO
-   ```
-
-4. 只需 Java 配置 MinIO endpoint、bucket 和凭证；Python 不访问 MinIO。
-5. `bidRecordId` 已经存在。
-6. 修改 collection 变量：
-
-   - `bidRecordId`：已存在的投标记录 ID；
-   - `fileAPath`：第一个本地测试文件绝对路径；
-   - `fileBPath`：第二个本地测试文件绝对路径。
-
-如果只测试一个文件，可以删除上传请求中第二个 `files` form-data 项。
-
-## 执行顺序
-
-按顺序执行：
-
-1. `00 Prerequisite / 确认 bid_record 存在`
-2. `01 Chain - upload original / 上传多个 original 文件`
-3. `02 Chain - convert original to markdown / 按 bidRecordId 转换全部文件批次`
-4. `02 Chain - ... / 验证 bid_record.credentials 已回写 converted object key`
-5. `03 Chain - aggregate and analyze / 汇总 Markdown 并调用大模型`
-6. `03 Chain - ... / 验证 risk_analysis 已落库`
-
-## 验证内容
-
-上传链会验证：
-
-- Java 返回 `uploadBatchId`；
-- 每个文件状态为 `UPLOADED`；
-- `originalFilePath` 位于 `bid-records/{bidRecordId}/batches/{uploadBatchId}/original/`；
-- 文件大小和 SHA-256 已返回。
-
-转换链会验证：
-
-- Java 找到该 `bidRecordId` 下的文件批次；
-- 所有批次状态为 `CONVERTED`；
-- 每个批次的 `convertedFileCount` 等于 `fileCount`；
-- `bid_record.credentials` 已回写 `converted/*.md` object key。
-
-风险分析链会验证：
-
-- 所有批次和文件均已转换完成后才能进入分析；
-- `bid-records/{bidRecordId}/merged/credentials.md` 作为汇总文件目标路径；
-- 大模型返回结构化风险结果；
-- 返回的 `analysisId` 已经可以在 `risk_analysis` 历史接口中查询到。
-
-第二条链路会间接验证 Java 能否从 MinIO 读取 original、multipart 调用 Python、
-接收 Markdown、上传 converted 并回读校验。汇总文件本身没有单独的下载接口，
-其写入是否成功由风险分析接口能否读取并完成模型分析来验证。也可以根据
-collection 变量 `mergedMarkdownPath` 到 MinIO 中手工检查对象。
+如需维护 Postman 自动化，应新建基于上述端点、Basic 鉴权和单文件状态机的 collection；不要在旧 collection 上继续叠加变量或断言。

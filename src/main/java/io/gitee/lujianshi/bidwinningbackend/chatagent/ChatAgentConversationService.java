@@ -29,6 +29,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * chat-agent 阶段 0 的会话协调边界。
@@ -50,6 +52,9 @@ public class ChatAgentConversationService {
     private static final String COMPLETED = "COMPLETED";
     private static final String FAILED = "FAILED";
     private static final String TEXT = "TEXT";
+    private static final Pattern BID_RECORD_REFERENCE_MARKER = Pattern.compile(
+            "<!--\\s*bid-record-refs\\s*:\\s*([0-9,\\s]+)\\s*-->");
+    private static final int MAX_REFERENCED_BID_RECORDS = 12;
 
     private static final Logger log = LoggerFactory.getLogger(
             ChatAgentConversationService.class);
@@ -87,7 +92,6 @@ public class ChatAgentConversationService {
                 || request.title().isBlank()
                 ? "新对话"
                 : request.title().trim();
-
         ChatConversation conversation = transactionTemplate.execute(status -> {
             ChatConversation created = new ChatConversation();
             created.setConversationId(UUID.randomUUID().toString());
@@ -132,7 +136,8 @@ public class ChatAgentConversationService {
 
             try {
                 PythonChatResponse pythonResponse = callPython(
-                        prepared.question(), conversationId);
+                        prepared.question(),
+                        conversationId);
                 if (pythonResponse == null
                         || pythonResponse.answer() == null
                         || pythonResponse.answer().isBlank()) {
@@ -145,7 +150,9 @@ public class ChatAgentConversationService {
                 return responseOf(
                         prepared,
                         pythonResponse.answer(),
-                        persistedTitle);
+                        persistedTitle,
+                        normalizeReferencedBidRecordIds(
+                                pythonResponse.referencedBidRecordIds()));
             } catch (RestClientException e) {
                 fail(prepared, "PYTHON_CALL", "知识问答服务调用失败");
                 throw pythonCallFailed(
@@ -257,7 +264,9 @@ public class ChatAgentConversationService {
         });
     }
 
-    private PythonChatResponse callPython(String question, String threadId) {
+    private PythonChatResponse callPython(
+            String question,
+            String threadId) {
         return restClient.post()
                 .uri("/chat")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -270,6 +279,9 @@ public class ChatAgentConversationService {
     private String complete(
             PreparedRequest prepared,
             PythonChatResponse pythonResponse) {
+        String persistedAnswer = withReferenceMarker(
+                pythonResponse.answer(),
+                pythonResponse.referencedBidRecordIds());
         transactionTemplate.executeWithoutResult(status -> {
             ChatMessage assistant = messageMapper.selectById(
                     prepared.assistantMessage().getMessageId());
@@ -281,7 +293,7 @@ public class ChatAgentConversationService {
                         "COMPLETE_MESSAGE",
                         "助手消息不存在");
             }
-            assistant.setContent(pythonResponse.answer());
+            assistant.setContent(persistedAnswer);
             assistant.setStatus(COMPLETED);
             assistant.setErrorCode(null);
             assistant.setErrorMessage(null);
@@ -409,23 +421,90 @@ public class ChatAgentConversationService {
     }
 
     private ChatResponse responseOf(PreparedRequest prepared) {
-        return responseOf(prepared, prepared.assistantMessage().getContent());
-    }
-
-    private ChatResponse responseOf(PreparedRequest prepared, String answer) {
-        return responseOf(prepared, answer, null);
+        String persistedAnswer = prepared.assistantMessage().getContent();
+        return responseOf(
+                prepared,
+                withoutReferenceMarker(persistedAnswer),
+                null,
+                referencedBidRecordIds(persistedAnswer));
     }
 
     private ChatResponse responseOf(
             PreparedRequest prepared,
             String answer,
-            String title) {
+            String title,
+            List<Integer> referencedBidRecordIds) {
         return new ChatResponse(
                 prepared.conversationId(),
                 prepared.requestId(),
                 prepared.clientMessageId(),
                 answer,
-                title);
+                title,
+                referencedBidRecordIds);
+    }
+
+    /**
+     * 把 Python 从实际 ToolMessage 中提取的资料范围同回答一起持久化。
+     * 标记是 Markdown 注释，不改变用户看到的正文；前端历史回放时可重新生成下载入口。
+     */
+    private String withReferenceMarker(
+            String answer,
+            List<Integer> referencedBidRecordIds) {
+        List<Integer> normalized = normalizeReferencedBidRecordIds(
+                referencedBidRecordIds);
+        if (normalized.isEmpty()) {
+            return answer;
+        }
+        StringBuilder ids = new StringBuilder();
+        for (int index = 0; index < normalized.size(); index++) {
+            if (index > 0) {
+                ids.append(',');
+            }
+            ids.append(normalized.get(index));
+        }
+        return answer + "\n\n<!-- bid-record-refs: " + ids + " -->";
+    }
+
+    private String withoutReferenceMarker(String answer) {
+        return answer == null
+                ? null
+                : BID_RECORD_REFERENCE_MARKER.matcher(answer).replaceAll("").strip();
+    }
+
+    private List<Integer> referencedBidRecordIds(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return List.of();
+        }
+        Matcher marker = BID_RECORD_REFERENCE_MARKER.matcher(answer);
+        if (!marker.find()) {
+            return List.of();
+        }
+        String[] rawIds = marker.group(1).split(",");
+        java.util.ArrayList<Integer> parsed = new java.util.ArrayList<>();
+        for (String rawId : rawIds) {
+            try {
+                parsed.add(Integer.parseInt(rawId.trim()));
+            } catch (NumberFormatException ignored) {
+                // 历史消息中的损坏注释只会失去下载入口，不能导致整条会话回放失败。
+            }
+        }
+        return normalizeReferencedBidRecordIds(parsed);
+    }
+
+    private List<Integer> normalizeReferencedBidRecordIds(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        java.util.LinkedHashSet<Integer> normalized = new java.util.LinkedHashSet<>();
+        for (Integer value : values) {
+            if (value != null && value > 0) {
+                normalized.add(value);
+            }
+            if (normalized.size() >= MAX_REFERENCED_BID_RECORDS) {
+                break;
+            }
+        }
+        return List.copyOf(normalized);
     }
 
     private AppException pythonCallFailed(
@@ -460,6 +539,10 @@ public class ChatAgentConversationService {
             @JsonProperty("thread_id") String threadId) {
     }
 
-    private record PythonChatResponse(String answer, String title) {
+    private record PythonChatResponse(
+            String answer,
+            String title,
+            @JsonProperty("referenced_bid_record_ids")
+            List<Integer> referencedBidRecordIds) {
     }
 }

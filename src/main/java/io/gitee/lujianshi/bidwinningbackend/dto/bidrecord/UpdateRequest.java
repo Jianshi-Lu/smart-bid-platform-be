@@ -1,6 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.bidrecord;
 
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -16,6 +17,7 @@ import java.util.List;
 public class UpdateRequest {
 
     @Size(max = 100, message = "投标人名称长度不能超过100")
+    @Pattern(regexp = ".*\\S.*", message = "投标人名称不能为空")
     private String bidderName;
 
     private BigDecimal quotePrice;

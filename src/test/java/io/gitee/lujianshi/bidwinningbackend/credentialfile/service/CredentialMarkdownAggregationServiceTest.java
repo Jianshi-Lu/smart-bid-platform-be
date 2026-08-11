@@ -4,8 +4,8 @@ import io.gitee.lujianshi.bidwinningbackend.config.RiskAnalysisProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.LocalObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
@@ -40,7 +40,7 @@ class CredentialMarkdownAggregationServiceTest {
 
     @Test
     void shouldMergeConvertedFilesInFileOrder() throws Exception {
-        FileStorage storage = createStorage();
+        ObjectStorage storage = createStorage();
 
         String firstPath = storeMarkdown(storage, "first", "第一份材料");
         String secondPath = storeMarkdown(storage, "second", "第二份材料");
@@ -98,7 +98,7 @@ class CredentialMarkdownAggregationServiceTest {
 
     @Test
     void shouldRejectMergedMarkdownOverConfiguredLimit() throws Exception {
-        FileStorage storage = createStorage();
+        ObjectStorage storage = createStorage();
         String markdownPath = storeMarkdown(storage, "large", "超过限制");
         CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
         when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
@@ -118,7 +118,7 @@ class CredentialMarkdownAggregationServiceTest {
     }
 
     private CredentialMarkdownAggregationService createService(
-            FileStorage storage,
+            ObjectStorage storage,
             CredentialFileMapper fileMapper,
             BidRecordMapper bidRecordMapper,
             int maxCharacters) {
@@ -140,21 +140,23 @@ class CredentialMarkdownAggregationServiceTest {
         return service;
     }
 
-    private FileStorage createStorage() {
+    private ObjectStorage createStorage() {
         var properties = new io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        return new LocalFileStorage(properties.getLocal().getRoot());
+        return new LocalObjectStorage(properties.getLocal().getRoot());
     }
 
     private String storeMarkdown(
-            FileStorage storage,
-            String fileUuid,
+            ObjectStorage storage,
+            String fileIdentity,
             String content) throws Exception {
+        String fileUuid = UUID.nameUUIDFromBytes(
+                fileIdentity.getBytes(StandardCharsets.UTF_8)).toString();
         String path = StoragePath.createConvertedMarkdownPath(
                 USERNAME + "/source.pdf/original/"
                         + fileUuid + "_source.pdf");
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        storage.store(new FileStorage.StoreRequest(
+        storage.store(new ObjectStorage.StoreRequest(
                 path,
                 "text/markdown",
                 bytes.length,

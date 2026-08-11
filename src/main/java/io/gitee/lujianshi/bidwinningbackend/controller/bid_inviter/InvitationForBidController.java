@@ -13,8 +13,9 @@ import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationFo
 import io.gitee.lujianshi.bidwinningbackend.entity.invitationforbid.InvitationForBidOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.InvitationForBidService;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.invitation.InvitationForBidService;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,9 @@ public class InvitationForBidController {
 
     @Resource
     private InvitationForBidService service;
+
+    @Resource
+    private BidRecordVectorIndexService bidRecordVectorIndexService;
 
     @Resource
     private OperationHistoryService operationHistoryService;
@@ -133,7 +137,9 @@ public class InvitationForBidController {
         if (rows == 0) {
             throw invitationNotFound("UPDATE", "UPDATE_RECORD", id);
         }
-        return Result.success(new Diff<>(before, after), "更新成功");
+        bidRecordVectorIndexService.reindexByInvitationId(id);
+        return Result.success(
+                new Diff<>(before, service.getById(id)), "更新成功");
     }
 
     /**
@@ -198,6 +204,8 @@ public class InvitationForBidController {
             @Valid @RequestBody StatusUpdateRequest request) {
         InvitationForBid updated = service.transitionStatus(
                 request.getInvitationId(), request.getStatus(), request.getRemark());
+        bidRecordVectorIndexService.reindexByInvitationId(
+                request.getInvitationId());
         return Result.success(updated, "状态变更成功");
     }
 

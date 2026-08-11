@@ -55,6 +55,25 @@ public class BidRecord {
 
     private List<String> credentials;
 
+    /** 结构化投标记录向量状态：PENDING/VECTORIZING/VECTORIZED/FAILED。 */
+    private String indexStatus;
+
+    /** 私有投标资料 collection 中结构化记录的实际文档数，正常为 1。 */
+    private Integer chunkCount;
+
+    private LocalDateTime indexedAt;
+
+    private String indexError;
+
+    /** 投标记录跨数据库、对象存储和私有向量删除状态；NULL 表示正常业务记录。 */
+    private String deletionStatus;
+
+    private LocalDateTime deletionStartedAt;
+
+    private String deletionFailedStage;
+
+    private String deletionError;
+
     private RiskAnalysisStatus riskAnalysisStatus;
 
     private LocalDateTime riskAnalysisStartedAt;

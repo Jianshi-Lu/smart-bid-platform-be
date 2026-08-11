@@ -12,8 +12,8 @@ import java.util.List;
 /**
  * 资信文件 multipart 上传请求。
  *
- * <p>前端以重复的 {@code files} 字段一次性提交当前资信材料批次的全部文件。
- * 批次 UUID 由 Java 后端生成，不由请求方传入。</p>
+ * <p>前端以重复的 {@code files} 字段一次性提交当前选择的多个文件；每个文件由
+ * 服务端生成独立 {@code fileUuid}，请求中不维护上传批次。</p>
  *
  * @since 1.0
  */

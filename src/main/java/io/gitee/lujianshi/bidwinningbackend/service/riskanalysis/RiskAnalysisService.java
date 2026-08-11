@@ -13,12 +13,13 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.CredentialMarkdownAggregationService;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.service.FileConvertService;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
 
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Lazy;
@@ -58,7 +59,7 @@ import java.util.Map;
 public class RiskAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(RiskAnalysisService.class);
-    private static final String PROMPT_VERSION = "v1";
+    private static final String PROMPT_VERSION = "v2";
 
     /** 风险分析模型的固定 system prompt，与当前 Structured Output schema 配套。 */
     private static final String SYSTEM_PROMPT =
@@ -69,6 +70,12 @@ public class RiskAnalysisService {
             2. 报价合理性
             3. 历史履约情况
             4. 关联风险（关联供应商、同一控制人等）
+
+            投标基础信息始终是有效分析输入，资信材料可能为空：
+            - 未上传资信材料时，仍必须基于已提供的投标基础信息完成初步风险分析；
+            - 对无法从基础信息确认的资质合规性、历史履约和关联关系，不得编造已确认事实，
+              应明确标注为待核验，并在建议中给出核验方向；
+            - 已提供资信材料时，再将其与投标基础信息结合分析。
 
             请以 JSON 格式返回分析结果，包含以下字段：
             - riskLevel: 风险等级（LOW / MEDIUM / HIGH / CRITICAL）
@@ -137,6 +144,9 @@ public class RiskAnalysisService {
     private BidRecordMapper bidRecordMapper;
 
     @Resource
+    private BidRecordVectorIndexService bidRecordVectorIndexService;
+
+    @Resource
     private CredentialMarkdownAggregationService markdownAggregationService;
 
     @Resource
@@ -146,7 +156,7 @@ public class RiskAnalysisService {
     private CredentialFileMapper credentialFileMapper;
 
     @Resource
-    private FileStorage fileStorage;
+    private ObjectStorage fileStorage;
 
     /**
      * 构造风险分析 ChatClient，并把 Structured Output JSON Schema 固化到默认调用参数中。
@@ -196,6 +206,7 @@ public class RiskAnalysisService {
                     "CLAIM_ANALYSIS",
                     "该投标记录正在进行风险分析，请稍后再试: " + bidRecordId);
         }
+        refreshBidRecordIndexSafely(bidRecordId, "ANALYZING");
 
         try {
             return doAnalyzeRisk(bidRecordId, record);
@@ -211,15 +222,13 @@ public class RiskAnalysisService {
         log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
                 record.getBidderName(), record.getQuotePrice(), record.getBidderContact());
 
-        ensureCredentialFilesConverted(bidRecordId);
-        String mergedMarkdownPath = markdownAggregationService.aggregate(bidRecordId);
-        String mergedMarkdown = readMergedMarkdown(mergedMarkdownPath);
+        String credentialMaterial = prepareCredentialMaterial(bidRecordId);
         String detailInfo = loader.loadDetail(bidRecordId);
         String userPrompt = USER_PROMPT_TEMPLATE.formatted(
                 record.getBidderName() != null ? record.getBidderName() : "",
                 record.getQuotePrice() != null ? record.getQuotePrice().toString() : "",
                 record.getBidderContact() != null ? record.getBidderContact() : "",
-                mergedMarkdown,
+                credentialMaterial,
                 detailInfo);
 
         log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", SYSTEM_PROMPT, userPrompt);
@@ -254,6 +263,8 @@ public class RiskAnalysisService {
         RiskAnalysis analysis = parseAndBuild(bidRecordId, record.getBidderName(), raw, analyzedAt);
 
         RiskAnalysis saved = self.persistAndComplete(analysis, bidRecordId);
+        // self 代理返回时事务已经提交，再刷新外部向量，避免数据库回滚却留下新状态。
+        refreshBidRecordIndexSafely(bidRecordId, "COMPLETED");
         log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
         return saved;
     }
@@ -261,34 +272,43 @@ public class RiskAnalysisService {
     /**
      * 风险分析入口的资信材料准备判断。
      *
-     * <p>前端只调用风险分析入口。若当前投标记录存在尚未转换完成的批次或文件，
-     * 由 Java 直接调用现有无差别转换流程；转换后重新查询数据库，只有全部文件完成
-     * 转换后才允许继续汇总和调用大模型。</p>
+     * <p>未上传任何文件时，基础投标信息已足以形成初步风险判断，因此不创建空的
+     * 汇总对象，直接把“缺少资信材料、需人工核验”的边界传给模型。若存在任一
+     * 资信文件，则仍由 Java 直接调用现有无差别转换流程；转换后重新查询数据库，
+     * 只有全部文件完成转换后才允许继续汇总和调用大模型，避免遗漏已上传材料。</p>
+     *
+     * @param bidRecordId 投标记录 ID
+     * @return 可直接写入模型 Prompt 的资信材料正文或“未上传材料”说明
      */
-    private void ensureCredentialFilesConverted(Integer bidRecordId) {
+    private String prepareCredentialMaterial(Integer bidRecordId) {
         List<CredentialFile> files =
                 credentialFileMapper.selectByBidRecordId(bidRecordId);
         if (files == null || files.isEmpty()) {
-            throw inputNotReady("该投标记录暂无资信材料，不能进行风险分析");
+            log.info("[风险分析] 未上传资信材料，改用基础投标信息分析 bidRecordId={}",
+                    bidRecordId);
+            return "当前投标记录未上传资信材料。请仅依据投标基础信息进行初步风险分析；"
+                    + "对资质合规性、历史履约和关联风险中缺少证据的部分，明确标注为待人工核验，"
+                    + "不得编造事实。";
         }
 
-        if (areCredentialFilesConverted(files)) {
-            return;
+        if (!areCredentialFilesConverted(files)) {
+            log.info("[风险分析] 资信材料未全部转换，自动发起转换 bidRecordId={}",
+                    bidRecordId);
+            FileConvertResponse response =
+                    fileConvertService.convertAll(bidRecordId);
+
+            // 转换服务返回的是文件汇总结果，仍需重新查询文件状态，避免只依据响应快照继续分析。
+            List<CredentialFile> latestFiles =
+                    credentialFileMapper.selectByBidRecordId(bidRecordId);
+            if (response == null
+                    || response.status() != BidRecordCredentialConversionStatus.ALL_CONVERTED
+                    || !areCredentialFilesConverted(latestFiles)) {
+                throw inputNotReady("资信材料尚未全部转换完成，暂不能进行风险分析");
+            }
         }
 
-        log.info("[风险分析] 资信材料未全部转换，自动发起转换 bidRecordId={}",
-                bidRecordId);
-        FileConvertResponse response =
-                fileConvertService.convertAll(bidRecordId);
-
-        // 转换服务返回的是文件汇总结果，仍需重新查询文件状态，避免只依据响应快照继续分析。
-        List<CredentialFile> latestFiles =
-                credentialFileMapper.selectByBidRecordId(bidRecordId);
-        if (response == null
-                || response.status() != BidRecordCredentialConversionStatus.ALL_CONVERTED
-                || !areCredentialFilesConverted(latestFiles)) {
-            throw inputNotReady("资信材料尚未全部转换完成，暂不能进行风险分析");
-        }
+        String mergedMarkdownPath = markdownAggregationService.aggregate(bidRecordId);
+        return readMergedMarkdown(mergedMarkdownPath);
     }
 
     /** 判断指定投标记录下的文件是否都已经具备可分析的 Markdown。 */
@@ -327,6 +347,20 @@ public class RiskAnalysisService {
         int rows = bidRecordMapper.markRiskAnalysisFailed(bidRecordId, message);
         if (rows != 1) {
             log.warn("[风险分析] 失败状态回写失败 bidRecordId={}", bidRecordId);
+        }
+        refreshBidRecordIndexSafely(bidRecordId, "FAILED");
+    }
+
+    /** 风险状态是数据库事实；派生索引失败由 index_status=FAILED 和启动恢复继续收敛。 */
+    private void refreshBidRecordIndexSafely(Integer bidRecordId, String status) {
+        try {
+            bidRecordVectorIndexService.reindex(bidRecordId);
+        } catch (RuntimeException indexFailure) {
+            log.error(
+                    "风险状态已提交但投标记录索引刷新失败: bidRecordId={}, status={}",
+                    bidRecordId,
+                    status,
+                    indexFailure);
         }
     }
 

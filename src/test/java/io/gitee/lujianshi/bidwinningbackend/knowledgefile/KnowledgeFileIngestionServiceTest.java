@@ -5,11 +5,11 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.ToMarkdownClie
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.KnowledgeFileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.FileStorageType;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.LocalObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.entity.KnowledgeFileRecord;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.knowledgefile.client.ChatAgentIngestionClient;
+import io.gitee.lujianshi.bidwinningbackend.storage.vector.KnowledgeFileVectorStorage;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.key.DocumentUuidGenerator;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.key.KnowledgeObjectKeyGenerator;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpload;
@@ -17,7 +17,8 @@ import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.PreparedKnowledg
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileIngestionService;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.service.KnowledgeFileObjectService;
 import io.gitee.lujianshi.bidwinningbackend.mapper.KnowledgeFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -44,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,9 +67,12 @@ class KnowledgeFileIngestionServiceTest {
         when(fixture.toMarkdownClient().convert(
                 any(), eq("knowledge.txt"), eq("text/plain"),
                 eq((long) original.length)))
-                .thenReturn(new PythonMarkdownResponse(
-                        markdown, "knowledge.md", "text/markdown"));
-        when(fixture.chatAgentClient().vectorizeDocument(any(
+                .thenAnswer(invocation -> {
+                    ((java.io.InputStream) invocation.getArgument(0)).readAllBytes();
+                    return new PythonMarkdownResponse(
+                            markdown, "knowledge.md", "text/markdown");
+                });
+        when(fixture.vectorStorage().vectorizeDocument(any(
                 PreparedKnowledgeDocument.class))).thenReturn(2);
 
         var response = fixture.service().ingest(List.of(upload(
@@ -81,7 +86,8 @@ class KnowledgeFileIngestionServiceTest {
                         + documentUuid + "_knowledge.txt",
                 document.originalObjectKey());
         assertEquals(
-                USERNAME + "/knowledge.txt/converted/knowledge.md",
+                USERNAME + "/knowledge.txt/converted/"
+                        + documentUuid + "_knowledge.md",
                 document.convertedObjectKey());
         assertEquals(2, document.chunkCount());
         assertEquals("CONVERTED", document.convertStatus());
@@ -90,6 +96,18 @@ class KnowledgeFileIngestionServiceTest {
                 eq(documentUuid.toString()), anyString(), anyString(), any());
         verify(fixture.mapper()).markVectorized(
                 eq(documentUuid.toString()), eq(2), any());
+        verify(fixture.fileStatusEventPublisher()).publish(
+                eq(FileStatusEventPublisher.KNOWLEDGE_TOPIC),
+                eq(documentUuid.toString()),
+                eq("STORED"),
+                eq("CONVERTED"),
+                eq("VECTORIZING"));
+        verify(fixture.fileStatusEventPublisher()).publish(
+                eq(FileStatusEventPublisher.KNOWLEDGE_TOPIC),
+                eq(documentUuid.toString()),
+                eq("STORED"),
+                eq("CONVERTED"),
+                eq("VECTORIZED"));
         try (var input = fixture.storage().open(
                 document.convertedObjectKey())) {
             assertEquals(
@@ -107,9 +125,12 @@ class KnowledgeFileIngestionServiceTest {
         byte[] markdown = "# 回滚不删对象".getBytes(StandardCharsets.UTF_8);
         when(fixture.toMarkdownClient().convert(
                 any(), any(), any(), anyLong()))
-                .thenReturn(new PythonMarkdownResponse(
-                        markdown, "knowledge.md", "text/markdown"));
-        when(fixture.chatAgentClient().vectorizeDocument(any(
+                .thenAnswer(invocation -> {
+                    ((java.io.InputStream) invocation.getArgument(0)).readAllBytes();
+                    return new PythonMarkdownResponse(
+                            markdown, "knowledge.md", "text/markdown");
+                });
+        when(fixture.vectorStorage().vectorizeDocument(any(
                 PreparedKnowledgeDocument.class)))
                 .thenThrow(new AppException(
                         AppErrorCode.KNOWLEDGE_FILE_VECTORIZATION_FAILED,
@@ -127,13 +148,14 @@ class KnowledgeFileIngestionServiceTest {
         verify(fixture.mapper()).markVectorizeFailed(
                 eq(documentUuid.toString()), anyString());
         // 失败保留对象与记录，供重试续跑，不做补偿删除。
-        verify(fixture.chatAgentClient(), never()).deleteDocument(anyString());
+        verify(fixture.vectorStorage(), never()).deleteDocument(anyString());
         verify(fixture.mapper(), never()).markDeleted(anyString(), any());
         assertPresent(fixture.storage(),
                 USERNAME + "/knowledge.txt/original/"
                         + documentUuid + "_knowledge.txt");
         assertPresent(fixture.storage(),
-                USERNAME + "/knowledge.txt/converted/knowledge.md");
+                USERNAME + "/knowledge.txt/converted/"
+                        + documentUuid + "_knowledge.md");
     }
 
     @Test
@@ -158,12 +180,48 @@ class KnowledgeFileIngestionServiceTest {
         assertEquals("知识文件转换失败", document.errorMessage());
         verify(fixture.mapper()).markConvertFailed(
                 eq(documentUuid.toString()), anyString());
-        verify(fixture.chatAgentClient(), never()).vectorizeDocument(any());
+        verify(fixture.vectorStorage(), never()).vectorizeDocument(any());
         assertPresent(fixture.storage(),
                 USERNAME + "/knowledge.txt/original/"
                         + documentUuid + "_knowledge.txt");
         assertMissing(fixture.storage(),
-                USERNAME + "/knowledge.txt/converted/knowledge.md");
+                USERNAME + "/knowledge.txt/converted/"
+                        + documentUuid + "_knowledge.md");
+    }
+
+    @Test
+    void shouldKeepKnowledgeFileVectorizedWhenConversionHistoryFails() {
+        UUID documentUuid = UUID.fromString(
+                "550e8400-e29b-41d4-a716-446655440000");
+        TestFixture fixture = fixture(documentUuid);
+        byte[] original = "原始知识".getBytes(StandardCharsets.UTF_8);
+        byte[] markdown = "# 已转换".getBytes(StandardCharsets.UTF_8);
+        when(fixture.toMarkdownClient().convert(
+                any(), any(), any(), anyLong()))
+                .thenAnswer(invocation -> {
+                    ((java.io.InputStream) invocation.getArgument(0)).readAllBytes();
+                    return new PythonMarkdownResponse(
+                            markdown, "knowledge.md", "text/markdown");
+                });
+        when(fixture.vectorStorage().vectorizeDocument(any(
+                PreparedKnowledgeDocument.class))).thenReturn(3);
+        AtomicInteger historyCallCount = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (historyCallCount.incrementAndGet() == 2) {
+                throw new IllegalStateException("history unavailable");
+            }
+            return null;
+        }).when(fixture.operationHistoryService()).recordKnowledgeFile(
+                anyString(), any(), any(), any(), any());
+
+        var response = fixture.service().ingest(List.of(upload(
+                "knowledge.txt", original)), USERNAME);
+
+        var document = response.documents().getFirst();
+        assertEquals("CONVERTED", document.convertStatus());
+        assertEquals("VECTORIZED", document.indexStatus());
+        verify(fixture.mapper(), never()).markConvertFailed(
+                eq(documentUuid.toString()), anyString());
     }
 
     @Test
@@ -171,7 +229,8 @@ class KnowledgeFileIngestionServiceTest {
         UUID documentUuid = UUID.fromString(
                 "550e8400-e29b-41d4-a716-446655440000");
         TestFixture fixture = fixture(documentUuid);
-        String convertedKey = USERNAME + "/knowledge.txt/converted/knowledge.md";
+        String convertedKey = USERNAME + "/knowledge.txt/converted/"
+                + documentUuid + "_knowledge.md";
         byte[] markdown = "# 已转换".getBytes(StandardCharsets.UTF_8);
         fixture.objectService().storeAndVerify(
                 convertedKey,
@@ -191,7 +250,7 @@ class KnowledgeFileIngestionServiceTest {
         initial.setMarkdownFilePath(convertedKey);
         initial.setFileSize((long) markdown.length);
         initial.setContentType("text/plain");
-        initial.setConvertedSha256("b".repeat(64));
+        initial.setConvertedSha256(sha256(markdown));
         KnowledgeFileRecord finalRecord = record(
                 documentUuid.toString(),
                 "knowledge.txt",
@@ -200,9 +259,9 @@ class KnowledgeFileIngestionServiceTest {
         finalRecord.setChunkCount(5);
         when(fixture.mapper().selectByDocumentUuid(documentUuid.toString()))
                 .thenReturn(initial, finalRecord);
-        when(fixture.chatAgentClient().getVectorStatus(
+        when(fixture.vectorStorage().getVectorStatus(
                 documentUuid.toString())).thenReturn(0);
-        when(fixture.chatAgentClient().vectorizeDocument(any(
+        when(fixture.vectorStorage().vectorizeDocument(any(
                 PreparedKnowledgeDocument.class))).thenReturn(5);
 
         KnowledgeFileRecord result =
@@ -213,6 +272,42 @@ class KnowledgeFileIngestionServiceTest {
         verify(fixture.mapper()).markVectorizing(documentUuid.toString());
         verify(fixture.mapper()).markVectorized(
                 eq(documentUuid.toString()), eq(5), any());
+    }
+
+    @Test
+    void shouldRejectTamperedMarkdownBeforeRetryVectorization() throws Exception {
+        UUID documentUuid = UUID.fromString(
+                "550e8400-e29b-41d4-a716-446655440000");
+        TestFixture fixture = fixture(documentUuid);
+        String convertedKey = USERNAME + "/knowledge.txt/converted/"
+                + documentUuid + "_knowledge.md";
+        byte[] markdown = "# 被篡改内容".getBytes(StandardCharsets.UTF_8);
+        fixture.objectService().storeAndVerify(
+                convertedKey,
+                "text/markdown; charset=UTF-8",
+                markdown.length,
+                Map.of("document-uuid", documentUuid.toString()),
+                () -> new ByteArrayInputStream(markdown));
+
+        KnowledgeFileRecord record = record(
+                documentUuid.toString(), "knowledge.txt", "CONVERTED", "FAILED");
+        record.setOriginalFilePath(
+                USERNAME + "/knowledge.txt/original/"
+                        + documentUuid + "_knowledge.txt");
+        record.setMarkdownFilePath(convertedKey);
+        record.setConvertedSha256("0".repeat(64));
+        when(fixture.mapper().selectByDocumentUuid(documentUuid.toString()))
+                .thenReturn(record);
+        when(fixture.vectorStorage().getVectorStatus(documentUuid.toString()))
+                .thenReturn(0);
+
+        fixture.service().retry(documentUuid.toString());
+
+        verify(fixture.mapper()).markVectorizeFailed(
+                eq(documentUuid.toString()), anyString());
+        verify(fixture.mapper(), never()).markConvertFailed(
+                eq(documentUuid.toString()), anyString());
+        verify(fixture.vectorStorage(), never()).vectorizeDocument(any());
     }
 
     @Test
@@ -229,7 +324,8 @@ class KnowledgeFileIngestionServiceTest {
                 USERNAME + "/knowledge.txt/original/"
                         + documentUuid + "_knowledge.txt");
         record.setMarkdownFilePath(
-                USERNAME + "/knowledge.txt/converted/knowledge.md");
+                USERNAME + "/knowledge.txt/converted/"
+                        + documentUuid + "_knowledge.md");
         when(fixture.mapper().selectByDocumentUuidIncludingDeleted(
                 documentUuid.toString()))
                 .thenReturn(record);
@@ -238,7 +334,7 @@ class KnowledgeFileIngestionServiceTest {
 
         fixture.service().delete(documentUuid.toString());
 
-        verify(fixture.chatAgentClient()).deleteDocument(
+        verify(fixture.vectorStorage()).deleteDocument(
                 documentUuid.toString());
         assertMissing(fixture.storage(), record.getOriginalFilePath());
         assertMissing(fixture.storage(), record.getMarkdownFilePath());
@@ -275,7 +371,7 @@ class KnowledgeFileIngestionServiceTest {
                         "DELETE",
                         "DELETE_VECTORS",
                         "向量删除失败"))
-                .when(fixture.chatAgentClient())
+                .when(fixture.vectorStorage())
                 .deleteDocument(documentUuid.toString());
 
         AppException failure = assertThrows(
@@ -317,7 +413,7 @@ class KnowledgeFileIngestionServiceTest {
                 anyString());
         verify(fixture.mapper()).markDeletionSucceeded(
                 documentUuid.toString());
-        verify(fixture.chatAgentClient(), never()).deleteDocument(
+        verify(fixture.vectorStorage(), never()).deleteDocument(
                 documentUuid.toString());
     }
 
@@ -339,7 +435,7 @@ class KnowledgeFileIngestionServiceTest {
 
         fixture.service().delete(documentUuid.toString());
 
-        verify(fixture.chatAgentClient(), never()).deleteDocument(
+        verify(fixture.vectorStorage(), never()).deleteDocument(
                 documentUuid.toString());
         verify(fixture.mapper(), never()).markDeleted(
                 eq(documentUuid.toString()), any());
@@ -378,7 +474,7 @@ class KnowledgeFileIngestionServiceTest {
         assertEquals(
                 AppErrorCode.KNOWLEDGE_FILE_DELETE_IN_PROGRESS,
                 failure.getErrorCode());
-        verify(fixture.chatAgentClient(), never()).deleteDocument(
+        verify(fixture.vectorStorage(), never()).deleteDocument(
                 documentUuid.toString());
     }
 
@@ -388,15 +484,17 @@ class KnowledgeFileIngestionServiceTest {
         KnowledgeFileStorageProperties storageProperties =
                 new KnowledgeFileStorageProperties();
         storageProperties.setType(FileStorageType.LOCAL);
-        LocalFileStorage storage = new LocalFileStorage(storageRoot.toString());
+        LocalObjectStorage storage = new LocalObjectStorage(storageRoot.toString());
         KnowledgeFileObjectService objectService = new KnowledgeFileObjectService(
                 storage, new Sha256FileChecksumCalculator());
         ToMarkdownClient toMarkdownClient = mock(ToMarkdownClient.class);
-        ChatAgentIngestionClient chatAgentClient =
-                mock(ChatAgentIngestionClient.class);
+        KnowledgeFileVectorStorage vectorStorage =
+                mock(KnowledgeFileVectorStorage.class);
         KnowledgeFileMapper mapper = mock(KnowledgeFileMapper.class);
         OperationHistoryService operationHistoryService =
                 mock(OperationHistoryService.class);
+        FileStatusEventPublisher fileStatusEventPublisher =
+                mock(FileStatusEventPublisher.class);
         DocumentUuidGenerator uuidGenerator = mock(DocumentUuidGenerator.class);
         AtomicInteger uuidIndex = new AtomicInteger();
         when(uuidGenerator.generate()).thenAnswer(
@@ -426,6 +524,14 @@ class KnowledgeFileIngestionServiceTest {
             }
             return 1;
         });
+        when(mapper.reserveMarkdownPath(anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    if (persisted.get() != null) {
+                        persisted.get().setMarkdownFilePath(
+                                invocation.getArgument(1));
+                    }
+                    return 1;
+                });
         when(mapper.markConverted(
                 anyString(), anyString(), anyString(), any())).thenAnswer(invocation -> {
                     if (persisted.get() != null) {
@@ -462,13 +568,6 @@ class KnowledgeFileIngestionServiceTest {
             }
             return 1;
         });
-        when(mapper.markOriginalStorageFailed(anyString(), anyString())).thenAnswer(invocation -> {
-            if (persisted.get() != null) {
-                persisted.get().setOriginalStorageStatus("FAILED");
-                persisted.get().setErrorMessage(invocation.getArgument(1));
-            }
-            return 1;
-        });
         when(mapper.markDeleted(anyString(), any())).thenReturn(1);
         when(mapper.beginDeletion(anyString(), any(), any())).thenReturn(1);
         when(mapper.markDeletionFailed(
@@ -482,20 +581,23 @@ class KnowledgeFileIngestionServiceTest {
                 new KnowledgeObjectKeyGenerator(),
                 objectService,
                 toMarkdownClient,
-                chatAgentClient,
+                vectorStorage,
                 mapper,
                 storageProperties);
         ReflectionTestUtils.setField(
                 service, "operationHistoryService", operationHistoryService);
+        ReflectionTestUtils.setField(
+                service, "fileStatusEventPublisher", fileStatusEventPublisher);
 
         return new TestFixture(
                 storage,
                 objectService,
                 toMarkdownClient,
-                chatAgentClient,
+                vectorStorage,
                 mapper,
                 service,
-                operationHistoryService);
+                operationHistoryService,
+                fileStatusEventPublisher);
     }
 
     private KnowledgeFileUpload upload(String filename, byte[] content) {
@@ -519,7 +621,12 @@ class KnowledgeFileIngestionServiceTest {
         return record;
     }
 
-    private void assertPresent(LocalFileStorage storage, String objectKey) {
+    private String sha256(byte[] content) throws IOException {
+        return new Sha256FileChecksumCalculator().calculate(
+                new ByteArrayInputStream(content));
+    }
+
+    private void assertPresent(LocalObjectStorage storage, String objectKey) {
         try (var input = storage.open(objectKey)) {
             assertTrue(input.readAllBytes().length > 0);
         } catch (IOException failure) {
@@ -527,17 +634,18 @@ class KnowledgeFileIngestionServiceTest {
         }
     }
 
-    private void assertMissing(LocalFileStorage storage, String objectKey) {
+    private void assertMissing(LocalObjectStorage storage, String objectKey) {
         assertThrows(IOException.class, () -> storage.open(objectKey));
     }
 
     private record TestFixture(
-            LocalFileStorage storage,
+            LocalObjectStorage storage,
             KnowledgeFileObjectService objectService,
             ToMarkdownClient toMarkdownClient,
-            ChatAgentIngestionClient chatAgentClient,
+            KnowledgeFileVectorStorage vectorStorage,
             KnowledgeFileMapper mapper,
             KnowledgeFileIngestionService service,
-            OperationHistoryService operationHistoryService) {
+            OperationHistoryService operationHistoryService,
+            FileStatusEventPublisher fileStatusEventPublisher) {
     }
 }

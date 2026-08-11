@@ -18,14 +18,14 @@ import java.util.List;
  * 风险分析记录查询 Controller。
  *
  * <p>本 Controller 统一承载风险分析的查询与触发入口。资信文件上传和转换仍由
- * {@code credentialfile} 模块对外暴露，风险分析入口负责完整编排“状态校验—Markdown 汇总—
- * 大模型分析—结果落库”流程。</p>
+ * {@code credentialfile} 模块对外暴露，风险分析入口负责完整编排“状态校验—可选 Markdown 汇总—
+ * 大模型分析—结果落库”流程。未上传资信材料时，服务端会以投标基础信息执行初步分析。</p>
  *
  * <p>当前 3 端点：</p>
  * <ul>
  *   <li>{@code GET /risk-analysis} — 分页查询全部历史分析记录</li>
  *   <li>{@code GET /risk-analysis/by-bid-record/{id}} — 按投标记录 ID 查询其所有历史分析记录</li>
- *   <li>{@code POST /bid-record/analyze-risk/{id}} — 触发一次整体资信材料风险分析</li>
+ *   <li>{@code POST /bid-record/analyze-risk/{id}} — 触发一次投标记录风险分析</li>
  * </ul>
  */
 @RestController
@@ -68,10 +68,10 @@ public class RiskAnalysisController {
     }
 
     /**
-     * 触发一次整体资信材料风险分析。
+     * 触发一次投标记录风险分析。
      *
-     * <p>服务端会先校验所有资信批次和文件均已转换完成，再按批次和文件顺序汇总 Markdown，
-     * 最后将完整材料一次性提交给大模型。</p>
+     * <p>存在资信文件时，服务端会先校验所有文件均已转换完成，再按文件顺序汇总 Markdown；
+     * 未上传资信材料时，则直接以投标基础信息进行初步分析，并要求模型明确待核验项。</p>
      *
      * @param id 投标记录 ID
      * @return 含 analysisId 的完整 RiskAnalysis

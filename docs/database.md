@@ -1,6 +1,6 @@
 # smart-bid-platform-be 数据库关系与字段文档
 
-> 本文档以 `src/main/resources/sql/ddl/V1-V24` 的最终目标结构、当前实体和 MyBatis XML 为准。
+> 本文档以 `src/main/resources/sql/ddl/V1-V54`、当前实体和 MyBatis XML 为准。DDL 由环境手工执行，不能把版本目录误当作应用启动时自动迁移。
 >
 > 当前业务层级见 [architecture.md](architecture.md)，端点的数据流见 [business-process.md](business-process.md)。
 
@@ -35,6 +35,8 @@
 > V46 将 `credential_file` 字段对齐 `knowledge_file`：`sha256→original_sha256`、
 > `status→convert_status`，新增 `converted_sha256` 与 `error_stage`，`file_uuid` 加唯一约束。
 > V47 将 `original_sha256` 改为可空：对齐先落库（UPLOADED）再存储回填的流程。
+> V48 为两个文件表增加 `original_storage_status`，区分原始对象的 `STORING/STORED/FAILED` 状态；
+> V49 将公共对象路径统一为 `VARCHAR(512)`，并补齐 `created_at` 默认值与通用失败阶段字段说明。
 > 账号表在 V36（bidder_account）/ V39（bid_inviter_account）创建，版本号与
 > chat-agent 独立库的 V28 标题来源脚本不再冲突。
 
@@ -118,12 +120,15 @@ erDiagram
         VARCHAR original_filename
         VARCHAR content_type
         BIGINT file_size
-        CHAR sha256
+        CHAR original_sha256
+        CHAR converted_sha256
         VARCHAR storage_type
         VARCHAR original_file_path
+        VARCHAR original_storage_status
         VARCHAR markdown_file_path
-        VARCHAR status
+        VARCHAR convert_status
         VARCHAR error_message
+        VARCHAR error_stage
         DATETIME created_at
         DATETIME converted_at
         DATETIME bound_at
@@ -390,10 +395,10 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    CF["credential_file<br/>status=CONVERTED"]
+    CF["credential_file<br/>convert_status=CONVERTED"]
     PATH["markdown_file_path"]
     JSON["bid_record.credentials<br/>JSON array"]
-    MERGE["风险分析按批次/文件重新查询"]
+    MERGE["风险分析按文件重新查询"]
 
     CF --> PATH --> JSON
     CF --> MERGE
@@ -429,26 +434,30 @@ COMPLETED ┘
 | `original_filename` | `VARCHAR(255)` | 否 | — | — | 清理后的原始文件名 |
 | `content_type` | `VARCHAR(100)` | 是 | `NULL` | — | MIME |
 | `file_size` | `BIGINT` | 否 | — | — | 字节数 |
-| `sha256` | `CHAR(64)` | 否 | — | — | 上传前与存储后回读一致的 SHA-256 |
+| `original_sha256` | `CHAR(64)` | 是 | `NULL` | — | 原始对象回读校验完成后回填的 SHA-256 |
+| `converted_sha256` | `CHAR(64)` | 是 | `NULL` | — | Markdown 对象回读校验完成后的 SHA-256 |
 | `storage_type` | `VARCHAR(20)` | 否 | `LOCAL` | — | `LOCAL/MINIO` |
-| `original_file_path` | `VARCHAR(500)` | 否 | — | 对象引用 | original 相对路径/object key |
-| `markdown_file_path` | `VARCHAR(500)` | 是 | `NULL` | 对象引用 | converted Markdown object key |
-| `status` | `VARCHAR(20)` | 否 | `UPLOADED` | 状态字段 | 文件转换状态 |
+| `original_file_path` | `VARCHAR(512)` | 否 | — | 对象引用 | original 相对路径/object key |
+| `original_storage_status` | `VARCHAR(20)` | 否 | `STORED` | 状态字段 | 原始对象 `STORING/STORED/FAILED` |
+| `markdown_file_path` | `VARCHAR(512)` | 是 | `NULL` | 对象引用 | converted Markdown object key |
+| `convert_status` | `VARCHAR(20)` | 否 | `UPLOADED` | 状态字段 | 文件转换 `UPLOADED/CONVERTING/CONVERTED/FAILED` |
 | `error_message` | `VARCHAR(1000)` | 是 | `NULL` | — | 最近失败原因 |
+| `error_stage` | `VARCHAR(20)` | 是 | `NULL` | — | `UPLOAD/CONVERT/VECTORIZE/UNKNOWN`；资信文件实际使用前两类 |
 | `created_at` | `DATETIME` | 否 | `CURRENT_TIMESTAMP` | — | 元数据创建时间 |
 | `converted_at` | `DATETIME` | 是 | `NULL` | — | 最近转换完成时间 |
 | `bound_at` | `DATETIME` | 是 | `NULL` | — | 与投标记录绑定时间 |
+| `deleted_at` 等删除字段 | 多种 | 是 | `NULL` | 状态字段 | V45 删除状态机及失败留痕 |
 
 索引：
 
 - PK：`file_id`
-- `idx_file_uuid(file_uuid)`
+- `file_uuid` 唯一约束（V46）
 - `idx_bid_record_id(bid_record_id)`
-- `idx_status(status)`
+- `idx_status(convert_status)`（V23 建立索引名，V46 重命名列后保留索引名）
 
 当前应用在上传时已经知道 `bidRecordId`，因此会立即填写 `bid_record_id` 和 `bound_at`。DDL 中“后续回填”的注释属于更早的设计，和当前上传实现不完全一致。
 
-当前没有唯一约束 `(file_uuid, file_order)`，因此顺序唯一性由 Java 上传循环维护。
+文件单元 UUID 全局唯一；同一投标记录中的展示顺序由 `file_order, file_id` 决定，不把请求内顺序误当作数据库唯一约束。
 
 ## 10. `risk_analysis`
 
@@ -495,11 +504,11 @@ flowchart LR
 ## 11. 文件对象与数据库字段的关系
 
 ```text
-{bidderAccountId}/
-├── files/{fileUuid}/
-│   ├── original/{fileUuid}_{filename}
+{username}/
+├── {safeFilename}/
+│   ├── original/{fileUuid}_{safeFilename}
 │   │   └── credential_file.original_file_path
-│   └── converted/content.md
+│   └── converted/{markdownFilename}.md
 │       └── credential_file.markdown_file_path
 └── merged/{bidRecordId}/credentials.md
     └── 不对应数据库文件行，每次风险分析时覆盖
@@ -507,7 +516,7 @@ flowchart LR
 
 | 对象信息 | 数据库来源 |
 |---|---|
-| `{bidderAccountId}` | `bid_record.bidder_account_id` |
+| `{username}` | 当前投标方登录用户名；上传入口要求它与 Basic 凭据一致 |
 | `{fileUuid}` | `credential_file.file_uuid` |
 | original object key | `credential_file.original_file_path` |
 | converted object key | `credential_file.markdown_file_path` |
@@ -543,7 +552,7 @@ flowchart LR
 - 经办人、公告、投标、账号、文件和风险记录之间的父记录存在性。
 - `credential_file.bid_record_id` 与 `bid_record.bidder_account_id` 归属一致。
 - `credentials` 与已转换文件路径一致。
-- `knowledge_file.convert_status/index_status` 与对象存储、Chroma 实际状态一致。
+- `knowledge_file.convert_status/index_status` 与对象存储、vector-service 中的 Chroma 实际状态一致。
 - 文件操作历史（UPLOAD/CONVERT/VECTORIZE/DELETE/RETRY）与文件状态变化一一对应。
 - 状态机合法跳转。
 - 删除父记录时对子记录和对象存储的处理。
@@ -554,9 +563,9 @@ flowchart LR
 |---|---|
 | 删除经办人 | 公告仍引用不存在的 `bid_handler_id` |
 | 删除公告 | 投标和状态历史成为孤儿 |
-| 删除投标记录 | 批次、文件、风险记录和对象仍保留 |
-| 用不存在的 `bidRecordId` 上传 | 可产生孤儿批次、文件和对象路径 |
-| 直接更新文件状态 | 批次计数和 `credentials` 不会自动同步 |
+| 删除投标记录 | 文件、风险记录和对象仍可能保留 |
+| 绕过投标方入口直接写文件元数据 | 可产生与投标账号归属不一致的文件和对象路径 |
+| 直接更新文件状态 | `credentials` 投影、SSE 和操作历史不会自动同步 |
 | 直接修改公告状态 | 不会自动写历史 |
 
 ## 15. DDL 使用注意事项
@@ -572,7 +581,7 @@ flowchart LR
 
 因此：
 
-1. 当前开发库应以 V24 后的最终表结构为准。
-2. 上生产前应生成一份经过验证的基线 DDL，而不是直接把 V1-V24 作为无损生产迁移执行。
+1. 当前开发库应以 V54 后的最终表结构为准；V48/V49 对齐文件公共字段，V50-V54 补充资信与投标记录向量/删除状态。
+2. 上生产前应生成一份经过验证的基线 DDL，而不是直接把 V1-V54 作为无损生产迁移执行。
 3. 迁移前必须先制定历史数据保留、旧表映射和对象存储迁移方案。
 4. 若后续启用 Flyway，需要先修正历史脚本可重复执行性和基线版本策略。

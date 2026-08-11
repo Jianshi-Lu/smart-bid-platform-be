@@ -12,9 +12,9 @@
 - 投标方账号绑定的资信文件上传、原始文件持久化、SHA-256 校验和、Markdown 转换及汇总；
 - 基于投标记录基础信息和资信材料的同步风险分析，并保存历史分析结果；
 - 邮件测试和中标通知书发送；
-- chat-agent 的 Java Controller 最小同步代理，以及 to-markdown 的 Java 编排接入。
+- Java 持久化的 chat-agent 会话、消息历史与同步问答编排，以及 to-markdown/vector-service 的 Java 编排接入。
 
-本仓库只实现 Java 服务。前端、Python `to-markdown`/chat-agent 服务、MySQL、MinIO 或本地文件系统、OpenAI 兼容大模型服务和 SMTP 都是外部运行依赖。
+本仓库只实现 Java 服务。前端、Python `to-markdown`/`vector-service`/chat-agent 服务、MySQL、MinIO 或本地文件系统、ChromaDB、OpenAI 兼容大模型服务和 SMTP 都是外部运行依赖。
 
 当前明确的边界：
 
@@ -23,7 +23,8 @@
 - 文件正文不进入 MySQL，数据库只保存元数据、状态和逻辑存储路径；
 - `bid_record.credentials` 是已转换 Markdown 路径的 JSON 投影，不是资信文件事实源；文件事实源是 `credential_file`；
 - DDL 使用 Flyway 风格 `V*.sql` 命名，但项目没有启用 Flyway，脚本需要按环境手工执行；
-- chat-agent 当前只支持单轮同步问答，不保存会话历史，也不提供流式输出；前端通过 Java Controller 访问 Python 服务。
+- chat-agent 由 Java 保存单用户边界下的会话与消息历史，并把 `conversationId` 映射为 Python `thread_id`；单次问答仍是同步 HTTP，当前不提供流式输出。
+- vector-service 独立负责切分、Embedding、ChromaDB 写入/查询/删除；Java 文件生命周期直接调用它，chat-agent 只通过它检索。
 
 ## 2. 构建、启动与配置
 
@@ -71,7 +72,8 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 | `credential-file.storage` | `FileStorageProperties`，选择 `LOCAL`/`MINIO` 及对应参数；资信材料默认桶 `credential-files` |
 | `knowledge-file.storage` | `KnowledgeFileStorageProperties`，RAG 知识文件存储配置；默认桶 `knowledge-file`，与资信材料分桶 |
 | `risk-analysis` | `RiskAnalysisProperties`，当前用于汇总 Markdown 字符上限，开发默认约 128K 字符 |
-| `chat-agent` | `ChatAgentProperties`，绑定 Python 单轮问答服务地址 |
+| `chat-agent` | `ChatAgentProperties`，绑定 Python 问答服务地址 |
+| `vector-service` | `VectorServiceProperties`，绑定 Python 向量服务地址 |
 
 开发环境通过环境变量提供外部配置，例如 `MYSQL_URL`、`MYSQL_USERNAME`、`MYSQL_PASSWORD`、模型 API Key、邮件密码、Python 服务地址、MinIO 地址/密钥/bucket 等。实际值不应写入仓库。
 
@@ -79,7 +81,7 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 
 ### 2.4 数据库脚本
 
-当前 DDL 位于 `src/main/resources/sql/ddl/`，版本为 V1-V24。V18、V20 等脚本包含重命名或 `TRUNCATE` 等强操作；修改数据库时必须先确认目标数据库和脚本执行历史，不能把所有脚本无条件重新执行。
+当前 DDL 位于 `src/main/resources/sql/ddl/`，版本为 V1-V54。V18、V20 等历史脚本包含重命名或 `TRUNCATE` 等强操作；V48-V54 继续补充文件与投标记录的存储、向量和删除状态。修改数据库时必须先确认目标数据库和脚本执行历史，不能把所有脚本无条件重新执行。
 
 ## 3. 源码组织与职责
 
@@ -87,14 +89,12 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/BidWinningBackendApplication.
 src/main/java/io/gitee/lujianshi/bidwinningbackend/
 ├── BidWinningBackendApplication.java
 ├── controller/                         # 通用/全局异常；角色 Controller 按 bid_inviter/bidder 分包
-│   ├── bid_inviter/                    # 招标方管理入口：公告、经办人、投标记录、风险分析、chat-agent 问答
-│   ├── bidder/                         # 投标方入口：AuthController（注册/登录/me）、BidRecordController（我的投标）
-│   ├── bid_inviter/                    # 招标方管理入口与登录：业务 Controller + AuthController（/bid-inviter/auth）
+│   ├── bid_inviter/                    # 招标方入口：业务 Controller、统一文件 Controller、登录与 chat-agent 问答
+│   └── bidder/                         # 投标方入口：认证、我的投标与统一资信文件 Controller
 ├── credentialfile/                     # 资信文件垂直模块
 │   ├── checksum/                       # SHA-256 算法抽象与实现
 │   ├── client/                         # Python HTTP 客户端及协议 DTO
-│   ├── config/                         # 转换、存储、MinIO 配置
-│   ├── controller/                     # 上传、无差别转换入口
+│   ├── config/                         # 转换与文件存储参数
 │   ├── dto/                            # 上传/转换响应与请求
 │   ├── entity/                         # credential_file 实体
 │   ├── enums/                          # ConvertStatus、存储类型、汇总状态
@@ -102,14 +102,28 @@ src/main/java/io/gitee/lujianshi/bidwinningbackend/
 │   ├── mapper/                         # 文件 Mapper
 │   ├── processor/                      # 单文件存储与完整性验证编排
 │   ├── service/                        # 上传、转换、Markdown 汇总
-│   └── storage/                        # FileStorage、Local、MinIO 适配器
+│   └── storage/                        # 资信对象 key 生成（基础设施实现位于 storage.object）
 ├── dto/                                # 通用业务请求/响应 DTO
 ├── config/                             # 双数据源、MyBatis 与招标方鉴权拦截器（BidInviterAuthInterceptor）
 ├── entity/                             # 核心数据库实体（含 BidInviterAccount）
 ├── enums/                              # 招标公告状态
 ├── exception/                          # AppException、AppErrorCode
 ├── mapper/                             # 核心 Mapper 抽象与接口
-├── service/                            # CRUD、邮件、风险分析、状态检查
+├── service/                            # CRUD 与业务编排
+│   ├── account/                         # 投标方/招标方账号与 Basic 鉴权业务
+│   ├── audit/                           # 操作历史与审计快照
+│   ├── bidhandler/                      # 招标经办人业务
+│   ├── bidrecord/                      # 投标记录事实、生命周期和向量索引编排
+│   ├── file/                            # 投标方/招标方文件应用服务与下载
+│   ├── invitation/                      # 招标公告业务
+│   ├── lifecycle/                       # 启动恢复与跨存储生命周期对账
+│   ├── mail/                            # 邮件发送
+│   ├── riskanalysis/                    # 风险分析
+│   ├── statuscheck/                     # 服务状态与邮件测试
+│   └── support/                         # 通用 CRUD 基类等支撑代码
+├── storage/
+│   ├── object/                         # ObjectStorage 及 Local/MinIO 实现
+│   └── vector/                         # Java 到 vector-service 的三类向量协议适配
 └── utils/                              # 路径解析与异步任务工具
 
 src/main/resources/
@@ -124,7 +138,7 @@ src/main/resources/
 ```text
 HTTP/Controller → DTO → Service → Entity/业务模型
                               ↓
-                 Mapper/XML、FileStorage、外部 Client、Spring AI
+                 Mapper/XML、ObjectStorage、VectorStorage、外部 Client、Spring AI
                               ↓
                      MySQL、文件存储、Python、模型、SMTP
 ```
@@ -167,7 +181,7 @@ bid_record 1 ── * risk_analysis
 
 `knowledge_file` 独立于资信文件，是知识入库链路的唯一事实源：
 `document_uuid` 同时是对象存储目录根（`{documentUuid}/original|converted`）
-与 chat-agent Chroma chunk 的稳定身份；转换与向量化分两个状态列推进，
+与 vector-service Chroma chunk 的稳定身份；转换与向量化分两个状态列推进，
 失败保留对象与错误信息，可按失败点重试，删除走软删除保留追溯。
 
 ### 4.2 `bid_record` 的特殊字段
@@ -233,7 +247,8 @@ UPLOADING → UPLOADED → CONVERTING → CONVERTED
 - 上传时文件记录为 `UPLOADED`；转换接口是无差别重处理入口，`UPLOADED`、`FAILED`、`CONVERTED` 可以重新抢占，`CONVERTING` 不会被第二个请求再次抢占；
 - V46 起上传链路对齐知识文件（向量化除外）：先落库再存储，单文件失败只留痕
   （`convert_status=FAILED` + `error_stage` + `error_message`），不整体回滚、不删对象、不连坐同批其他文件；
-- 上传成功即同步转换，状态直接推进到 `CONVERTED/FAILED`；转换失败保留 original 供重试；
+- 原始对象经回读校验后，`FileConvertService.convertFileAsync` 在 `fileProcessingExecutor` 后台推进转换；上传响应可能仍是 `UPLOADED`，列表和 SSE 是后续状态的读取入口；
+- `original_storage_status` 单独表示原始对象写入：`STORING → STORED / FAILED`，用于列表/SSE 与生命周期追溯；下载服务仍以原始路径和 SHA-256 的持久化就绪条件为准；
 - 文件状态抢占通过 Mapper 的条件更新完成，返回行数是是否拿到处理权的依据；
 - Python 只负责文件流到 Markdown 的内容转换；Java 负责 original/converted 存取、
   完整性校验、文件循环和数据库状态收敛；
@@ -261,7 +276,7 @@ UPLOADING → UPLOADED → CONVERTING → CONVERTED
 
 - 上传即建记录，状态由 Java 逐阶段条件更新推进，不整体回滚；
 - 失败只写状态与错误（error_stage=CONVERT/VECTORIZE），对象保留供重试；
-- 重试前先查询 chat-agent 向量状态：已存在则直接置 VECTORIZED，否则按替换语义重写；
+- 重试前先查询 vector-service 向量状态：已存在则直接置 VECTORIZED，否则按替换语义重写；
 - 删除是可追溯、可幂等续删的状态机（V44）：CAS 抢占 `DELETING` → Chroma 向量 →
   original/converted 对象 → `deleted_at` 软删除 → 删除历史 → `DELETED` 终态；
   任一步失败把失败点写入 `deletion_failed_stage/deletion_error_message` 后抛错，
@@ -295,11 +310,11 @@ UploadItem
   ↓ FileUploadService
 每个 UploadItem：
 生成文件单元 UUID（file_uuid）→ 插入 credential_file(UPLOADED)
-  → 计算请求流 SHA-256 → StoragePath 生成 original 逻辑路径 → FileStorage.store()
+  → 计算请求流 SHA-256 → StoragePath 生成 original 逻辑路径 → ObjectStorage.store()
   → 从存储重新 open()，再次计算 SHA-256 并比对
-  → 回填 original_sha256/original_file_path/storage_type → 写 CREATE 历史
-  → 同步转换（CONVERTING → CONVERTED/FAILED + converted_sha256）
-  → 返回该文件最新状态（成功或 FAILED + error_stage/error_message）
+  → 回填 original_sha256/original_file_path/storage_type/original_storage_status=STORED → 写 CREATE 历史
+  → 发布 SSE 状态事件并触发后台转换（CONVERTING → CONVERTED/FAILED + converted_sha256）
+  → 返回提交时的文件状态；前端由列表/SSE 读取后续状态
 ```
 
 路径由 `StoragePath` 统一生成，当前形态为：
@@ -310,29 +325,29 @@ UploadItem
 {username}/merged/{bidRecordId}/credentials.md
 ```
 
-`LocalFileStorage` 将它解释为存储根目录下的相对路径；`MinioFileStorage` 将它解释为
+`LocalObjectStorage` 将它解释为存储根目录下的相对路径；`MinioObjectStorage` 将它解释为
 object key。路径会拒绝绝对路径、`.`、`..` 和空片段，原始文件名会去除客户端路径片段和
 控制字符。文件单元 UUID 保证 original 目录唯一，converted 由转换服务命名（固定 `.md`），
 重复转换覆盖同一对象。单文件失败不触发整批清理，失败状态与原因留存在该行上；
 显式删除接口（V45 删除状态机）才清理对象与软删记录。上传接口强制要求投标记录已绑定
-`bidder_account_id`（Controller 校验归属 + Service 防御校验），不存在“无账号上传”。
+`bidder_account_id`（`BidderFileApplicationService` 校验归属 + 文件 Service 防御校验），不存在“无账号上传”。
 
 ### 6.3 原始文件转 Markdown
 
 入口：`POST /credential-files/bid-records/{bidRecordId}/convert`。
 
 ```text
-FileConvertController
+BidInviterFileController
   → FileConvertService.convertAll(bidRecordId)
   → 查询该投标记录全部文件（created_at/file_order/file_id ASC）
   → Java 条件抢占单文件 CONVERTING
-  → FileStorage.open(original_file_path)
+  → ObjectStorage.open(original_file_path)
   → 读取过程中重新计算并校验 original SHA-256
   → ToMarkdownClient multipart POST Python /convert
        file=<original 文件流>
   → 校验 Python 返回非空 text/markdown 文件
   → Java 生成同文件单元 converted Markdown 路径（converted/content.md）
-  → FileStorage.store() 上传 Markdown 并校验属性/metadata
+  → ObjectStorage.store() 上传 Markdown 并校验属性/metadata
   → 重新 open converted，校验 Markdown SHA-256
   → 文件标记 CONVERTED 并保存 markdown_file_path
   → 重新聚合已完成路径，回写 bid_record.credentials JSON
@@ -401,11 +416,10 @@ RiskAnalysisController
 | `InvitationForBidController` | `/invitation-for-bid/*`：CRUD、批量新增、状态变更 |
 | `BidRecordController` | `/bid-record/*`：CRUD、分页、批量删除、按公告查询 |
 | `RiskAnalysisController` | `GET /risk-analysis`、`GET /risk-analysis/by-bid-record/{id}`、`POST /bid-record/analyze-risk/{id}` |
-| `BidderBidRecordController` | `/bidder/bid-records/*`：我的投标 CRUD、`GET/POST /{id}/credential-files` 列表/上传、`DELETE /{id}/credential-files/{fileId}` 删除 |
-| `FileConvertController` | `POST /credential-files/bid-records/{bidRecordId}/convert` |
-| `CredentialFileOperationHistoryController` | `GET /credential-files/{fileId}/history`：资信文件生命周期历史 |
-| `KnowledgeFileController` | `/knowledge-files`：上传入库、分页列表、详情、`POST /{uuid}/retry` 重试、`DELETE /{uuid}` 删除、`GET /{uuid}/history` 历史 |
-| `ChatAgentController` | `POST /chat-agent/chat`：单轮问答代理 |
+| `BidRecordController`（投标方） | `/bidder/bid-records/*`：我的投标 CRUD |
+| `BidderFileController` | `/bidder/bid-records/{id}/credential-files/**`：上传、列表、删除、下载和 SSE |
+| `BidInviterFileController` | `/knowledge-files/**` 与 `/credential-files/**`：知识文件生命周期、资信转换/历史/下载 |
+| `ChatAgentController` | `/chat-agent/conversations` 会话创建/查询/改名/删除、消息查询和 `POST /chat-agent/chat` 问答 |
 
 完整请求字段和响应示例见 `docs/api.md`；实际 Controller 注解优先于文档中的历史端点数量。
 
@@ -413,17 +427,17 @@ RiskAnalysisController
 
 | Java 组件 | 外部目标 | 调用职责 |
 |---|---|---|
-| `LocalFileStorage` | Java 本地文件系统 | original/converted/merged 的本地持久化 |
-| `MinioFileStorage` | MinIO | 与本地实现相同的 `store/open/delete` 抽象 |
+| `LocalObjectStorage` | Java 本地文件系统 | original/converted/merged 的本地持久化 |
+| `MinioObjectStorage` | MinIO | 与本地实现相同的 `store/open/delete` 抽象 |
 | `ToMarkdownClient` | Python `to-markdown` | multipart 发送单个原文件流并接收 Markdown 文件 |
-| `ChatAgentIngestionClient` | Python `chat-agent` | 单文件向量化、按 UUID 查询/删除 Chroma 向量状态 |
-| `ChatAgentController` | Python `chat-agent` | 转发单轮 JSON 问题并包装平台响应 |
+| `KnowledgeFileVectorStorage` / `CredentialFileVectorStorage` / `BidRecordVectorStorage` | Python `vector-service` | 向量替换写入、状态查询、删除与读后校验 |
+| `ChatAgentConversationService` | Python `chat-agent` | 将 Java 会话映射为 `thread_id`，持久化消息、提供幂等问答并同步转发 JSON 请求 |
 | `RiskAnalysisService` | OpenAI 兼容模型/LM Studio | 结构化风险分析 |
 | `MailService` | SMTP | 纯文本和 HTML 邮件 |
 
 ### 7.3 存储抽象约束
 
-新增业务代码应依赖 `FileStorage`，不要直接在 Service 中调用 NIO 或 MinIO SDK。`FileStorage.store()` 目标已存在时按实现约定覆盖，适合覆盖 `merged/credentials.md`；原始路径由 UUID 保证唯一。所有逻辑路径必须经过 `StoragePath`/规范化边界，不能接收客户端绝对路径作为存储目标。
+新增业务代码应依赖 `ObjectStorage`，不要直接在 Service 中调用 NIO 或 MinIO SDK。`ObjectStorage.store()` 目标已存在时按实现约定覆盖，适合覆盖 `merged/credentials.md`；原始路径由 UUID 保证唯一。所有逻辑路径必须经过 `StoragePath`/`ObjectKey` 规范化边界，不能接收客户端绝对路径作为存储目标。向量业务必须按知识、资信、投标记录分别依赖对应 `storage.vector` 适配器，不把三套状态机合并成通用客户端。
 
 ## 8. 统一响应与异常流向
 
@@ -522,7 +536,7 @@ tests/postman/credential-file-flow.postman_collection.json
 
 典型联调前提是 Java 服务、Python `to-markdown` 服务、Java 可访问的文件存储和
 已存在的 `bid_record`。Python 不访问文件存储，因此无需与 Java 共享 MinIO 配置或
-本地目录；生产配置为 `MINIO` 时由 Java 的 `MinioFileStorage` 完成全部对象操作。
+本地目录；生产配置为 `MINIO` 时由 Java 的 `MinioObjectStorage` 完成全部对象操作。
 
 ## 11. 已实现、未完成与待确认事项
 
@@ -542,14 +556,14 @@ tests/postman/credential-file-flow.postman_collection.json
 ### 未完成或已知限制
 
 - 资信文件删除已实现软删 + 删除状态机（对象 + `deleted_at` 软删 + 历史 + `bid_record.credentials` 投影同步），但删除不级联投标记录；
-- 上传已自动同步转换（对齐 knowledge_file）；转换失败保留 original，可通过无差别转换接口重试；
+- 上传会自动触发后台转换（对齐 knowledge_file）；转换失败保留 original，可通过无差别转换接口重试；
 - 风险分析 `ANALYZING` 没有超时恢复；
 - 手动转换与风险分析没有投标记录级互斥；
 - 租户隔离、数据库硬外键、级联删除和孤儿数据清理仍缺失；演示鉴权为 HTTP Basic 明文密码；
-- 资讯采集的 Python 服务、定时任务、LangChain 编排、原文/Markdown 持久化、去重、向量化、向量数据库和前端 UI 尚未实现；
+- 资讯采集的定时任务、去重和前端 UI 尚未实现；现有知识/资信/投标向量化由 vector-service 承担；
 - 生产 profile 的数据库、模型和文件存储配置完整性待部署前确认；
 - Python 的标题/OCR 格式化细节不属于本仓库；converted 覆盖、MinIO 权限和存储
-  完整性由 Java 的 `FileStorage` 实现负责。
+  完整性由 Java 的 `ObjectStorage` 实现负责。
 
 ### 参考资料
 

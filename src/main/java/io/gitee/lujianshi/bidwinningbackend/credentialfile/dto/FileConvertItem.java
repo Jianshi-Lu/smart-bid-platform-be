@@ -7,5 +7,7 @@ public record FileConvertItem(
         Long fileId,
         String originalFilename,
         ConvertStatus fileStatus,
+        String indexStatus,
+        Integer chunkCount,
         String message) {
 }

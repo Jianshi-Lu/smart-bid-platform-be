@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 知识文件生命周期记录 — 数据库实体。对应表 {@code knowledge_file}（V32）。
  *
  * <p>每个知识文件对应一行，是知识入库链路的唯一事实源：
- * {@code documentUuid} 同时是对象存储目录根与 chat-agent Chroma chunk 的稳定身份。
+ * {@code documentUuid} 同时是对象存储目录根与 vector-service chunk 的稳定身份。
  * 转换（original → Markdown）与向量化（Markdown → Chroma）分为两个状态列，
  * 失败记录保留对象与错误信息，支持按失败点重试。</p>
  *
@@ -47,6 +47,7 @@ public class KnowledgeFileRecord {
     /** 原始文件对象存储状态：STORING/STORED/FAILED。 */
     private String originalStorageStatus;
 
+    /** 转换后 Markdown 的逻辑路径/object key。 */
     private String markdownFilePath;
 
     /** 转换状态：UPLOADED/CONVERTING/CONVERTED/FAILED。 */
@@ -55,7 +56,7 @@ public class KnowledgeFileRecord {
     /** 向量化状态：PENDING/VECTORIZING/VECTORIZED/FAILED。 */
     private String indexStatus;
 
-    /** chat-agent 实际写入 Chroma 的 chunk 数。 */
+    /** vector-service 实际写入 Chroma 的 chunk 数。 */
     private Integer chunkCount;
 
     private String errorMessage;

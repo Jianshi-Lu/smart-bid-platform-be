@@ -3,7 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.processor;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadFileContext;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.intake.UploadItem;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
@@ -32,7 +32,7 @@ public class UploadItemProcessor {
     private static final String SHA256_METADATA = "sha256";
 
     @Resource
-    private FileStorage fileStorage;
+    private ObjectStorage fileStorage;
 
     @Resource(name = "sha256FileChecksumCalculator")
     private FileChecksumCalculator fileChecksumCalculator;
@@ -76,12 +76,12 @@ public class UploadItemProcessor {
                     "资信文件存储路径不合法",
                     failure);
         }
-        FileStorage.StoredFile storedFile = null;
+        ObjectStorage.StoredFile storedFile = null;
         try {
             // 开启文件流存储文件，并写入首次计算的checksum
             try (InputStream inputStream = item.content().openStream()) {
                 storedFile = fileStorage.store(
-                        new FileStorage.StoreRequest(
+                        new ObjectStorage.StoreRequest(
                                 storagePath.relativePath(),
                                 item.contentType(),
                                 item.fileSize(),
@@ -95,7 +95,7 @@ public class UploadItemProcessor {
             String actualSha256;
             // 从MinIO中打开文件流
             try (InputStream inputStream = fileStorage.open(
-                    new FileStorage.OpenRequest(
+                    new ObjectStorage.OpenRequest(
                             storedFile.relativePath(), storedFile.etag()))) {
                 // 再次计算checksum并与首次对比，校验存储完整性
                 actualSha256 = fileChecksumCalculator.calculate(inputStream);

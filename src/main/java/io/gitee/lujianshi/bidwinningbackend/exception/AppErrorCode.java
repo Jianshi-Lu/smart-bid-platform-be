@@ -66,6 +66,22 @@ public enum AppErrorCode {
     BID_RECORD_FORBIDDEN(
             "BID_RECORD.FORBIDDEN", 403, "无权操作该投标记录", false),
 
+    /** BID_RECORD：目标公告未发布或商务投标已经截止。 */
+    BID_RECORD_BIDDING_NOT_OPEN(
+            "BID_RECORD.BIDDING_NOT_OPEN", 409, "当前招标公告不允许投标", false),
+
+    /** BID_RECORD：vector-service 私有投标资料向量化或补偿删除失败。 */
+    BID_RECORD_VECTORIZATION_FAILED(
+            "BID_RECORD.VECTORIZATION_FAILED", 502, "投标记录向量化失败", true),
+
+    /** BID_RECORD：跨数据库、对象存储和私有向量删除失败，可安全重试。 */
+    BID_RECORD_DELETE_FAILED(
+            "BID_RECORD.DELETE_FAILED", 503, "投标记录删除失败", true),
+
+    /** BID_RECORD：另一请求正在执行投标记录跨资源删除。 */
+    BID_RECORD_DELETE_IN_PROGRESS(
+            "BID_RECORD.DELETE_IN_PROGRESS", 409, "投标记录正在删除中，请稍后重试", false),
+
     // ==================== BIDDER_ACCOUNT：投标方账号 ====================
 
     /** BIDDER_ACCOUNT：登录账号名已被占用。 */
@@ -104,6 +120,10 @@ public enum AppErrorCode {
     BID_HANDLER_PERSISTENCE_FAILED(
             "BID_HANDLER.PERSISTENCE_FAILED", 500, "招标经办人保存失败", true),
 
+    /** BID_HANDLER：仍有招标公告引用时禁止删除，避免公告逻辑外键失效。 */
+    BID_HANDLER_HAS_INVITATIONS(
+            "BID_HANDLER.HAS_INVITATIONS", 409, "招标经办人仍有关联招标公告", false),
+
     // ==================== INVITATION：招标公告 ====================
 
     /** INVITATION：招标公告不存在。 */
@@ -121,6 +141,10 @@ public enum AppErrorCode {
     /** INVITATION：招标公告状态发生并发冲突。 */
     INVITATION_STATUS_CONFLICT(
             "INVITATION.STATUS_CONFLICT", 409, "招标公告状态已发生变化", true),
+
+    /** INVITATION：仍有投标记录时禁止删除公告，避免逻辑外键和私有向量失去归属。 */
+    INVITATION_HAS_BID_RECORDS(
+            "INVITATION.HAS_BID_RECORDS", 409, "招标公告仍有关联投标记录", false),
 
     // ==================== CREDENTIAL_FILE：资信文件 ====================
 
@@ -152,7 +176,11 @@ public enum AppErrorCode {
     CREDENTIAL_FILE_CONVERSION_FAILED(
             "CREDENTIAL_FILE.CONVERSION_FAILED", 502, "资信文件转换失败", true),
 
-    /** CREDENTIAL_FILE：转换批次与文件数据不一致。 */
+    /** CREDENTIAL_FILE：vector-service 独立资信向量化或补偿删除失败。 */
+    CREDENTIAL_FILE_VECTORIZATION_FAILED(
+            "CREDENTIAL_FILE.VECTORIZATION_FAILED", 502, "资信文件向量化失败", true),
+
+    /** CREDENTIAL_FILE：转换汇总结果与文件数据不一致。 */
     CREDENTIAL_FILE_CONVERSION_DATA_INCONSISTENT(
             "CREDENTIAL_FILE.CONVERSION_DATA_INCONSISTENT", 500, "资信文件转换数据不一致", false),
 
@@ -214,7 +242,7 @@ public enum AppErrorCode {
     KNOWLEDGE_FILE_CONVERSION_FAILED(
             "KNOWLEDGE_FILE.CONVERSION_FAILED", 502, "知识文件转换失败", true),
 
-    /** KNOWLEDGE_FILE：chat-agent 向量化或补偿删除失败。 */
+    /** KNOWLEDGE_FILE：vector-service 向量化或补偿删除失败。 */
     KNOWLEDGE_FILE_VECTORIZATION_FAILED(
             "KNOWLEDGE_FILE.VECTORIZATION_FAILED", 502, "知识文件向量化失败", true),
 

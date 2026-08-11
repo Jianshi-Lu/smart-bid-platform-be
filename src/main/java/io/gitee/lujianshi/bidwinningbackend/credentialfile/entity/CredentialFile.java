@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 /**
  * 资信文件实体。对应表 {@code credential_file}（V21/V23）。
  *
- * <p>每个原始文件对应一条记录；同一次上传的文件通过 {@code fileUuid} 聚合。
- * {@code bidRecordId} 在创建投标记录后回填，转换前为 {@code null} 的 Markdown 路径也保持为 {@code null}。</p>
+ * <p>每个原始文件对应一条记录，并拥有独立的 {@code fileUuid}。资信文件在创建时已
+ * 绑定 {@code bidRecordId}；转换前 {@code markdownFilePath} 保持为 {@code null}。</p>
  */
 @Data
 @NoArgsConstructor
@@ -49,9 +49,16 @@ public class CredentialFile {
     /** 原始文件对象存储状态：STORING/STORED/FAILED。 */
     private String originalStorageStatus;
 
+    /** 转换后 Markdown 的逻辑路径/object key。 */
     private String markdownFilePath;
 
     private ConvertStatus convertStatus;
+
+    /** 独立资信向量化状态：PENDING/VECTORIZING/VECTORIZED/FAILED。 */
+    private String indexStatus;
+
+    /** vector-service 在 credential_file_chunks 中实际写入的 chunk 数。 */
+    private Integer chunkCount;
 
     private String errorMessage;
 
@@ -61,6 +68,8 @@ public class CredentialFile {
     private LocalDateTime createdAt;
 
     private LocalDateTime convertedAt;
+
+    private LocalDateTime indexedAt;
 
     private LocalDateTime boundAt;
 

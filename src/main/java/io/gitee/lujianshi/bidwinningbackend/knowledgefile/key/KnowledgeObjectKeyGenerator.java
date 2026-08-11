@@ -23,20 +23,22 @@ public class KnowledgeObjectKeyGenerator {
     }
 
     /**
-     * 生成 {@code {username}/{safeFilename}/converted/{markdownFilename}}。
+     * 生成 {@code {username}/{safeFilename}/converted/{uuid}_{markdownFilename}}。
      *
-     * <p>Markdown 文件名由转换服务返回（固定 {@code .md} 后缀），
-     * 与 original 同名不同后缀，不再拼接 UUID 前缀。</p>
+     * <p>Markdown 文件名由转换服务返回（固定 {@code .md} 后缀）。文件单元 UUID 必须
+     * 保留在目标 key 中，避免同一账号上传同名文件时互相覆盖转换结果。</p>
      */
     public String converted(
             String username,
+            UUID documentUuid,
             String safeOriginalFilename,
             String markdownFilename) {
         validateUsername(username);
+        requireUuid(documentUuid);
         String safeFilename = normalizeFilename(safeOriginalFilename);
         String safeMarkdownFilename = normalizeFilename(markdownFilename);
         return username + "/" + safeFilename
-                + "/converted/" + safeMarkdownFilename;
+                + "/converted/" + documentUuid + "_" + safeMarkdownFilename;
     }
 
     private void validateUsername(String username) {

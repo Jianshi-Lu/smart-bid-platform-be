@@ -24,6 +24,16 @@ public class RestClientConfig {
                 .build();
     }
 
+    /** 构造独立 vector-service 客户端。 */
+    @Bean("vectorServiceRestClient")
+    public RestClient vectorServiceRestClient(
+            RestClient.Builder builder,
+            VectorServiceProperties properties) {
+        return builder.clone()
+                .baseUrl(properties.getBaseUrl())
+                .build();
+    }
+
     /** 构造 to-markdown Python 服务客户端。 */
     @Bean("toMarkdownRestClient")
     public RestClient toMarkdownRestClient(

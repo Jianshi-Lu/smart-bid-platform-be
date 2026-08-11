@@ -5,7 +5,7 @@ import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.LoginResponse;
 import io.gitee.lujianshi.bidwinningbackend.dto.bidderaccount.RegisterRequest;
 import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidderaccount.BidderAccount;
-import io.gitee.lujianshi.bidwinningbackend.service.BidderAccountService;
+import io.gitee.lujianshi.bidwinningbackend.service.account.BidderAccountService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;

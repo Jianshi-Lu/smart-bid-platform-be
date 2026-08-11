@@ -9,6 +9,8 @@ import io.gitee.lujianshi.bidwinningbackend.dto.common.Result;
 import io.gitee.lujianshi.bidwinningbackend.controller.bid_inviter.ChatAgentController;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -25,7 +27,7 @@ class ChatAgentControllerTest {
                 "conversation-1", "client-message-1", "什么是招标公告？");
         when(service.chat(any(ChatRequest.class))).thenReturn(new ChatResponse(
                 "conversation-1", "request-1", "client-message-1",
-                "招标公告是采购活动的公告文件。", null));
+                "招标公告是采购活动的公告文件。", null, List.of()));
 
         Result<ChatResponse> result = controller.chat(request);
 

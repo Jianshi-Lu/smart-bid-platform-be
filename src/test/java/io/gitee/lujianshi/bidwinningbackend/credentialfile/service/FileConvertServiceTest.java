@@ -3,6 +3,7 @@ package io.gitee.lujianshi.bidwinningbackend.credentialfile.service;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.Sha256FileChecksumCalculator;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.ToMarkdownClient;
+import io.gitee.lujianshi.bidwinningbackend.storage.vector.CredentialFileVectorStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.client.dto.PythonMarkdownResponse;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.config.FileStorageProperties;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.dto.FileConvertResponse;
@@ -10,13 +11,16 @@ import io.gitee.lujianshi.bidwinningbackend.credentialfile.entity.CredentialFile
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.BidRecordCredentialConversionStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.enums.ConvertStatus;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.mapper.CredentialFileMapper;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.LocalFileStorage;
+import io.gitee.lujianshi.bidwinningbackend.credentialfile.model.PreparedCredentialDocument;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.LocalObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.StoragePath;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
-import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.realtime.FileStatusEventPublisher;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordVectorIndexService;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -33,7 +37,11 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,12 +64,12 @@ class FileConvertServiceTest {
                 .getBytes(StandardCharsets.UTF_8);
         FileChecksumCalculator checksumCalculator =
                 new Sha256FileChecksumCalculator();
-        FileStorage storage = createStorage();
+        ObjectStorage storage = createStorage();
         String originalPath = USERNAME + "/source.pdf/original/"
                 + fileUuid + "_source.pdf";
         String originalSha256 = checksumCalculator.calculate(
                 new ByteArrayInputStream(original));
-        storage.store(new FileStorage.StoreRequest(
+        storage.store(new ObjectStorage.StoreRequest(
                 originalPath,
                 "application/pdf",
                 original.length,
@@ -80,14 +88,21 @@ class FileConvertServiceTest {
                 original.length,
                 originalSha256,
                 ConvertStatus.CONVERTED);
+        convertedFile.setConvertedSha256(checksumCalculator.calculate(
+                new ByteArrayInputStream(markdown)));
 
         CredentialFileMapper fileMapper =
                 mock(CredentialFileMapper.class);
         when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
                 .thenReturn(List.of(sourceFile), List.of(convertedFile));
         when(fileMapper.markConverting(1L)).thenReturn(1);
+        when(fileMapper.reserveMarkdownPath(eq(1L), any())).thenReturn(1);
         when(fileMapper.markConverted(eq(1L), any(), any(), any()))
                 .thenReturn(1);
+        when(fileMapper.markVectorizing(1L)).thenReturn(1);
+        when(fileMapper.markVectorized(eq(1L), eq(2), any()))
+                .thenReturn(1);
+        when(fileMapper.selectById(1L)).thenReturn(convertedFile);
 
         ToMarkdownClient toMarkdownClient =
                 mock(ToMarkdownClient.class);
@@ -107,8 +122,14 @@ class FileConvertServiceTest {
 
         BidRecordService bidRecordService =
                 mock(BidRecordService.class);
+        BidRecord bidRecord = new BidRecord();
+        bidRecord.setBidderName("测试投标人");
         when(bidRecordService.getById(BID_RECORD_ID))
-                .thenReturn(new BidRecord());
+                .thenReturn(bidRecord);
+        CredentialFileVectorStorage vectorClient =
+                mock(CredentialFileVectorStorage.class);
+        when(vectorClient.replaceDocument(any(PreparedCredentialDocument.class)))
+                .thenReturn(2);
         FileConvertService self = mock(FileConvertService.class);
         FileConvertService service = createService(
                 fileMapper,
@@ -117,12 +138,15 @@ class FileConvertServiceTest {
                 checksumCalculator,
                 bidRecordService,
                 self);
+        ReflectionTestUtils.setField(
+                service, "credentialVectorStorage", vectorClient);
 
         FileConvertResponse response =
                 service.convertAll(BID_RECORD_ID);
 
         String markdownPath =
-                USERNAME + "/source.pdf/converted/source.md";
+                USERNAME + "/source.pdf/converted/"
+                        + fileUuid + "_source.md";
         assertEquals(
                 BidRecordCredentialConversionStatus.ALL_CONVERTED,
                 response.status());
@@ -133,7 +157,77 @@ class FileConvertServiceTest {
         verify(fileMapper).markConverted(
                 eq(1L), eq(markdownPath), any(), any());
         verify(fileMapper, never()).markFailed(eq(1L), any(), any());
+        verify(fileMapper).markVectorized(eq(1L), eq(2), any());
+        ArgumentCaptor<PreparedCredentialDocument> vectorRequest =
+                ArgumentCaptor.forClass(PreparedCredentialDocument.class);
+        verify(vectorClient).replaceDocument(vectorRequest.capture());
+        assertEquals(fileUuid, vectorRequest.getValue().fileUuid());
+        assertEquals(BID_RECORD_ID, vectorRequest.getValue().bidRecordId());
+        assertEquals("# converted", vectorRequest.getValue().markdownText());
         verify(self).syncBidRecordCredentials(BID_RECORD_ID);
+    }
+
+    @Test
+    void shouldCleanVectorsAndMarkIndexFailedWhenCredentialVectorizationFails()
+            throws Exception {
+        byte[] markdown = "# persisted credential"
+                .getBytes(StandardCharsets.UTF_8);
+        FileChecksumCalculator checksumCalculator =
+                new Sha256FileChecksumCalculator();
+        ObjectStorage storage = createStorage();
+        String fileUuid = UUID.randomUUID().toString();
+        String originalPath = USERNAME + "/source.pdf/original/"
+                + fileUuid + "_source.pdf";
+        String markdownPath = StoragePath.createConvertedMarkdownPath(
+                originalPath);
+        storage.store(new ObjectStorage.StoreRequest(
+                markdownPath,
+                "text/markdown; charset=utf-8",
+                markdown.length,
+                Map.of(),
+                new ByteArrayInputStream(markdown)));
+
+        CredentialFile converted = file(
+                fileUuid,
+                originalPath,
+                10L,
+                "a".repeat(64),
+                ConvertStatus.CONVERTED);
+        converted.setMarkdownFilePath(markdownPath);
+        converted.setConvertedSha256(checksumCalculator.calculate(
+                new ByteArrayInputStream(markdown)));
+
+        CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
+        when(fileMapper.markVectorizing(1L)).thenReturn(1);
+        when(fileMapper.selectById(1L)).thenReturn(converted);
+        when(fileMapper.markVectorizeFailed(eq(1L), any())).thenReturn(1);
+        BidRecord record = new BidRecord();
+        record.setBidderName("测试投标人");
+        BidRecordService bidRecordService = mock(BidRecordService.class);
+        when(bidRecordService.getById(BID_RECORD_ID)).thenReturn(record);
+        CredentialFileVectorStorage vectorClient =
+                mock(CredentialFileVectorStorage.class);
+        doThrow(new IllegalStateException("vector service unavailable"))
+                .when(vectorClient)
+                .replaceDocument(any(PreparedCredentialDocument.class));
+
+        FileConvertService service = createService(
+                fileMapper,
+                mock(ToMarkdownClient.class),
+                storage,
+                checksumCalculator,
+                bidRecordService,
+                mock(FileConvertService.class));
+        ReflectionTestUtils.setField(
+                service, "credentialVectorStorage", vectorClient);
+
+        ReflectionTestUtils.invokeMethod(
+                service, "vectorizeConvertedFile", converted);
+
+        verify(vectorClient, atLeastOnce()).deleteDocument(fileUuid);
+        verify(fileMapper).markVectorizeFailed(
+                eq(1L), eq("vector service unavailable"));
+        verify(fileMapper, never()).markVectorized(eq(1L), anyInt(), any());
     }
 
     @Test
@@ -163,10 +257,129 @@ class FileConvertServiceTest {
         assertEquals(List.of(), patch.getValue().getCredentials());
     }
 
+    @Test
+    void shouldRebuildEmptyCredentialProjectionWhenNoActiveFileExists() {
+        CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
+        when(fileMapper.selectByBidRecordId(BID_RECORD_ID))
+                .thenReturn(List.of());
+        BidRecordService bidRecordService = mock(BidRecordService.class);
+        when(bidRecordService.getById(BID_RECORD_ID))
+                .thenReturn(new BidRecord());
+        FileConvertService self = mock(FileConvertService.class);
+        FileConvertService service = createService(
+                fileMapper,
+                mock(ToMarkdownClient.class),
+                mock(ObjectStorage.class),
+                mock(FileChecksumCalculator.class),
+                bidRecordService,
+                self);
+
+        FileConvertResponse response = service.convertAll(BID_RECORD_ID);
+
+        assertEquals(
+                BidRecordCredentialConversionStatus.ALL_CONVERTED,
+                response.status());
+        assertEquals(0, response.totalFileCount());
+        verify(self).syncBidRecordCredentials(BID_RECORD_ID);
+    }
+
+    @Test
+    void shouldKeepConvertedWhenCredentialProjectionSyncFails() throws Exception {
+        String fileUuid = UUID.randomUUID().toString();
+        byte[] original = "original-pdf-content"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] markdown = "# converted"
+                .getBytes(StandardCharsets.UTF_8);
+        FileChecksumCalculator checksumCalculator =
+                new Sha256FileChecksumCalculator();
+        ObjectStorage storage = createStorage();
+        String originalPath = USERNAME + "/source.pdf/original/"
+                + fileUuid + "_source.pdf";
+        String originalSha256 = checksumCalculator.calculate(
+                new ByteArrayInputStream(original));
+        storage.store(new ObjectStorage.StoreRequest(
+                originalPath,
+                "application/pdf",
+                original.length,
+                Map.of(),
+                new ByteArrayInputStream(original)));
+
+        CredentialFile sourceFile = file(
+                fileUuid,
+                originalPath,
+                original.length,
+                originalSha256,
+                ConvertStatus.UPLOADED);
+        sourceFile.setOriginalStorageStatus("STORED");
+        CredentialFile convertingFile = file(
+                fileUuid,
+                originalPath,
+                original.length,
+                originalSha256,
+                ConvertStatus.CONVERTING);
+        convertingFile.setOriginalStorageStatus("STORED");
+        CredentialFile convertedFile = file(
+                fileUuid,
+                originalPath,
+                original.length,
+                originalSha256,
+                ConvertStatus.CONVERTED);
+        convertedFile.setOriginalStorageStatus("STORED");
+
+        CredentialFileMapper fileMapper = mock(CredentialFileMapper.class);
+        when(fileMapper.markConverting(1L)).thenReturn(1);
+        when(fileMapper.reserveMarkdownPath(eq(1L), any())).thenReturn(1);
+        when(fileMapper.markConverted(eq(1L), any(), any(), any()))
+                .thenReturn(1);
+        when(fileMapper.selectById(1L)).thenReturn(
+                convertingFile, convertedFile, convertedFile);
+
+        ToMarkdownClient toMarkdownClient = mock(ToMarkdownClient.class);
+        when(toMarkdownClient.convert(
+                any(InputStream.class),
+                eq("source.pdf"),
+                eq("application/pdf"),
+                eq((long) original.length)))
+                .thenAnswer(invocation -> {
+                    InputStream requestStream = invocation.getArgument(0);
+                    assertArrayEquals(original, requestStream.readAllBytes());
+                    return new PythonMarkdownResponse(
+                            markdown,
+                            "source.md",
+                            "text/markdown; charset=utf-8");
+                });
+
+        FileConvertService self = mock(FileConvertService.class);
+        doThrow(new IllegalStateException("projection unavailable"))
+                .when(self).syncBidRecordCredentials(BID_RECORD_ID);
+        FileConvertService service = createService(
+                fileMapper,
+                toMarkdownClient,
+                storage,
+                checksumCalculator,
+                mock(BidRecordService.class),
+                self);
+        FileStatusEventPublisher eventPublisher =
+                mock(FileStatusEventPublisher.class);
+        ReflectionTestUtils.setField(
+                service, "fileStatusEventPublisher", eventPublisher);
+
+        service.convertFile(sourceFile);
+
+        verify(fileMapper, never()).markFailed(eq(1L), any(), any());
+        verify(eventPublisher, atLeastOnce()).publish(
+                eq(FileStatusEventPublisher.CREDENTIAL_TOPIC_PREFIX
+                        + BID_RECORD_ID),
+                eq("1"),
+                eq("STORED"),
+                eq("CONVERTED"),
+                isNull());
+    }
+
     private FileConvertService createService(
             CredentialFileMapper fileMapper,
             ToMarkdownClient toMarkdownClient,
-            FileStorage storage,
+            ObjectStorage storage,
             FileChecksumCalculator checksumCalculator,
             BidRecordService bidRecordService,
             FileConvertService self) {
@@ -187,13 +400,19 @@ class FileConvertServiceTest {
         ReflectionTestUtils.setField(
                 service, "operationHistoryService",
                 mock(OperationHistoryService.class));
+        ReflectionTestUtils.setField(
+                service, "credentialVectorStorage",
+                mock(CredentialFileVectorStorage.class));
+        ReflectionTestUtils.setField(
+                service, "bidRecordVectorIndexService",
+                mock(BidRecordVectorIndexService.class));
         return service;
     }
 
-    private FileStorage createStorage() {
+    private ObjectStorage createStorage() {
         FileStorageProperties properties = localStorageProperties();
         properties.getLocal().setRoot(tempDir.toString());
-        return new LocalFileStorage(properties.getLocal().getRoot());
+        return new LocalObjectStorage(properties.getLocal().getRoot());
     }
 
     private FileStorageProperties localStorageProperties() {

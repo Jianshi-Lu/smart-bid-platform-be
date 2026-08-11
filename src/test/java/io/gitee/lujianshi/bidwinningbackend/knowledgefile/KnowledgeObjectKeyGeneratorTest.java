@@ -27,8 +27,9 @@ class KnowledgeObjectKeyGeneratorTest {
                         + documentUuid + "_采购规则.txt",
                 original.objectKey());
         assertEquals(
-                username + "/采购规则.txt/converted/采购规则.md",
+                username + "/采购规则.txt/converted/"
+                        + documentUuid + "_采购规则.md",
                 generator.converted(
-                        username, "采购规则.txt", "采购规则.md"));
+                        username, documentUuid, "采购规则.txt", "采购规则.md"));
     }
 }

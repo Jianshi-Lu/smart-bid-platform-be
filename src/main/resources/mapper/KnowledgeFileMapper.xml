@@ -44,13 +44,13 @@
             keyProperty="knowledgeFileId">
         INSERT INTO knowledge_file
             (document_uuid, original_filename, content_type, file_size,
-             original_sha256, converted_sha256, storage_type, original_file_path,
-             original_storage_status, markdown_file_path, convert_status, index_status, chunk_count,
+             original_sha256, converted_sha256, storage_type, original_file_path, original_storage_status,
+             markdown_file_path, convert_status, index_status, chunk_count,
              error_message, error_stage, created_at, converted_at, indexed_at, deleted_at)
         VALUES
             (#{documentUuid}, #{originalFilename}, #{contentType}, #{fileSize},
-             #{originalSha256}, #{convertedSha256}, #{storageType}, #{originalFilePath},
-             #{originalStorageStatus}, #{markdownFilePath}, #{convertStatus}, #{indexStatus}, #{chunkCount},
+             #{originalSha256}, #{convertedSha256}, #{storageType}, #{originalFilePath}, #{originalStorageStatus},
+             #{markdownFilePath}, #{convertStatus}, #{indexStatus}, #{chunkCount},
              #{errorMessage}, #{errorStage}, #{createdAt}, #{convertedAt}, #{indexedAt}, #{deletedAt})
     </insert>
 
@@ -105,6 +105,22 @@
         </where>
     </select>
 
+    <select id="countActiveByOriginalFilePathExcluding" resultType="int">
+        SELECT COUNT(*)
+        FROM knowledge_file
+        WHERE original_file_path = #{originalFilePath}
+          AND document_uuid &lt;&gt; #{documentUuid}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="countActiveByMarkdownFilePathExcluding" resultType="int">
+        SELECT COUNT(*)
+        FROM knowledge_file
+        WHERE markdown_file_path = #{markdownFilePath}
+          AND document_uuid &lt;&gt; #{documentUuid}
+          AND deleted_at IS NULL
+    </select>
+
     <update id="updateOriginalMetadata">
         UPDATE knowledge_file
         SET original_file_path = #{originalFilePath},
@@ -113,15 +129,7 @@
             original_storage_status = 'STORED'
         WHERE document_uuid = #{documentUuid}
           AND deleted_at IS NULL
-    </update>
-
-    <update id="markOriginalStorageFailed">
-        UPDATE knowledge_file
-        SET original_storage_status = 'FAILED',
-            error_message = #{errorMessage},
-            error_stage = 'UPLOAD'
-        WHERE document_uuid = #{documentUuid}
-          AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="updateById"
@@ -164,6 +172,16 @@
         </foreach>
     </delete>
 
+    <update id="markOriginalStorageFailed">
+        UPDATE knowledge_file
+        SET original_storage_status = 'FAILED',
+            error_message = #{errorMessage},
+            error_stage = 'UPLOAD'
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+          AND deletion_status IS NULL
+    </update>
+
     <update id="markConverting">
         UPDATE knowledge_file
         SET convert_status = 'CONVERTING',
@@ -172,6 +190,16 @@
         WHERE document_uuid = #{documentUuid}
           AND convert_status IN ('UPLOADED', 'FAILED')
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
+    </update>
+
+    <update id="reserveMarkdownPath">
+        UPDATE knowledge_file
+        SET markdown_file_path = #{markdownFilePath}
+        WHERE document_uuid = #{documentUuid}
+          AND convert_status = 'CONVERTING'
+          AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markConverted">
@@ -185,6 +213,7 @@
         WHERE document_uuid = #{documentUuid}
           AND convert_status = 'CONVERTING'
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markVectorizing">
@@ -196,6 +225,7 @@
           AND convert_status = 'CONVERTED'
           AND index_status IN ('PENDING', 'FAILED', 'VECTORIZED')
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markVectorized">
@@ -208,6 +238,7 @@
         WHERE document_uuid = #{documentUuid}
           AND index_status = 'VECTORIZING'
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markConvertFailed">
@@ -217,6 +248,7 @@
             error_stage    = 'CONVERT'
         WHERE document_uuid = #{documentUuid}
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markVectorizeFailed">
@@ -226,6 +258,59 @@
             error_stage   = 'VECTORIZE'
         WHERE document_uuid = #{documentUuid}
           AND deleted_at IS NULL
+          AND deletion_status IS NULL
+    </update>
+
+    <update id="markInterruptedProcessingFailed">
+        UPDATE knowledge_file
+        SET error_stage = CASE
+                WHEN original_storage_status = 'STORING' THEN 'UPLOAD'
+                WHEN convert_status = 'CONVERTING' THEN 'CONVERT'
+                ELSE 'VECTORIZE'
+            END,
+            error_message = #{errorMessage},
+            original_storage_status = CASE
+                WHEN original_storage_status = 'STORING' THEN 'FAILED'
+                ELSE original_storage_status
+            END,
+            chunk_count = CASE
+                WHEN convert_status = 'CONVERTING'
+                     OR index_status = 'VECTORIZING' THEN NULL
+                ELSE chunk_count
+            END,
+            indexed_at = CASE
+                WHEN convert_status = 'CONVERTING'
+                     OR index_status = 'VECTORIZING' THEN NULL
+                ELSE indexed_at
+            END,
+            index_status = CASE
+                WHEN convert_status = 'CONVERTING'
+                     OR index_status = 'VECTORIZING' THEN 'FAILED'
+                ELSE index_status
+            END,
+            convert_status = CASE
+                WHEN convert_status = 'CONVERTING' THEN 'FAILED'
+                ELSE convert_status
+            END
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+          AND deletion_status IS NULL
+          AND (original_storage_status = 'STORING'
+               OR convert_status = 'CONVERTING'
+               OR index_status = 'VECTORIZING')
+    </update>
+
+    <update id="markIndexInconsistent">
+        UPDATE knowledge_file
+        SET index_status = 'FAILED',
+            chunk_count = NULL,
+            indexed_at = NULL,
+            error_message = #{errorMessage},
+            error_stage = 'VECTORIZE'
+        WHERE document_uuid = #{documentUuid}
+          AND convert_status = 'CONVERTED'
+          AND deleted_at IS NULL
+          AND deletion_status IS NULL
     </update>
 
     <update id="markDeleted">
@@ -233,6 +318,7 @@
         SET deleted_at = #{deletedAt}
         WHERE document_uuid = #{documentUuid}
           AND deleted_at IS NULL
+          AND deletion_status = 'DELETING'
     </update>
 
     <update id="beginDeletion">
@@ -243,6 +329,9 @@
             deletion_started_at = #{startedAt}
         WHERE document_uuid = #{documentUuid}
           AND deleted_at IS NULL
+          AND (original_storage_status IS NULL OR original_storage_status &lt;&gt; 'STORING')
+          AND (convert_status IS NULL OR convert_status &lt;&gt; 'CONVERTING')
+          AND (index_status IS NULL OR index_status &lt;&gt; 'VECTORIZING')
           AND (deletion_status IS NULL
                OR deletion_status = 'FAILED'
                OR (deletion_status = 'DELETING'
@@ -265,7 +354,21 @@
             deletion_error_message = NULL,
             deletion_started_at = NULL
         WHERE document_uuid = #{documentUuid}
-          AND (deletion_status IS NULL OR deletion_status &lt;&gt; 'DELETED')
+          AND deleted_at IS NOT NULL
+          AND (deletion_status IS NULL
+               OR deletion_status = 'DELETING'
+               OR deletion_status = 'FAILED')
+    </update>
+
+    <update id="resetInterruptedDeletion">
+        UPDATE knowledge_file
+        SET deletion_status = 'FAILED',
+            deletion_failed_stage = 'PROCESS_RESTART',
+            deletion_error_message = '后端进程重启，自动续删',
+            deletion_started_at = NULL
+        WHERE document_uuid = #{documentUuid}
+          AND deleted_at IS NULL
+          AND deletion_status = 'DELETING'
     </update>
 
 </mapper>

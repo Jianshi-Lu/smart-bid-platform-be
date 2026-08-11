@@ -32,6 +32,20 @@ public interface KnowledgeFileMapper extends BaseMapper<KnowledgeFileRecord, Lon
             @Param("convertStatus") String convertStatus,
             @Param("indexStatus") String indexStatus);
 
+    /**
+     * 查询仍引用指定 original 对象的其他 active 文档数。
+     *
+     * <p>用于兼容旧版本产生的同 key 数据，避免删除一个文档时误删另一个文档仍在使用的对象。</p>
+     */
+    int countActiveByOriginalFilePathExcluding(
+            @Param("originalFilePath") String originalFilePath,
+            @Param("documentUuid") String documentUuid);
+
+    /** 查询仍引用指定 converted 对象的其他 active 文档数。 */
+    int countActiveByMarkdownFilePathExcluding(
+            @Param("markdownFilePath") String markdownFilePath,
+            @Param("documentUuid") String documentUuid);
+
     /** 原始对象落库后回填路径、SHA-256 与存储介质。 */
     int updateOriginalMetadata(
             @Param("documentUuid") String documentUuid,
@@ -39,13 +53,17 @@ public interface KnowledgeFileMapper extends BaseMapper<KnowledgeFileRecord, Lon
             @Param("originalSha256") String originalSha256,
             @Param("storageType") String storageType);
 
-    /** 原始对象存储失败：与转换、向量化状态分开留痕。 */
     int markOriginalStorageFailed(
             @Param("documentUuid") String documentUuid,
             @Param("errorMessage") String errorMessage);
 
     /** 抢占转换：UPLOADED/FAILED → CONVERTING。 */
     int markConverting(@Param("documentUuid") String documentUuid);
+
+    /** 转换写对象前先保存目标 key，进程中断后仍可定位并补偿。 */
+    int reserveMarkdownPath(
+            @Param("documentUuid") String documentUuid,
+            @Param("markdownFilePath") String markdownFilePath);
 
     /** 转换完成：CONVERTING → CONVERTED，回填路径与时间。 */
     int markConverted(
@@ -73,6 +91,16 @@ public interface KnowledgeFileMapper extends BaseMapper<KnowledgeFileRecord, Lon
             @Param("documentUuid") String documentUuid,
             @Param("errorMessage") String errorMessage);
 
+    /** 将进程中断遗留的 STORING/CONVERTING/VECTORIZING 收敛为可重试 FAILED。 */
+    int markInterruptedProcessingFailed(
+            @Param("documentUuid") String documentUuid,
+            @Param("errorMessage") String errorMessage);
+
+    /** DB 与 Chroma 数量不一致时强制回到可重试索引失败态。 */
+    int markIndexInconsistent(
+            @Param("documentUuid") String documentUuid,
+            @Param("errorMessage") String errorMessage);
+
     /** 软删除：写入 deleted_at，保留追溯记录。 */
     int markDeleted(
             @Param("documentUuid") String documentUuid,
@@ -96,4 +124,7 @@ public interface KnowledgeFileMapper extends BaseMapper<KnowledgeFileRecord, Lon
 
     /** 删除完成：置 DELETED 终态并清空失败信息。 */
     int markDeletionSucceeded(@Param("documentUuid") String documentUuid);
+
+    /** JVM 重启后旧 DELETING 已无执行者，改为 FAILED 以便幂等续删。 */
+    int resetInterruptedDeletion(@Param("documentUuid") String documentUuid);
 }

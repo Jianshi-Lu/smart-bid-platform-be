@@ -95,6 +95,35 @@ class ToMarkdownClientTest {
         server.verify();
     }
 
+    @Test
+    void shouldRejectPartialMarkdownBeforeItCanBePersisted() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server =
+                MockRestServiceServer.bindTo(builder).build();
+        ToMarkdownClient client = createClient(builder);
+        byte[] source = "source-content".getBytes(StandardCharsets.UTF_8);
+
+        server.expect(requestTo("http://127.0.0.1:8081/convert"))
+                .andRespond(withSuccess(
+                                "# partial",
+                                MediaType.parseMediaType(
+                                        "text/markdown; charset=utf-8"))
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"partial.md\"")
+                        .header("X-Conversion-Partial", "true"));
+
+        AppException exception = assertThrows(
+                AppException.class,
+                () -> client.convert(
+                        new ByteArrayInputStream(source),
+                        "license.pdf",
+                        "application/pdf",
+                        source.length));
+
+        assertEquals("PYTHON_PARTIAL_OUTPUT", exception.getStage());
+        server.verify();
+    }
+
     private ToMarkdownClient createClient(RestClient.Builder builder) {
         return new ToMarkdownClient(
                 builder.baseUrl("http://127.0.0.1:8081").build());

@@ -1,5 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.storage;
 
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectKey;
+
 import java.util.UUID;
 
 /**
@@ -61,8 +63,10 @@ public final class StoragePath {
     /**
      * 根据 original 逻辑路径和转换服务返回的 Markdown 文件名生成 converted 路径。
      *
-     * <p>转换服务负责确定 Markdown 文件名（固定 {@code .md} 后缀）；本方法只负责把
-     * 文件单元 UUID 前缀拼回去，保证同一文件单元的 converted 对象唯一。</p>
+     * <p>转换服务负责确定 Markdown 文件名（固定 {@code .md} 后缀）；本方法从 original
+     * 路径中的存储文件名恢复文件单元 UUID，并始终将其作为 converted 文件名的前缀。这样
+     * 即使多个文件的原始文件名和转换服务返回的 Markdown 文件名相同，也不会覆盖彼此的
+     * 派生对象。</p>
      *
      * @param originalFilePath 已落库的 original 相对路径或 MinIO object key
      * @param markdownFilename 转换服务返回的 Markdown 文件名；为空时按原文件名推导
@@ -78,17 +82,28 @@ public final class StoragePath {
             throw new IllegalArgumentException("原始文件路径必须位于 original 目录");
         }
 
-        String relativeFilename = normalizedPath.substring(
+        String storedFilename = normalizedPath.substring(
                 markerIndex + marker.length());
-        if (relativeFilename.isBlank()) {
+        if (storedFilename.isBlank()) {
             throw new IllegalArgumentException("原始文件路径必须位于 original 目录");
         }
+        int separator = storedFilename.indexOf('_');
+        if (separator <= 0 || separator == storedFilename.length() - 1) {
+            throw new IllegalArgumentException("原始文件路径缺少文件单元 UUID 前缀");
+        }
+        String fileUuid;
+        try {
+            fileUuid = UUID.fromString(storedFilename.substring(0, separator)).toString();
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("原始文件路径中的文件单元 UUID 不合法", e);
+        }
+        String originalFilename = storedFilename.substring(separator + 1);
         String targetFilename = markdownFilename == null
                 || markdownFilename.isBlank()
-                ? toMarkdownFilename(relativeFilename)
-                : markdownFilename;
+                ? toMarkdownFilename(originalFilename)
+                : normalizeFilename(markdownFilename);
         return normalizedPath.substring(0, markerIndex)
-                + "/converted/" + targetFilename;
+                + "/converted/" + fileUuid + "_" + targetFilename;
     }
 
     /**
@@ -117,20 +132,7 @@ public final class StoragePath {
      * @return 使用正斜杠的安全逻辑路径
      */
     static String normalizeRelativePath(String relativePath) {
-        if (relativePath == null || relativePath.isBlank()) {
-            throw new IllegalArgumentException("文件相对路径不能为空");
-        }
-
-        String normalized = relativePath.replace('\\', '/');
-        if (normalized.startsWith("/")) {
-            throw new IllegalArgumentException("文件相对路径不合法");
-        }
-        for (String segment : normalized.split("/", -1)) {
-            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) {
-                throw new IllegalArgumentException("文件相对路径不合法");
-            }
-        }
-        return normalized;
+        return ObjectKey.normalize(relativePath);
     }
 
     /** 去除客户端路径片段和控制字符，得到安全文件名。 */

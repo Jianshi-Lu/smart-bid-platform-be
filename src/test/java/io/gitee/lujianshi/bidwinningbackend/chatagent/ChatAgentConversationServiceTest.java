@@ -8,6 +8,7 @@ import io.gitee.lujianshi.bidwinningbackend.config.ChatAgentProperties;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatRequest;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatResponse;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ConversationResponse;
+import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.CreateConversationRequest;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import org.junit.jupiter.api.Test;
@@ -95,9 +96,11 @@ class ChatAgentConversationServiceTest {
 
         server.expect(once(), requestTo("http://127.0.0.1:8082/chat"))
                 .andExpect(content().json(
-                        "{\"question\":\"第一个问题\",\"thread_id\":\"conversation-1\"}"))
+                        "{\"question\":\"第一个问题\",\"thread_id\":\"conversation-1\"}",
+                        true))
                 .andRespond(withSuccess(
-                        "{\"answer\":\"第一个回答\"}",
+                        "{\"answer\":\"第一个回答\","
+                                + "\"referenced_bid_record_ids\":[17,17,-1]}",
                         MediaType.APPLICATION_JSON));
 
         ChatRequest request = new ChatRequest(
@@ -110,6 +113,12 @@ class ChatAgentConversationServiceTest {
         assertNotNull(first.requestId());
         assertEquals("client-1", first.clientMessageId());
         assertEquals("第一个回答", first.answer());
+        assertEquals(List.of(17), first.referencedBidRecordIds());
+        assertEquals(List.of(17), replay.referencedBidRecordIds());
+        assertEquals("第一个回答", replay.answer());
+        assertEquals(
+                "第一个回答\n\n<!-- bid-record-refs: 17 -->",
+                insertedMessages.get(1).getContent());
         assertEquals(2, insertedMessages.size());
         assertEquals(1L, insertedMessages.get(0).getSequenceNo());
         assertEquals(2L, insertedMessages.get(1).getSequenceNo());
@@ -137,6 +146,32 @@ class ChatAgentConversationServiceTest {
         assertEquals(
                 AppErrorCode.CHAT_AGENT_CONVERSATION_FORBIDDEN,
                 exception.getErrorCode());
+    }
+
+    @Test
+    void shouldCreateConversationWithoutBidRecordScope() {
+        ChatConversationMapper conversationMapper =
+                mock(ChatConversationMapper.class);
+        ChatConversation[] inserted = new ChatConversation[1];
+        when(conversationMapper.insert(any(ChatConversation.class)))
+                .thenAnswer(invocation -> {
+                    inserted[0] = invocation.getArgument(
+                            0, ChatConversation.class);
+                    return 1;
+                });
+        when(conversationMapper.selectById(anyString()))
+                .thenAnswer(invocation -> inserted[0]);
+        ChatAgentConversationService service = new ChatAgentConversationService(
+                mock(RestClient.class),
+                conversationMapper,
+                mock(ChatMessageMapper.class),
+                properties(1L),
+                transactionManager());
+        ConversationResponse response = service.createConversation(
+                new CreateConversationRequest("投标问答"));
+
+        assertEquals("投标问答", response.title());
+        assertEquals("投标问答", inserted[0].getTitle());
     }
 
     @Test

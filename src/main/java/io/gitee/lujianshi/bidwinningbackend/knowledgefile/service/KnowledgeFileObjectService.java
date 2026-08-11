@@ -1,7 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.knowledgefile.service;
 
 import io.gitee.lujianshi.bidwinningbackend.credentialfile.checksum.FileChecksumCalculator;
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.knowledgefile.model.KnowledgeFileUpload;
@@ -14,17 +14,17 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** 复用 FileStorage 完成知识对象写入、回读和 SHA-256 完整性校验。 */
+/** 复用 ObjectStorage 完成知识对象写入、回读和 SHA-256 完整性校验。 */
 @Service
 public class KnowledgeFileObjectService {
 
     private static final String SHA256_METADATA = "sha256";
 
-    private final FileStorage fileStorage;
+    private final ObjectStorage fileStorage;
     private final FileChecksumCalculator checksumCalculator;
 
     public KnowledgeFileObjectService(
-            @Qualifier("knowledgeFileStorage") FileStorage fileStorage,
+            @Qualifier("knowledgeFileStorage") ObjectStorage fileStorage,
             @Qualifier("sha256FileChecksumCalculator")
             FileChecksumCalculator checksumCalculator) {
         this.fileStorage = fileStorage;
@@ -47,10 +47,10 @@ public class KnowledgeFileObjectService {
                 metadata == null ? Map.of() : metadata);
         storedMetadata.put(SHA256_METADATA, expectedSha256);
 
-        FileStorage.StoredFile storedFile = null;
+        ObjectStorage.StoredFile storedFile = null;
         try {
             try (InputStream input = content.openStream()) {
-                storedFile = fileStorage.store(new FileStorage.StoreRequest(
+                storedFile = fileStorage.store(new ObjectStorage.StoreRequest(
                         objectKey,
                         contentType,
                         contentLength,
@@ -63,7 +63,7 @@ public class KnowledgeFileObjectService {
 
             String actualSha256;
             try (InputStream input = fileStorage.open(
-                    new FileStorage.OpenRequest(
+                    new ObjectStorage.OpenRequest(
                             storedFile.relativePath(), storedFile.etag()))) {
                 actualSha256 = checksumCalculator.calculate(input);
             }
@@ -91,7 +91,7 @@ public class KnowledgeFileObjectService {
     }
 
     public InputStream open(StoredKnowledgeObject object) throws IOException {
-        return fileStorage.open(new FileStorage.OpenRequest(
+        return fileStorage.open(new ObjectStorage.OpenRequest(
                 object.objectKey(), object.etag()));
     }
 

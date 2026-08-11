@@ -65,9 +65,17 @@ class StoragePathTest {
                 "bidder01/file.v2.pdf/converted/" + fileUuid + "_file.v2.md",
                 StoragePath.createConvertedMarkdownPath(originalPath));
         assertEquals(
-                "bidder01/file.v2.pdf/converted/source.md",
+                "bidder01/file.v2.pdf/converted/" + fileUuid + "_source.md",
                 StoragePath.createConvertedMarkdownPath(
                         originalPath, "source.md"));
+
+        String otherUuid = UUID.randomUUID().toString();
+        assertNotEquals(
+                StoragePath.createConvertedMarkdownPath(originalPath, "source.md"),
+                StoragePath.createConvertedMarkdownPath(
+                        "bidder01/file.v2.pdf/original/"
+                                + otherUuid + "_file.v2.pdf",
+                        "source.md"));
     }
 
     @Test

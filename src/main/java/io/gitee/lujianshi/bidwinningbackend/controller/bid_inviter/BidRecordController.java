@@ -10,8 +10,9 @@ import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecord;
 import io.gitee.lujianshi.bidwinningbackend.entity.bidrecord.BidRecordOperationHistory;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
-import io.gitee.lujianshi.bidwinningbackend.service.BidRecordService;
-import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordService;
+import io.gitee.lujianshi.bidwinningbackend.service.bidrecord.BidRecordLifecycleService;
+import io.gitee.lujianshi.bidwinningbackend.service.audit.OperationHistoryService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,9 @@ public class BidRecordController {
 
     @Resource
     private BidRecordService service;
+
+    @Resource
+    private BidRecordLifecycleService lifecycleService;
 
     @Resource
     private OperationHistoryService operationHistoryService;
@@ -71,12 +75,9 @@ public class BidRecordController {
         after.setBidderName(request.getBidderName());
         after.setQuotePrice(request.getQuotePrice());
         after.setBidderContact(request.getBidderContact());
-        after.setCredentials(request.getCredentials());
-        int rows = service.update(after);
-        if (rows == 0) {
-            throw bidRecordNotFound("UPDATE", "UPDATE_RECORD", id);
-        }
-        return Result.success(new Diff<>(before, after), "更新成功");
+        // credentials 是 credential_file 的派生投影，招标方也不能直接覆盖。
+        BidRecord updated = lifecycleService.update(after);
+        return Result.success(new Diff<>(before, updated), "更新成功");
     }
 
     /**
@@ -87,10 +88,7 @@ public class BidRecordController {
      */
     @DeleteMapping("/bid-record/{id}")
     public Result<Void> deleteBidRecord(@PathVariable Integer id) {
-        int rows = service.delete(id);
-        if (rows == 0) {
-            throw bidRecordNotFound("DELETE", "DELETE_RECORD", id);
-        }
+        lifecycleService.delete(id, null);
         return Result.success(null, "删除成功");
     }
 
@@ -126,7 +124,7 @@ public class BidRecordController {
      */
     @PostMapping("/bid-record/batch-delete")
     public Result<List<BidRecord>> batchDeleteBidRecord(@Valid @RequestBody BatchDeleteRequest request) {
-        List<BidRecord> deleted = service.deleteByIds(request.getIds());
+        List<BidRecord> deleted = lifecycleService.deleteByIds(request.getIds());
         return Result.success(deleted, "批量删除完成");
     }
 

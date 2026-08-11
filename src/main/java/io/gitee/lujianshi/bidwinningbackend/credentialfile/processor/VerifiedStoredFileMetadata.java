@@ -1,6 +1,6 @@
 package io.gitee.lujianshi.bidwinningbackend.credentialfile.processor;
 
-import io.gitee.lujianshi.bidwinningbackend.credentialfile.storage.FileStorage;
+import io.gitee.lujianshi.bidwinningbackend.storage.object.ObjectStorage;
 
 /**
  * 已完成持久化和正文回读校验的文件元数据，可以安全写入 {@code credential_file}。
@@ -36,7 +36,7 @@ public record VerifiedStoredFileMetadata(
 
     /** 从已确认的存储结果中提取可落库的文件元数据。 */
     public static VerifiedStoredFileMetadata extractMetadata(
-            FileStorage.StoredFile storedFile,
+            ObjectStorage.StoredFile storedFile,
             String safeOriginalFilename,
             String sha256) {
         if (storedFile == null) {
