@@ -3,7 +3,7 @@ spring:
     name: bid-winning-backend
   servlet:
     multipart:
-      max-file-size: 150MB
+      max-file-size: 100MB
       max-request-size: 200MB
   thymeleaf:
     prefix: classpath:/templates/
