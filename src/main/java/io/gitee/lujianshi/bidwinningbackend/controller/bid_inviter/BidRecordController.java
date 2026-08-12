@@ -59,7 +59,7 @@ public class BidRecordController {
      * <p>不允许修改 {@code bidNo} / {@code bidAt}（由 Service 在 add 时自动算）。</p>
      *
      * @param id      投标记录 ID
-     * @param request 更新请求（4 字段全可选，credentials 为 Markdown 路径列表）
+     * @param request 更新请求，三个可写字段至少提供一项
      * @return Diff（更新前后对比）
      */
     @PatchMapping("/bid-record/{id}")

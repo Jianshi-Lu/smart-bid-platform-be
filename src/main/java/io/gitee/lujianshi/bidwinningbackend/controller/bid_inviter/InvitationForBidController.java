@@ -102,7 +102,7 @@ public class InvitationForBidController {
      * <p>不支持修改 {@code status}，请使用 {@code POST /invitation-for-bid/status-update}。</p>
      *
      * @param id      公告 ID
-     * @param request 更新请求（16 字段全可选）
+     * @param request 更新请求，至少提供一个可更新字段
      * @return Diff（更新前后对比）
      */
     @PatchMapping("/invitation-for-bid/{id}")

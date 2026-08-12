@@ -1,5 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.invitationforbid;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -56,4 +58,27 @@ public class UpdateRequest {
 
     @Size(max = 100, message = "招标主体长度不能超过100")
     private String tenderingParty;
+
+    @JsonIgnore
+    @AssertTrue(message = "至少提供一个可更新字段")
+    public boolean isUpdatePresent() {
+        return bidHandlerId != null
+                || projectNo != null
+                || purchaseTaskNo != null
+                || platformCategory != null
+                || tenderProcess != null
+                || tenderMethod != null
+                || purchaseMethod != null
+                || isFixedPrice != null
+                || hasDocumentFee != null
+                || deposit != null
+                || creditReportRequired != null
+                || registrationDeadline != null
+                || technicalTenderDeadline != null
+                || businessTenderDeadline != null
+                || notes != null
+                || purchaseCompany != null
+                || purchaseDepartment != null
+                || tenderingParty != null;
+    }
 }

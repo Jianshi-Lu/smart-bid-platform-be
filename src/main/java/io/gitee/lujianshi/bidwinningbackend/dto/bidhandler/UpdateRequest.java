@@ -1,5 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.bidhandler;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -19,4 +21,13 @@ public class UpdateRequest {
     private String departmentName;
 
     private String targetEmail;
+
+    @JsonIgnore
+    @AssertTrue(message = "至少提供一个可更新字段")
+    public boolean isUpdatePresent() {
+        return handlerName != null
+                || companyName != null
+                || departmentName != null
+                || targetEmail != null;
+    }
 }

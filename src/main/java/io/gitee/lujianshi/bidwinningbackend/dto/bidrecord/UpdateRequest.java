@@ -1,5 +1,7 @@
 package io.gitee.lujianshi.bidwinningbackend.dto.bidrecord;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
@@ -26,4 +28,13 @@ public class UpdateRequest {
     private String bidderContact;
 
     private List<String> credentials;
+
+    /** credentials 是只读派生投影，不能单独构成一次有效更新。 */
+    @JsonIgnore
+    @AssertTrue(message = "至少提供一个可更新字段")
+    public boolean isUpdatePresent() {
+        return bidderName != null
+                || quotePrice != null
+                || bidderContact != null;
+    }
 }

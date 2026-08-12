@@ -82,7 +82,7 @@ public class BidHandlerInfoController {
      * 部分更新经办人（PATCH 语义，null 字段不修改）。
      *
      * @param id      经办人 ID
-     * @param request 更新请求（4 字段全可选）
+     * @param request 更新请求（4 字段至少提供一项）
      * @return Diff（更新前后对比）
      */
     @PatchMapping("/bid-handler-info/{id}")
@@ -103,7 +103,8 @@ public class BidHandlerInfoController {
         if (rows == 0) {
             throw bidHandlerNotFound("UPDATE", "UPDATE_RECORD", id);
         }
-        return Result.success(new Diff<>(before, after), "更新成功");
+        return Result.success(
+                new Diff<>(before, service.getById(id)), "更新成功");
     }
 
     /**
