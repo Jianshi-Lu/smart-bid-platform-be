@@ -6,6 +6,7 @@ import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BaseMapper;
 import io.gitee.lujianshi.bidwinningbackend.mapper.BidRecordMapper;
+import io.gitee.lujianshi.bidwinningbackend.mapper.RiskAnalysisMapper;
 import io.gitee.lujianshi.bidwinningbackend.service.OperationHistoryService;
 import io.gitee.lujianshi.bidwinningbackend.service.BaseService;
 import jakarta.annotation.Resource;
@@ -38,6 +39,9 @@ public class BidRecordService extends BaseService<BidRecord> {
 
     @Resource
     private BidRecordMapper mapper;
+
+    @Resource
+    private RiskAnalysisMapper riskAnalysisMapper;
 
     @Resource
     private OperationHistoryService operationHistoryService;
@@ -144,5 +148,18 @@ public class BidRecordService extends BaseService<BidRecord> {
      */
     public List<BidRecord> listByBidderAccountId(Long bidderAccountId) {
         return mapper.selectByBidderAccountId(bidderAccountId);
+    }
+
+    /**
+     * 同一事务内删除投标记录和其非审计性质的风险分析，避免留下无父记录结果。
+     * 操作历史仍由 {@link BaseService#delete} 在事务内保留。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int deleteWithRiskAnalyses(Integer bidRecordId) {
+        int rows = super.delete(bidRecordId);
+        if (rows == 1) {
+            riskAnalysisMapper.deleteByBidRecordId(bidRecordId);
+        }
+        return rows;
     }
 }

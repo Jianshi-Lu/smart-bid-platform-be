@@ -2,6 +2,7 @@ package io.gitee.lujianshi.bidwinningbackend.mapper;
 
 import io.gitee.lujianshi.bidwinningbackend.entity.riskanalysis.RiskAnalysis;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -20,4 +21,7 @@ public interface RiskAnalysisMapper extends BaseMapper<RiskAnalysis, Integer> {
      * @return 历史分析记录列表，无记录时返回空列表
      */
     List<RiskAnalysis> selectByBidRecordId(Integer bidRecordId);
+
+    /** 投标记录生命周期删除时同步清理非审计性质的风险分析结果。 */
+    int deleteByBidRecordId(@Param("bidRecordId") Integer bidRecordId);
 }

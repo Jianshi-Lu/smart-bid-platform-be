@@ -88,7 +88,7 @@ public class BidRecordLifecycleService {
             String username = resolveUsername(existing, knownUsername);
             fileUploadService.deleteAllForBidRecord(bidRecordId, username);
             vectorIndexService.deleteAllMaterials(bidRecordId);
-            if (bidRecordService.delete(bidRecordId) != 1) {
+            if (bidRecordService.deleteWithRiskAnalyses(bidRecordId) != 1) {
                 throw deleteFailure(
                         "DELETE_RECORD",
                         "投标记录删除失败: " + bidRecordId,

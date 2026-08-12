@@ -96,7 +96,7 @@ class BidRecordLifecycleServiceTest {
         when(fixture.bidderAccountMapper().selectById(7L)).thenReturn(account);
         when(fixture.bidRecordMapper().beginDeletion(any(), any(), any()))
                 .thenReturn(1);
-        when(fixture.bidRecordService().delete(13)).thenReturn(1);
+        when(fixture.bidRecordService().deleteWithRiskAnalyses(13)).thenReturn(1);
 
         BidRecord deleted = fixture.lifecycle().delete(13, null);
 
@@ -111,7 +111,7 @@ class BidRecordLifecycleServiceTest {
         order.verify(fixture.fileUploadService())
                 .deleteAllForBidRecord(13, "bidder01");
         order.verify(fixture.vectorIndexService()).deleteAllMaterials(13);
-        order.verify(fixture.bidRecordService()).delete(13);
+        order.verify(fixture.bidRecordService()).deleteWithRiskAnalyses(13);
     }
 
     @Test

@@ -91,4 +91,9 @@
         </foreach>
     </delete>
 
+    <delete id="deleteByBidRecordId">
+        DELETE FROM risk_analysis
+        WHERE bid_record_id = #{bidRecordId}
+    </delete>
+
 </mapper>
