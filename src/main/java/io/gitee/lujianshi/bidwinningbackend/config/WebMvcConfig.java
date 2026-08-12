@@ -26,7 +26,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/risk-analysis/**",
                         "/chat-agent/**",
                         "/knowledge-files/**",
-                        "/credential-files/**")
+                        "/credential-files/**",
+                        "/send-email",
+                        "/send-notification")
                 .excludePathPatterns(
                         "/bid-inviter/auth/**",
                         "/service-status/**",

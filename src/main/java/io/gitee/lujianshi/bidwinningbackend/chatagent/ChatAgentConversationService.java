@@ -6,6 +6,7 @@ import io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatMessage;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.mapper.ChatConversationMapper;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.mapper.ChatMessageMapper;
 import io.gitee.lujianshi.bidwinningbackend.config.ChatAgentProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.CurrentAccountContext;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatMessageResponse;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatRequest;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatResponse;
@@ -417,7 +418,20 @@ public class ChatAgentConversationService {
     }
 
     private Long currentUserId() {
-        return properties.getUserId();
+        CurrentAccountContext.CurrentAccount account =
+                CurrentAccountContext.get();
+        if (account == null
+                || !CurrentAccountContext.BID_INVITER.equals(
+                        account.operatorType())
+                || account.operatorId() == null) {
+            throw new AppException(
+                    AppErrorCode.BID_INVITER_ACCOUNT_UNAUTHORIZED,
+                    "chat-agent",
+                    "CONVERSATION",
+                    "RESOLVE_CURRENT_ACCOUNT",
+                    "请先登录");
+        }
+        return account.operatorId();
     }
 
     private ChatResponse responseOf(PreparedRequest prepared) {

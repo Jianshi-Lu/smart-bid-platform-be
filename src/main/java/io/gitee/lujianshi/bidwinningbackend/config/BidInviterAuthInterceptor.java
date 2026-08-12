@@ -6,7 +6,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
-import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.AsyncHandlerInterceptor;
 
 /**
  * 招标方管理接口统一鉴权拦截器。
@@ -18,7 +18,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * @since V39
  */
 @Component
-public class BidInviterAuthInterceptor implements HandlerInterceptor {
+public class BidInviterAuthInterceptor implements AsyncHandlerInterceptor {
 
     @Resource
     private BidInviterAccountService bidInviterAccountService;
@@ -28,6 +28,8 @@ public class BidInviterAuthInterceptor implements HandlerInterceptor {
             HttpServletRequest request,
             HttpServletResponse response,
             Object handler) {
+        // 容器线程会复用；认证失败前先清除潜在陈旧上下文。
+        CurrentAccountContext.clear();
         BidInviterAccount account = bidInviterAccountService.authenticateBasic(
                 request.getHeader("Authorization"));
         CurrentAccountContext.set(new CurrentAccountContext.CurrentAccount(
@@ -35,6 +37,15 @@ public class BidInviterAuthInterceptor implements HandlerInterceptor {
                 account.getBidInviterAccountId(),
                 account.getUsername()));
         return true;
+    }
+
+    /** SSE/异步 MVC 在原请求线程退出时立即清理，不能等待异步完成回调。 */
+    @Override
+    public void afterConcurrentHandlingStarted(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Object handler) {
+        CurrentAccountContext.clear();
     }
 
     @Override

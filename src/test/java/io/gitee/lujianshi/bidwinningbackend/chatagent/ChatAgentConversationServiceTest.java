@@ -5,12 +5,15 @@ import io.gitee.lujianshi.bidwinningbackend.chatagent.entity.ChatMessage;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.mapper.ChatConversationMapper;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.mapper.ChatMessageMapper;
 import io.gitee.lujianshi.bidwinningbackend.config.ChatAgentProperties;
+import io.gitee.lujianshi.bidwinningbackend.config.CurrentAccountContext;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatRequest;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ChatResponse;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.ConversationResponse;
 import io.gitee.lujianshi.bidwinningbackend.chatagent.dto.CreateConversationRequest;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppErrorCode;
 import io.gitee.lujianshi.bidwinningbackend.exception.AppException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -41,6 +44,17 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 /** 验证阶段 0 的会话 ID 映射、幂等、序号和归属边界。 */
 class ChatAgentConversationServiceTest {
+
+    @BeforeEach
+    void setCurrentAccount() {
+        CurrentAccountContext.set(new CurrentAccountContext.CurrentAccount(
+                CurrentAccountContext.BID_INVITER, 1L, "inviter-1"));
+    }
+
+    @AfterEach
+    void clearCurrentAccount() {
+        CurrentAccountContext.clear();
+    }
 
     @Test
     void shouldMapConversationIdToThreadIdAndReplayIdempotentRequest() {
@@ -136,7 +150,7 @@ class ChatAgentConversationServiceTest {
                 mock(RestClient.class),
                 conversationMapper,
                 mock(ChatMessageMapper.class),
-                properties(1L),
+                properties(2L),
                 transactionManager());
 
         AppException exception = assertThrows(
@@ -165,13 +179,14 @@ class ChatAgentConversationServiceTest {
                 mock(RestClient.class),
                 conversationMapper,
                 mock(ChatMessageMapper.class),
-                properties(1L),
+                properties(999L),
                 transactionManager());
         ConversationResponse response = service.createConversation(
                 new CreateConversationRequest("投标问答"));
 
         assertEquals("投标问答", response.title());
         assertEquals("投标问答", inserted[0].getTitle());
+        assertEquals(1L, inserted[0].getUserId());
     }
 
     @Test
