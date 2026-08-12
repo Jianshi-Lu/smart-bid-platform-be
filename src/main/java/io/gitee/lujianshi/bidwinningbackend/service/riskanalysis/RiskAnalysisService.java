@@ -218,10 +218,6 @@ public class RiskAnalysisService {
 
     /** 执行已经成功抢占分析权后的汇总、模型调用和结果落库流程。 */
     private RiskAnalysis doAnalyzeRisk(Integer bidRecordId, BidRecord record) {
-
-        log.info(">>> [风险分析] 投标人信息 name={} quotePrice={} contact={}",
-                record.getBidderName(), record.getQuotePrice(), record.getBidderContact());
-
         String credentialMaterial = prepareCredentialMaterial(bidRecordId);
         String detailInfo = loader.loadDetail(bidRecordId);
         String userPrompt = USER_PROMPT_TEMPLATE.formatted(
@@ -231,7 +227,11 @@ public class RiskAnalysisService {
                 credentialMaterial,
                 detailInfo);
 
-        log.info(">>> [风险分析] 发送 Prompt:\nsystem=\n{}\nuser=\n{}", SYSTEM_PROMPT, userPrompt);
+        log.info(
+                ">>> [风险分析] 请求模型 bidRecordId={}, systemChars={}, userChars={}",
+                bidRecordId,
+                SYSTEM_PROMPT.length(),
+                userPrompt.length());
 
         long startNs = System.nanoTime();
 
@@ -257,15 +257,22 @@ public class RiskAnalysisService {
 
         LocalDateTime analyzedAt = LocalDateTime.now();
 
-        log.info("<<< [风险分析] AI 响应 (length={}, elapsed={}ms, analyzedAt={}):\n{}",
-                raw != null ? raw.length() : 0, elapsedMs, analyzedAt, raw);
-
         RiskAnalysis analysis = parseAndBuild(bidRecordId, record.getBidderName(), raw, analyzedAt);
+
+        log.info(
+                "<<< [风险分析] 模型响应已校验 bidRecordId={}, outputChars={}, "
+                        + "elapsedMs={}, riskLevel={}, analyzedAt={}",
+                bidRecordId,
+                raw == null ? 0 : raw.length(),
+                elapsedMs,
+                analysis.getRiskLevel(),
+                analyzedAt);
 
         RiskAnalysis saved = self.persistAndComplete(analysis, bidRecordId);
         // self 代理返回时事务已经提交，再刷新外部向量，避免数据库回滚却留下新状态。
         refreshBidRecordIndexSafely(bidRecordId, "COMPLETED");
-        log.info("<<< [风险分析] 落库成功 analysisId={}", saved.getAnalysisId());
+        log.info("<<< [风险分析] 落库成功 bidRecordId={}, analysisId={}",
+                bidRecordId, saved.getAnalysisId());
         return saved;
     }
 
@@ -501,8 +508,6 @@ public class RiskAnalysisService {
                     "风险分析模型返回的风险等级不合法",
                     null);
         }
-
-        log.info(">>> [风险分析] JSON 解析成功 riskLevel={}", riskLevel);
 
         RiskAnalysis a = new RiskAnalysis();
         a.setBidRecordId(bidRecordId);
