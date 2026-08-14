@@ -271,3 +271,40 @@ print_health_summary() {
     fi
   done
 }
+
+# 启动成功后输出统一日志索引和即将执行的实时查看命令。
+print_log_dashboard() {
+  local service pid log_file health_url
+
+  printf '\n'
+  log "服务日志面板"
+  printf '%-16s %-10s %-34s %s\n' "服务" "PID" "健康地址" "日志文件"
+  for service in "$@"; do
+    pid="$(read_service_pid "${service}" 2>/dev/null || printf '%s' '-')"
+    health_url="$(service_health_url "${service}")"
+    log_file="$(service_log_file "${service}")"
+    printf '%-16s %-10s %-34s %s\n' \
+      "${service}" "${pid}" "${health_url}" "${log_file}"
+  done
+
+  printf '\n'
+  log "启动完成后将自动进入实时日志查看（Ctrl+C 仅退出日志查看，不会停止服务）。"
+  printf 'tail -n 100 -F'
+  for service in "$@"; do
+    printf ' %q' "$(service_log_file "${service}")"
+  done
+  printf '\n'
+}
+
+# 复用各服务原有落盘日志，统一输出到当前终端，不改变 nohup 的重定向行为。
+follow_service_logs() {
+  local service
+  local -a log_files=()
+
+  for service in "$@"; do
+    log_files+=("$(service_log_file "${service}")")
+  done
+
+  log "全部服务已启动，开始实时打印服务日志"
+  exec tail -n 100 -F "${log_files[@]}"
+}

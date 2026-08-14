@@ -58,4 +58,5 @@ if ! print_health_summary to-markdown backend vector-service chat-agent frontend
   cleanup_started_services
   exit 1
 fi
-log "全部服务已启动"
+print_log_dashboard to-markdown backend vector-service chat-agent frontend
+follow_service_logs to-markdown backend vector-service chat-agent frontend
