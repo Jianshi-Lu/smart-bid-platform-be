@@ -1,5 +1,5 @@
 -- V53: 为结构化投标记录增加独立向量化状态。
--- 投标记录与 credential_file chunks 共用私有 bid_material_chunks collection，
+-- 投标记录写入私有 bid_record_chunks collection，
 -- 与公共知识 knowledge_file_chunks 完全隔离。
 -- 每个字段独立守卫，允许手工执行中断后从部分迁移状态继续。
 

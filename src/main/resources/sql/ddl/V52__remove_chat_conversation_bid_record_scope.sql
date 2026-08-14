@@ -1,5 +1,5 @@
 -- V52: 撤销 V51 的会话预绑定设计。
--- 投标记录和资信材料统一进入独立的 bid_material_chunks collection，
+-- 投标记录和资信材料分别进入 bid_record_chunks、credential_file_chunks collection，
 -- 招标方可在任意会话中通过动态工具检索，不再把投标范围固化到会话。
 -- information_schema 守卫让手工 DDL 可在已执行或部分执行后安全重放。
 

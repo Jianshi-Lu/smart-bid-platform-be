@@ -1,5 +1,5 @@
 -- V50: 为资信文件增加独立向量化状态。
--- 资信向量写入 vector-service 的 bid_material_chunks 私有 collection，
+-- 资信向量写入 vector-service 的 credential_file_chunks 私有 collection，
 -- 与公共知识 knowledge_file_chunks 完全隔离。
 
 ALTER TABLE credential_file
