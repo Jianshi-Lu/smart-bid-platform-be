@@ -142,7 +142,7 @@ public class BidRecordLifecycleService {
         return account == null ? null : account.getUsername();
     }
 
-    /** 后端最终约束投标窗口，避免绕过前端向草稿、终态或已截止公告投标。 */
+    /** 后端最终按招标公告状态约束投标准入，避免绕过前端向草稿或终态公告投标。 */
     private void requireBiddingOpen(BidRecord record) {
         Integer invitationId = record == null ? null : record.getInvitationId();
         if (invitationId == null) {
@@ -161,13 +161,6 @@ public class BidRecordLifecycleService {
             throw biddingNotOpen(
                     "CHECK_INVITATION_STATUS",
                     "当前招标公告未处于已发布状态，不能提交投标: invitationId="
-                            + invitationId);
-        }
-        LocalDateTime deadline = invitation.getBusinessTenderDeadline();
-        if (deadline != null && !LocalDateTime.now().isBefore(deadline)) {
-            throw biddingNotOpen(
-                    "CHECK_BUSINESS_DEADLINE",
-                    "商务投标已截止，不能继续提交投标: invitationId="
                             + invitationId);
         }
     }

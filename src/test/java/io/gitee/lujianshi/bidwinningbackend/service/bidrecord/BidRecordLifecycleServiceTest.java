@@ -67,22 +67,25 @@ class BidRecordLifecycleServiceTest {
     }
 
     @Test
-    void shouldRejectBidWhenBusinessDeadlineHasPassed() {
+    void shouldCreateBidWhenPublishedEvenIfBusinessDeadlineHasPassed() {
         Fixture fixture = fixture();
         BidRecord input = new BidRecord();
         input.setInvitationId(3);
         when(fixture.invitationForBidService().getById(3)).thenReturn(invitation(
                 BidNoticeStatus.PUBLISHED,
                 LocalDateTime.now().minusMinutes(1)));
+        BidRecord indexed = record(14, 7L);
+        when(fixture.bidRecordService().add(input)).thenAnswer(invocation -> {
+            input.setBidRecordId(14);
+            return 1;
+        });
+        when(fixture.vectorIndexService().reindex(14)).thenReturn(indexed);
 
-        AppException failure = assertThrows(
-                AppException.class,
-                () -> fixture.lifecycle().create(input));
+        BidRecord result = fixture.lifecycle().create(input);
 
-        assertEquals(AppErrorCode.BID_RECORD_BIDDING_NOT_OPEN,
-                failure.getErrorCode());
-        assertEquals("CHECK_BUSINESS_DEADLINE", failure.getStage());
-        verifyNoInteractions(fixture.bidRecordService(), fixture.vectorIndexService());
+        assertEquals(indexed, result);
+        verify(fixture.bidRecordService()).add(input);
+        verify(fixture.vectorIndexService()).reindex(14);
     }
 
     @Test
